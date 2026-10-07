@@ -17,9 +17,11 @@ const LOGOS = {
 export function BrandLogo({
   variant = "color",
   className,
+  priority = false,
 }: {
   variant?: keyof typeof LOGOS;
   className?: string;
+  priority?: boolean;
 }) {
   const logo = LOGOS[variant];
 
@@ -29,7 +31,8 @@ export function BrandLogo({
       alt="Bank NTT"
       width={logo.width}
       height={logo.height}
-      className={cn("h-16 w-auto", className)}
+      priority={priority}
+      className={cn("w-auto", className ?? "h-16")}
     />
   );
 }

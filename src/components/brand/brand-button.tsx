@@ -18,6 +18,8 @@ type BrandButtonProps = {
   className?: string;
   href?: string;
   type?: "button" | "submit";
+  disabled?: boolean;
+  onClick?: () => void;
 };
 
 export function BrandButton({
@@ -27,9 +29,11 @@ export function BrandButton({
   className,
   href,
   type = "button",
+  disabled = false,
+  onClick,
 }: BrandButtonProps) {
   const classes = cn(
-    "inline-flex items-center justify-center rounded-[var(--radius-card)] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-sky",
+    "inline-flex items-center justify-center rounded-[var(--radius-card)] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-sky disabled:pointer-events-none disabled:opacity-60",
     variants[variant],
     sizes[size],
     className,
@@ -44,7 +48,7 @@ export function BrandButton({
   }
 
   return (
-    <button type={type} className={classes}>
+    <button type={type} className={classes} disabled={disabled} onClick={onClick}>
       {children}
     </button>
   );
