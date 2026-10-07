@@ -1,0 +1,151 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TicketStatus {
+  WAITING
+  SERVING
+  DONE
+  NO_SHOW
+  EXPIRED
+
+  @@map("ticket_status")
+}
+
+enum CounterStatus {
+  CLOSED
+  OPEN
+  PAUSED
+
+  @@map("counter_status")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+
+  @@map("user_role")
+}
+
+model Service {
+  id        Int     @id @default(autoincrement())
+  name      String
+  prefix    String  @unique @db.VarChar(2)
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  counterServices CounterService[]
+  dailySequences  DailySequence[]
+  tickets         Ticket[]
+
+  @@map("services")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(STAFF)
+  isActive     Boolean  @default(true) @map("is_active")
+
+  currentCounters Counter[]     @relation("CounterCurrentUser")
+  servedTickets   Ticket[]      @relation("TicketServedBy")
+  ticketEvents    TicketEvent[]
+
+  @@map("users")
+}
+
+model Counter {
+  id             Int           @id @default(autoincrement())
+  name           String
+  displayNumber  Int           @map("display_number")
+  status         CounterStatus @default(CLOSED)
+  currentUserId  Int?          @map("current_user_id")
+  isActive       Boolean       @default(true) @map("is_active")
+
+  currentUser     User?           @relation("CounterCurrentUser", fields: [currentUserId], references: [id], onDelete: Restrict)
+  counterServices CounterService[]
+  tickets         Ticket[]
+  ticketEvents    TicketEvent[]
+
+  @@map("counters")
+}
+
+model CounterService {
+  counterId Int @map("counter_id")
+  serviceId Int @map("service_id")
+
+  counter Counter @relation(fields: [counterId], references: [id], onDelete: Restrict)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@id([counterId, serviceId])
+  @@map("counter_services")
+}
+
+model DailySequence {
+  serviceId   Int      @map("service_id")
+  serviceDate DateTime @map("service_date") @db.Date
+  lastNumber  Int      @map("last_number")
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@id([serviceId, serviceDate])
+  @@map("daily_sequences")
+}
+
+model Ticket {
+  id          BigInt       @id @default(autoincrement())
+  requestId   String       @unique @map("request_id") @db.Uuid
+  serviceId   Int          @map("service_id")
+  serviceDate DateTime     @map("service_date") @db.Date
+  seq         Int
+  number      String
+  status      TicketStatus @default(WAITING)
+  counterId   Int?         @map("counter_id")
+  servedById  Int?         @map("served_by")
+  callCount   Int          @default(0) @map("call_count")
+  autoClosed  Boolean      @default(false) @map("auto_closed")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  calledAt    DateTime?    @map("called_at") @db.Timestamptz(6)
+  finishedAt  DateTime?    @map("finished_at") @db.Timestamptz(6)
+
+  service      Service       @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  counter      Counter?      @relation(fields: [counterId], references: [id], onDelete: Restrict)
+  servedBy     User?         @relation("TicketServedBy", fields: [servedById], references: [id], onDelete: Restrict)
+  ticketEvents TicketEvent[]
+
+  @@unique([serviceId, serviceDate, seq])
+  @@index([serviceDate, serviceId, createdAt, id], map: "tickets_waiting_idx", where: raw("status = 'WAITING'"))
+  @@unique([counterId], map: "tickets_one_active_per_counter", where: raw("status = 'SERVING'"))
+  @@index([serviceDate, status], map: "tickets_report_idx")
+  @@map("tickets")
+}
+
+model TicketEvent {
+  id        BigInt   @id @default(autoincrement())
+  ticketId  BigInt   @map("ticket_id")
+  type      String
+  counterId Int?     @map("counter_id")
+  userId    Int?     @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket  Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  counter Counter? @relation(fields: [counterId], references: [id], onDelete: Restrict)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("ticket_events")
+}
+
+model Setting {
+  key   String @id
+  value Json
+
+  @@map("settings")
+}
