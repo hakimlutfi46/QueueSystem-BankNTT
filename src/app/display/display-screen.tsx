@@ -80,7 +80,7 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
   return (
     <main className="relative flex h-dvh flex-col overflow-hidden bg-brand-deep text-brand-white">
       <header className="flex items-center gap-6 px-8 py-4">
-        <BrandLogo variant="onBlue" priority className="h-16" />
+        <BrandLogo variant="color" priority className="h-20" />
         <div className="min-w-0">
           <p className="truncate text-3xl font-bold">{state.settings.branchName}</p>
           <p className="text-lg font-bold">melayani lebih sungguh</p>
