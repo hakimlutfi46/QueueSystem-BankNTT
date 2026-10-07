@@ -1,0 +1,16 @@
+:root {
+  --brand-navy: #004ea2;
+  --brand-blue: #0075c2;
+  --brand-sky: #0097e0;
+  --brand-orange: #f08300;
+  --brand-grey: #898989;
+  --brand-white: #ffffff;
+  --brand-deep: #00088f;
+  --ink: #1a2433;
+  --ink-muted: #5b6470;
+  --surface: #f4f6f9;
+  --success: #147a3a;
+  --danger: #c62828;
+  --radius-card: 16px;
+  --font-brand: Arial, Helvetica, sans-serif;
+}
