@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
+import { kioskEntry } from "./device";
 
 test.describe.configure({ mode: "serial" });
 
@@ -17,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 
 test("one touch issues one ticket and prints it once", async ({ page }) => {
   const before = await ticketCount();
-  await page.goto("/kiosk");
+  await page.goto(kioskEntry());
   const button = page.getByRole("button", { name: /Customer Service/ });
   await expect(button).toBeVisible();
 
@@ -42,7 +43,7 @@ test("one touch issues one ticket and prints it once", async ({ page }) => {
 test("a failed request does not print a ticket", async ({ page }) => {
   const before = await ticketCount();
   await page.route("**/api/tickets", (route) => route.abort());
-  await page.goto("/kiosk");
+  await page.goto(kioskEntry());
   const button = page.getByRole("button", { name: /Teller/ });
   await expect(button).toBeVisible();
   await button.evaluate((element) => {

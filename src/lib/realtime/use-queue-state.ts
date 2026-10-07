@@ -20,7 +20,7 @@ export function subscribeQueueEvents(listener: (event: QueueEvent) => void): () 
 async function fetchQueueState(): Promise<QueueState> {
   const response = await fetch("/api/queue/state", { cache: "no-store" });
   if (!response.ok) {
-    throw new Error("Could not load the queue.");
+    throw new Error("Antrian gagal dimuat.");
   }
   return (await response.json()) as QueueState;
 }

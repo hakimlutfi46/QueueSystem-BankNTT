@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { closeCounter, openCounter, pauseCounter } from "@/lib/queue/desk";
 import { QueueError, callNext, finishTicket, markNoShow, recallTicket } from "@/lib/queue";
+import { ensureDayClosed } from "@/lib/queue/day-close";
 import type { QueueTicket } from "@/lib/queue/types";
 
 const actions = ["open", "pause", "close", "next", "recall", "finish", "no-show"] as const;
@@ -35,6 +36,7 @@ export async function handleCounterAction(
 
   const id = Number(counterId.data);
   try {
+    await ensureDayClosed(db);
     if (action.data === "open") {
       return Response.json({ counter: await openCounter(db, { counterId: id, userId }) });
     }

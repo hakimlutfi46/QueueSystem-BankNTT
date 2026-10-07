@@ -2,6 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
+import { ticketEndpoint } from "./device";
 
 test.describe.configure({ mode: "serial" });
 
@@ -17,7 +18,7 @@ test.beforeAll(async () => {
 test("two officers call different numbers", async ({ browser }) => {
   const serviceId = await serviceA();
   for (let index = 0; index < 4; index += 1) {
-    const response = await fetch(`${baseUrl()}/api/tickets`, {
+    const response = await fetch(ticketEndpoint(baseUrl()), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ serviceId, requestId: randomUUID() }),

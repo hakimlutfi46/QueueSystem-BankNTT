@@ -2,6 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
+import { displayEntry, ticketEndpoint } from "./device";
 
 test.describe.configure({ mode: "serial" });
 
@@ -17,7 +18,7 @@ test.beforeAll(async () => {
 test("a counter call shows on the TV and two close calls are spoken in order", async ({ browser }) => {
   const serviceId = await serviceA();
   for (let index = 0; index < 2; index += 1) {
-    const response = await fetch("http://127.0.0.1:3000/api/tickets", {
+    const response = await fetch(ticketEndpoint(), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ serviceId, requestId: randomUUID() }),
@@ -39,7 +40,7 @@ test("a counter call shows on the TV and two close calls are spoken in order", a
     };
   });
 
-  await display.goto("/display");
+  await display.goto(displayEntry());
   await display.getByRole("button", { name: "Aktifkan suara" }).click();
   await login(officer, "petugas.cs");
   await officer.getByRole("button", { name: "Buka CS 1" }).click();

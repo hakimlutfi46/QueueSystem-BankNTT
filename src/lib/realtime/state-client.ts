@@ -61,7 +61,7 @@ export function createQueueStateController(options: {
       if (token !== generation) return;
       emit({
         ...snapshot,
-        error: error instanceof Error ? error.message : "Could not load the queue.",
+        error: error instanceof Error ? error.message : "Antrian gagal dimuat.",
       });
     }
   }

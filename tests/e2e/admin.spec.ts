@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { expect, test, type Page } from "@playwright/test";
+import { displayEntry } from "./device";
 import { Client } from "pg";
 
 test.describe.configure({ mode: "serial" });
@@ -22,7 +23,7 @@ test("a new counter appears on the officer screen and the TV without a reload", 
   const officer = await officerContext.newPage();
   const admin = await adminContext.newPage();
 
-  await display.goto("/display");
+  await display.goto(displayEntry());
   await login(officer, "petugas.cs");
   await expect(officer.getByRole("heading", { name: "Pilih loket" })).toBeVisible();
   await login(admin, "admin");

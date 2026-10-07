@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { QueueError, issueTicket } from "@/lib/queue";
+import { ensureDayClosed } from "@/lib/queue/day-close";
 
 const issueTicketBody = z.object({
   serviceId: z.number().int().positive(),
@@ -22,6 +23,7 @@ export async function issueTicketResponse(db: PrismaClient, body: unknown): Prom
   }
 
   try {
+    await ensureDayClosed(db);
     const issued = await issueTicket(db, parsed.data);
     return Response.json({
       ticket: {
