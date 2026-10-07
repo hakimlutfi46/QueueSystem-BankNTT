@@ -31,7 +31,7 @@ test("a new counter appears on the officer screen and the TV without a reload", 
   await admin.getByLabel("Nomor tampil").fill("9");
   await admin.getByRole("checkbox", { name: "Customer Service" }).check();
   await admin.getByRole("button", { name: "Simpan loket" }).click();
-  await expect(admin.getByText("CS Khusus")).toBeVisible();
+  await expect(admin.getByText("CS Khusus").first()).toBeVisible();
 
   const openButton = officer.getByRole("button", { name: "Buka CS Khusus" });
   await expect(openButton).toBeVisible({ timeout: 8_000 });
