@@ -25,6 +25,7 @@ export type QueueCounterState = {
   name: string;
   displayNumber: number;
   status: "CLOSED" | "OPEN" | "PAUSED";
+  officerId: number | null;
   officerName: string | null;
   serviceIds: number[];
   activeTicket: QueueActiveTicket | null;

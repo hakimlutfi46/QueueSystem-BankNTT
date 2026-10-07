@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { appTimezone } from "@/lib/env";
 import { QueueError } from "@/lib/queue/errors";
 import type { QueueTicket, TicketStatus } from "@/lib/queue/types";
@@ -186,6 +187,25 @@ export async function recordEvent(
     ticketId: event.ticketId.toString(),
     counterId: event.counterId ?? null,
     serviceId: event.serviceId,
+  });
+  await db.$queryRaw`SELECT pg_notify('queue_events', ${payload})::text AS notified`;
+}
+
+export async function notifyQueue(
+  db: Sql,
+  event: {
+    type: string;
+    ticketId?: string | null;
+    counterId?: number | null;
+    serviceId?: number | null;
+  },
+): Promise<void> {
+  const payload = JSON.stringify({
+    id: randomUUID(),
+    type: event.type,
+    ticketId: event.ticketId ?? null,
+    counterId: event.counterId ?? null,
+    serviceId: event.serviceId ?? null,
   });
   await db.$queryRaw`SELECT pg_notify('queue_events', ${payload})::text AS notified`;
 }

@@ -1,5 +1,13 @@
 # Keputusan
 
+## 2026-10-08 — Perubahan status loket
+
+`COUNTER_CHANGED` hanya dikirim lewat `pg_notify`. Tabel `ticket_events` tetap untuk kejadian tiket, karena buka, istirahat, dan tutup loket tidak punya tiket.
+
+## 2026-10-08 — Auth.js versi 5
+
+Plan memakai Auth.js dengan login nama pengguna dan kata sandi. Rilis stabil `next-auth` 4 tidak memakai App Router. Yang dipasang adalah Auth.js 5 (`next-auth@5.0.0-beta.32`), karena versi itu yang mendukung sesi di App Router dan Next.js 16. Sesi disimpan di cookie JWT, tanpa tabel sesi baru.
+
 ## 2026-10-08 — Notifikasi tiket kedaluwarsa
 
 Daftar event realtime di plan belum menyebut tiket `EXPIRED`. Tutup hari tetap menulis jejak `EXPIRED` dan mengirim `pg_notify` bertipe `TICKET_EXPIRED`, supaya layar nanti bisa memuat ulang dari sinyal yang sama dengan event antrian lain.

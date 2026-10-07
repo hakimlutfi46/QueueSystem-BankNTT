@@ -4,6 +4,10 @@ export default function Home() {
       <h1>Sistem Antrian</h1>
       <p>Aplikasi cabang siap dijalankan.</p>
       <p>
+        <a className="font-bold text-brand-blue" href="/counter">
+          Loket petugas
+        </a>
+        {" · "}
         <a className="font-bold text-brand-blue" href="/kiosk">
           Kiosk tiket
         </a>
