@@ -10,6 +10,9 @@ export type QueueEvent = {
   ticketId: string | null;
   counterId: number | null;
   serviceId: number | null;
+  ticketNumber?: string | null;
+  counterName?: string | null;
+  displayNumber?: number | null;
 };
 
 export type QueueActiveTicket = {
@@ -81,6 +84,9 @@ export function parseQueueEvent(payload: string | undefined): QueueEvent | null 
       ticketId: record.ticketId == null ? null : String(record.ticketId),
       counterId: typeof record.counterId === "number" ? record.counterId : null,
       serviceId: typeof record.serviceId === "number" ? record.serviceId : null,
+      ticketNumber: typeof record.ticketNumber === "string" ? record.ticketNumber : null,
+      counterName: typeof record.counterName === "string" ? record.counterName : null,
+      displayNumber: typeof record.displayNumber === "number" ? record.displayNumber : null,
     };
   } catch {
     return null;

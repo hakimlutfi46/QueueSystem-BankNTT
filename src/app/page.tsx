@@ -8,6 +8,10 @@ export default function Home() {
           Loket petugas
         </a>
         {" · "}
+        <a className="font-bold text-brand-blue" href="/display">
+          Layar TV
+        </a>
+        {" · "}
         <a className="font-bold text-brand-blue" href="/kiosk">
           Kiosk tiket
         </a>

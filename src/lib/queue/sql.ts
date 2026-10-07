@@ -181,14 +181,37 @@ export async function recordEvent(
     )
     RETURNING id::text AS id
   `;
+  const spoken = await spokenCall(db, event);
   const payload = JSON.stringify({
     id: rows[0]?.id,
     type: event.notifyType,
     ticketId: event.ticketId.toString(),
     counterId: event.counterId ?? null,
     serviceId: event.serviceId,
+    ...spoken,
   });
   await db.$queryRaw`SELECT pg_notify('queue_events', ${payload})::text AS notified`;
+}
+
+async function spokenCall(
+  db: Sql,
+  event: { notifyType: string; ticketId: bigint },
+): Promise<{ ticketNumber: string | null; counterName: string | null; displayNumber: number | null } | undefined> {
+  if (event.notifyType !== "TICKET_CALLED" && event.notifyType !== "TICKET_RECALLED") return undefined;
+  const rows = await db.$queryRaw<
+    { number: string; counter_name: string | null; display_number: number | null }[]
+  >`
+    SELECT ticket.number, counter.name AS counter_name, counter.display_number
+    FROM tickets AS ticket
+    LEFT JOIN counters AS counter ON counter.id = ticket.counter_id
+    WHERE ticket.id = ${event.ticketId.toString()}::bigint
+  `;
+  const row = rows[0];
+  return {
+    ticketNumber: row?.number ?? null,
+    counterName: row?.counter_name ?? null,
+    displayNumber: row?.display_number ?? null,
+  };
 }
 
 export async function notifyQueue(

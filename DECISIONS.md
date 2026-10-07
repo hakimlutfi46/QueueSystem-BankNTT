@@ -1,5 +1,9 @@
 # Keputusan
 
+## 2026-10-08 — Isi pengumuman di sinyal panggilan
+
+Payload `pg_notify` untuk `TICKET_CALLED` dan `TICKET_RECALLED` juga memuat nomor tiket, nama loket, dan nomor tampil. Dua panggilan yang datang berdekatan tetap bisa dibacakan berurutan, meskipun layar hanya menyimpan satu panggilan terakhir.
+
 ## 2026-10-08 — Perubahan status loket
 
 `COUNTER_CHANGED` hanya dikirim lewat `pg_notify`. Tabel `ticket_events` tetap untuk kejadian tiket, karena buka, istirahat, dan tutup loket tidak punya tiket.

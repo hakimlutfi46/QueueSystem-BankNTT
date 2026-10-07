@@ -40,6 +40,9 @@ describe("queue events", () => {
       ticketId: "9",
       counterId: 2,
       serviceId: 1,
+      ticketNumber: null,
+      counterName: null,
+      displayNumber: null,
     });
     expect(parseQueueEvent("not-json")).toBeNull();
     expect(parseQueueEvent(JSON.stringify({ ticketId: "1" }))).toBeNull();

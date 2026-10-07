@@ -25,3 +25,30 @@ body {
   color: var(--ink);
   font-family: var(--font-brand);
 }
+
+@keyframes call-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.animate-call-blink {
+  animation: call-blink 0.5s ease-in-out 3;
+}
+
+@keyframes running-text {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-running-text {
+  animation: running-text 24s linear infinite;
+}
