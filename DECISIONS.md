@@ -1,5 +1,9 @@
 # Keputusan
 
+## 2026-10-08 — Notifikasi tiket kedaluwarsa
+
+Daftar event realtime di plan belum menyebut tiket `EXPIRED`. Tutup hari tetap menulis jejak `EXPIRED` dan mengirim `pg_notify` bertipe `TICKET_EXPIRED`, supaya layar nanti bisa memuat ulang dari sinyal yang sama dengan event antrian lain.
+
 ## 2026-10-07 — Cache Components Next.js dimatikan
 
 Template Next.js 16 menyalakan `cacheComponents`. Mode itu menolak `export const runtime` dan `export const dynamic` di route handler.

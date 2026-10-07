@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],
+    // Queue tests share one Postgres database, so files and cases stay serial.
+    fileParallelism: false,
+    sequence: { concurrent: false },
   },
   resolve: {
     alias: {
