@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BrandButton } from "@/components/brand/brand-button";
 import { BrandHeader } from "@/components/brand/brand-header";
 import { useBranding } from "@/components/brand/branding-provider";
@@ -8,6 +8,8 @@ import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { QueueNumber } from "@/components/brand/queue-number";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
+import { kioskGrid, MIN_BUTTON_HEIGHT } from "@/lib/kiosk/layout";
+import { useFitText } from "@/lib/use-fit-text";
 import type { TicketOutput } from "@/lib/print/output";
 import { downloadTicketPdf, printTicket } from "@/lib/print/print-ticket";
 import { newRequestId } from "@/lib/request-id";
@@ -22,15 +24,6 @@ type IssuedTicketView = {
   serviceName: string;
   aheadCount: number;
 };
-
-/** Jumlah kolom menyesuaikan jumlah layanan supaya tombol tetap besar dan tidak perlu digulir. */
-function gridFor(count: number): { grid: string; compact: boolean } {
-  if (count <= 1) return { grid: "mx-auto w-full max-w-3xl grid-cols-1", compact: false };
-  if (count === 2) return { grid: "grid-cols-1 md:grid-cols-2", compact: false };
-  if (count === 3) return { grid: "grid-cols-1 md:grid-cols-3", compact: false };
-  if (count === 4) return { grid: "grid-cols-1 md:grid-cols-2", compact: false };
-  return { grid: "grid-cols-2 lg:grid-cols-3", compact: true };
-}
 
 export function KioskScreen({ timeZone, output }: { timeZone: string; output: TicketOutput }) {
   const { state, error } = useQueueState();
@@ -87,12 +80,11 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
   const { orgName } = useBranding();
   const branchName = state?.settings.branchName || orgName;
   const services = state?.services ?? [];
-  const layout = gridFor(services.length);
 
   return (
     <div className="flex h-dvh select-none flex-col overflow-hidden bg-brand-white">
       <BrandHeader branchName={branchName} trailing={<KioskClock timeZone={timeZone} />} />
-      <main className="relative flex min-h-0 flex-1 flex-col px-6 py-8 lg:px-12">
+      <main className="relative flex min-h-0 flex-1 flex-col px-[clamp(16px,3vw,48px)] py-[clamp(12px,3vh,32px)]">
         {issued ? (
           <section
             className="flex flex-1 flex-col items-center justify-center text-center"
@@ -153,19 +145,19 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
 
         {!issued && !unavailable && state ? (
           <>
-            <div className="mb-8 text-center">
-              <h1 className="text-[40px] font-bold leading-tight text-brand-navy lg:text-5xl">Silakan pilih layanan</h1>
-              <p className="mt-2 flex items-center justify-center gap-2 text-2xl text-ink-muted">
-                <Icon name="touch" className="size-7" />
+            <div className="mb-[clamp(12px,3vh,32px)] shrink-0 text-center">
+              <h1 className="text-[clamp(28px,5vh,48px)] font-bold leading-tight text-brand-navy">Silakan pilih layanan</h1>
+              <p className="mt-1 flex items-center justify-center gap-2 text-[clamp(16px,2.6vh,24px)] text-ink-muted [@media(max-height:640px)]:hidden">
+                <Icon name="touch" className="size-[1.2em]" />
                 Sentuh salah satu tombol untuk mengambil nomor antrian
               </p>
             </div>
             {services.length === 0 ? (
               <p className="m-auto text-[40px] font-bold text-brand-navy">Layanan belum dibuka</p>
             ) : (
-              <ul className={cn("grid min-h-0 flex-1 content-center gap-6", layout.grid)}>
+              <ServiceGrid count={services.length}>
                 {services.map((service) => (
-                  <li key={service.id}>
+                  <li key={service.id} className="min-h-0">
                     <button
                       type="button"
                       disabled={busy != null}
@@ -173,43 +165,82 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
                         void chooseService(service.id, service.name);
                       }}
                       className={cn(
-                        "group flex w-full items-center gap-6 rounded-[var(--radius-card)] bg-brand-navy px-8 text-left text-brand-white shadow-card transition-[background-color,transform,box-shadow] duration-150 hover:bg-brand-blue focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand-sky active:scale-[0.98] active:shadow-glow disabled:opacity-60",
-                        layout.compact ? "min-h-40 py-6" : "min-h-52 py-8",
+                        "group flex h-full w-full items-center [container-type:size] gap-[clamp(12px,5cqw,28px)] rounded-[var(--radius-card)] bg-brand-navy px-[clamp(14px,5cqw,32px)] text-left text-brand-white shadow-card transition-[background-color,transform,box-shadow] duration-150 hover:bg-brand-blue focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand-sky active:scale-[0.98] active:shadow-glow disabled:opacity-60",
                         busy === service.id ? "shadow-glow" : null,
                       )}
                     >
-                      <span
-                        className={cn(
-                          "flex shrink-0 items-center justify-center rounded-2xl bg-brand-white font-bold text-brand-navy",
-                          layout.compact ? "size-20 text-5xl" : "size-28 text-6xl",
-                        )}
-                        aria-hidden="true"
-                      >
-                        {service.prefix}
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col gap-2">
-                        <span className={cn("font-bold leading-tight", layout.compact ? "text-[32px]" : "text-[40px]")}>
-                          {service.name}
-                        </span>
-                        <span className="flex items-center gap-2 text-2xl">
-                          <Icon name="users" className="size-6" />
-                          {service.waitingCount === 0 ? "Tidak ada antrian" : `${service.waitingCount} menunggu`}
-                        </span>
-                      </span>
+                      <ServiceLabel name={service.name} waitingCount={service.waitingCount} />
                       {busy === service.id ? (
-                        <span className="size-10 shrink-0 animate-spin rounded-full border-4 border-brand-white/30 border-t-brand-white" aria-hidden="true" />
+                        <span className="size-[min(22cqh,9cqw)] shrink-0 animate-spin rounded-full border-4 border-brand-white/30 border-t-brand-white" aria-hidden="true" />
                       ) : (
-                        <Icon name="arrowRight" className="size-10 shrink-0 transition-transform group-hover:translate-x-1" />
+                        <Icon name="arrowRight" className="size-[min(22cqh,9cqw)] shrink-0 transition-transform group-hover:translate-x-1 @max-[340px]:hidden" />
                       )}
                     </button>
                   </li>
                 ))}
-              </ul>
+              </ServiceGrid>
             )}
           </>
         ) : null}
       </main>
       <DiagonalStripes />
+    </div>
+  );
+}
+
+const GRID_GAP = 20;
+
+/**
+ * Nama layanan dan jumlah menunggu. Ukuran huruf dikecilkan otomatis sampai semuanya muat di tombol,
+ * jadi nama panjang seperti "Kartu ATM & Mobile Banking" tidak pernah terpotong.
+ */
+function ServiceLabel({ name, waitingCount }: { name: string; waitingCount: number }) {
+  const ref = useFitText<HTMLSpanElement>(44, 14, [name, waitingCount]);
+  return (
+    <span ref={ref} className="flex h-full min-w-0 flex-1 flex-col justify-center gap-[0.2em] overflow-hidden py-[6cqh]">
+      <span className="font-bold leading-tight [overflow-wrap:break-word]">{name}</span>
+      <span className="flex items-center gap-2 text-[0.6em] opacity-90">
+        <Icon name="users" className="size-[1.1em] shrink-0" />
+        {waitingCount === 0 ? "Tanpa antrian" : `${waitingCount} menunggu`}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Grid tombol layanan yang mengisi sisa layar. Jumlah kolom dan baris dihitung dari ukuran ruang dan
+ * jumlah layanan, jadi semua tombol sama besar dan muat tanpa digulir; bila layanan terlalu banyak untuk
+ * ukuran jari, grid beralih ke gulir dengan tinggi tombol minimal.
+ */
+function ServiceGrid({ count, children }: { count: number; children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const grid = size ? kioskGrid(count, size.width, size.height, GRID_GAP) : { columns: 2, rows: Math.ceil(count / 2), scroll: false };
+  return (
+    <div ref={box} className={cn("min-h-0 flex-1", grid.scroll ? "overflow-y-auto" : "overflow-hidden")}>
+      <ul
+        className={cn("grid", grid.scroll ? null : "h-full")}
+        style={{
+          gap: GRID_GAP,
+          gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
+          gridTemplateRows: grid.scroll ? `repeat(${grid.rows}, ${MIN_BUTTON_HEIGHT + 24}px)` : `repeat(${grid.rows}, minmax(0, 1fr))`,
+          visibility: size ? "visible" : "hidden",
+        }}
+      >
+        {children}
+      </ul>
     </div>
   );
 }
