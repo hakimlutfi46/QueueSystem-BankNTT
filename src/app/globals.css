@@ -14,6 +14,14 @@
   --color-surface: var(--surface);
   --color-success: var(--success);
   --color-danger: var(--danger);
+  --color-navy-soft: var(--navy-soft);
+  --color-sky-soft: var(--sky-soft);
+  --color-orange-soft: var(--orange-soft);
+  --color-success-soft: var(--success-soft);
+  --color-danger-soft: var(--danger-soft);
+  --color-line: var(--line);
+  --shadow-card: var(--shadow-card);
+  --shadow-glow: var(--shadow-glow);
   --font-sans: var(--font-brand);
   --radius-card: var(--radius-card);
 }
@@ -24,6 +32,81 @@ body {
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-brand);
+}
+
+::selection {
+  background: var(--sky-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-sky);
+  outline-offset: 2px;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.28s ease-out both;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.animate-countdown {
+  transform-origin: left;
+  animation: countdown var(--countdown-ms, 4000ms) linear both;
+}
+
+@keyframes live-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, currentColor 0%, transparent);
+  }
+}
+
+.animate-live-dot {
+  animation: live-dot 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-pop-in,
+  .animate-live-dot {
+    animation: none;
+  }
 }
 
 @keyframes call-blink {

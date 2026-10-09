@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { AdminError } from "@/lib/admin/errors";
-import { createCounter } from "@/lib/admin/counters";
+import { createCounter, createCounters, updateCounter } from "@/lib/admin/counters";
 import { createService } from "@/lib/admin/services";
 import { readSettings, saveSettings } from "@/lib/admin/settings";
 import { loadDaySummary } from "@/lib/admin/summary";
@@ -51,6 +51,36 @@ describe("admin records", () => {
       serviceIds: [service.id],
     });
     expect(counter).toMatchObject({ name: "CS Khusus", displayNumber: 9, isActive: true, serviceIds: [service.id] });
+  });
+
+  it("adds several counters in one step and keeps active names unique", async () => {
+    const teller = await createService(prisma, { name: "Teller", prefix: "B", sortOrder: 2 });
+    const created = await createCounters(prisma, {
+      items: [3, 4, 5].map((number) => ({ name: `Teller ${number}`, displayNumber: number, serviceIds: [teller.id] })),
+    });
+    expect(created.map((counter) => counter.name)).toEqual(["Teller 3", "Teller 4", "Teller 5"]);
+    expect(created.every((counter) => counter.serviceIds.join() === String(teller.id))).toBe(true);
+
+    await expect(
+      createCounter(prisma, { name: "teller 4", displayNumber: 4, serviceIds: [teller.id] }),
+    ).rejects.toMatchObject({ code: "NAME_TAKEN" });
+
+    const failed = createCounters(prisma, {
+      items: [
+        { name: "Teller 6", displayNumber: 6, serviceIds: [teller.id] },
+        { name: "Teller 5", displayNumber: 5, serviceIds: [teller.id] },
+      ],
+    });
+    await expect(failed).rejects.toMatchObject({ code: "NAME_TAKEN" });
+    const rows = await prisma.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM counters`;
+    expect(rows[0]?.count).toBe(3);
+
+    const fourth = created[1];
+    if (!fourth) throw new Error("missing counter");
+    await updateCounter(prisma, fourth.id, { isActive: false });
+    const again = await createCounter(prisma, { name: "Teller 4", displayNumber: 4, serviceIds: [teller.id] });
+    expect(again.isActive).toBe(true);
+    await expect(updateCounter(prisma, fourth.id, { isActive: true })).rejects.toMatchObject({ code: "NAME_TAKEN" });
   });
 
   it("summarizes today's tickets from their timestamps", async () => {

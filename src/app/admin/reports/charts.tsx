@@ -12,11 +12,11 @@ export function HourChart({ hours }: { hours: HourBucket[] }) {
     <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
-          <CartesianGrid stroke="var(--brand-grey)" strokeOpacity={0.35} />
-          <XAxis dataKey="jam" />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Bar dataKey="jumlah" name="Jumlah tiket" fill="var(--brand-navy)" />
+          <CartesianGrid stroke="var(--brand-grey)" strokeOpacity={0.25} vertical={false} />
+          <XAxis dataKey="jam" tickLine={false} axisLine={false} />
+          <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} />
+          <Tooltip cursor={{ fill: "var(--navy-soft)" }} />
+          <Bar dataKey="jumlah" name="Jumlah tiket" fill="var(--brand-navy)" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -33,10 +33,10 @@ export function RangeChart({ days }: { days: RangeDay[] }) {
     <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
-          <CartesianGrid stroke="var(--brand-grey)" strokeOpacity={0.35} />
-          <XAxis dataKey="tanggal" />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
+          <CartesianGrid stroke="var(--brand-grey)" strokeOpacity={0.25} vertical={false} />
+          <XAxis dataKey="tanggal" tickLine={false} axisLine={false} />
+          <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={40} />
+          <Tooltip cursor={{ fill: "var(--navy-soft)" }} />
           <Legend />
           <Line type="monotone" dataKey="tunggu" name="Rata-rata tunggu (detik)" stroke="var(--brand-navy)" strokeWidth={2} connectNulls={false} />
           <Line type="monotone" dataKey="penanganan" name="Rata-rata penanganan (detik)" stroke="var(--brand-orange)" strokeWidth={2} connectNulls={false} />

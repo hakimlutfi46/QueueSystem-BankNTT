@@ -6,6 +6,8 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { QueueNumber } from "@/components/brand/queue-number";
 import { TokenSwatches } from "@/components/brand/token-swatch";
+import { Badge, CounterStatusBadge, PrefixTile } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/panel";
 
 export const metadata: Metadata = {
   title: "Panduan tampilan",
@@ -127,6 +129,33 @@ export default function StyleguidePage() {
               <span className="mx-3 text-brand-grey">|</span>
               <span className="font-bold text-danger">Tidak hadir</span>
             </p>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2 className="text-2xl font-bold">Komponen antarmuka</h2>
+          <BrandCard className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-3">
+              <BrandButton variant="outline">Garis tepi</BrandButton>
+              <BrandButton variant="ghost">Tanpa latar</BrandButton>
+              <BrandButton variant="danger">Bahaya</BrandButton>
+              <BrandButton variant="accent">Aksen</BrandButton>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CounterStatusBadge status="OPEN" />
+              <CounterStatusBadge status="PAUSED" />
+              <CounterStatusBadge status="CLOSED" />
+              <CounterStatusBadge status="OPEN" inactive />
+              <Badge tone="sky">A · Customer Service</Badge>
+              <PrefixTile prefix="A" />
+              <PrefixTile prefix="B" />
+            </div>
+          </BrandCard>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Total tiket" value={128} icon="ticket" />
+            <StatCard label="Menunggu" value={7} icon="clock" tone="orange" />
+            <StatCard label="Selesai" value={112} icon="check" tone="success" />
+            <StatCard label="Tidak hadir" value={4} icon="userX" tone="danger" />
           </div>
         </section>
       </div>

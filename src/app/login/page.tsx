@@ -1,10 +1,20 @@
 import { redirect } from "next/navigation";
-import { BrandHeader } from "@/components/brand/brand-header";
+import { BrandLogo } from "@/components/brand/brand-logo";
+import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { auth } from "@/auth";
 import { LoginForm } from "@/app/login/login-form";
+import { readSettings } from "@/lib/admin/settings";
+import { getPrisma } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const highlights: { icon: IconName; text: string }[] = [
+  { icon: "megaphone", text: "Panggil nomor berikutnya dengan satu tombol atau tombol Spasi" },
+  { icon: "tv", text: "Nomor langsung tampil dan dibacakan di layar TV" },
+  { icon: "chart", text: "Laporan harian dan rekap siap diunduh" },
+];
 
 export default async function LoginPage({
   searchParams,
@@ -18,13 +28,63 @@ export default async function LoginPage({
       ? params.callbackUrl
       : "/counter";
   if (session?.user) redirect(callbackUrl);
+  const { branchName } = await readSettings(getPrisma());
+  const forAdmin = callbackUrl.startsWith("/admin");
 
   return (
-    <main className="min-h-screen bg-surface">
-      <BrandHeader branchName="Bank NTT" />
-      <section className="px-4 py-10">
-        <h1 className="mb-6 text-center text-2xl font-bold text-brand-navy">Masuk loket</h1>
-        <LoginForm callbackUrl={callbackUrl} />
+    <main className="grid min-h-screen bg-surface lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-brand-deep p-12 text-brand-white lg:flex">
+        <div
+          className="absolute inset-y-0 right-0 w-5 bg-brand-orange"
+          style={{ clipPath: "polygon(45% 0, 100% 0, 55% 100%, 0 100%)" }}
+          aria-hidden="true"
+        />
+        <div className="inline-flex w-fit rounded-xl bg-brand-white px-5 py-3">
+          <BrandLogo variant="color" priority className="h-16" />
+        </div>
+        <div className="max-w-lg">
+          <p className="text-lg font-bold opacity-80">{branchName}</p>
+          <h2 className="mt-2 text-5xl font-bold leading-tight">Sistem Antrian Customer Service dan Teller</h2>
+          <ul className="mt-8 flex flex-col gap-4">
+            {highlights.map((item) => (
+              <li key={item.text} className="flex items-center gap-4 text-lg">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-navy">
+                  <Icon name={item.icon} />
+                </span>
+                {item.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="mb-3 font-bold">melayani lebih sungguh</p>
+          <DiagonalStripes className="-mx-12" />
+        </div>
+      </section>
+
+      <section className="flex flex-col">
+        <div className="bg-brand-navy px-6 py-4 lg:hidden">
+          <div className="inline-flex rounded-lg bg-brand-white px-3 py-2">
+            <BrandLogo variant="color" priority className="h-10" />
+          </div>
+        </div>
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <div className="w-full max-w-md">
+            <span className="flex size-12 items-center justify-center rounded-xl bg-navy-soft text-brand-navy">
+              <Icon name={forAdmin ? "settings" : "desk"} className="size-6" />
+            </span>
+            <h1 className="mt-5 text-3xl font-bold text-brand-navy">{forAdmin ? "Masuk admin" : "Masuk loket"}</h1>
+            <p className="mb-8 mt-2 text-ink-muted">
+              {forAdmin
+                ? "Kelola loket, layanan, petugas, dan laporan cabang."
+                : "Masuk dengan akun petugas, lalu pilih loket tempat Anda bertugas."}
+            </p>
+            <LoginForm callbackUrl={callbackUrl} />
+            <p className="mt-8 text-center text-xs text-ink-muted">
+              Lupa kata sandi? Minta admin cabang menggantinya dari menu Petugas.
+            </p>
+          </div>
+        </div>
       </section>
     </main>
   );

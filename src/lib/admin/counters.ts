@@ -10,6 +10,12 @@ const counterBody = z.object({
   isActive: z.boolean().optional(),
 });
 
+const MAX_BATCH = 20;
+
+const batchBody = z.object({
+  items: z.array(counterBody).min(1).max(MAX_BATCH),
+});
+
 export type AdminCounter = {
   id: number;
   name: string;
@@ -58,28 +64,43 @@ export async function listCounters(db: PrismaClient): Promise<AdminCounter[]> {
 }
 
 export async function createCounter(db: PrismaClient, body: unknown): Promise<AdminCounter> {
-  const parsed = counterBody.safeParse(body);
+  const [created] = await createCounters(db, { items: [body] });
+  if (!created) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
+  return created;
+}
+
+/** Membuat beberapa loket dalam satu transaksi; gagal satu berarti tidak ada yang tersimpan. */
+export async function createCounters(db: PrismaClient, body: unknown): Promise<AdminCounter[]> {
+  const parsed = batchBody.safeParse(body);
   if (!parsed.success) throw new AdminError("VALIDATION", "Data tidak valid.");
-  const serviceIds = [...new Set(parsed.data.serviceIds)];
+  const names = parsed.data.items.map((item) => item.name.toLowerCase());
+  if (new Set(names).size !== names.length) {
+    throw new AdminError("NAME_TAKEN", "Nama loket tidak boleh sama.");
+  }
   return db.$transaction(async (tx) => {
-    await assertServices(tx, serviceIds);
-    const rows = await tx.$queryRaw<{ id: number }[]>`
-      INSERT INTO counters (name, display_number)
-      VALUES (${parsed.data.name}, ${parsed.data.displayNumber})
-      RETURNING id
-    `;
-    const id = rows[0]?.id;
-    if (!id) throw new AdminError("VALIDATION", "Data tidak valid.");
-    for (const serviceId of serviceIds) {
-      await tx.$executeRaw`
-        INSERT INTO counter_services (counter_id, service_id)
-        VALUES (${id}, ${serviceId})
+    const ids: number[] = [];
+    for (const item of parsed.data.items) {
+      const serviceIds = [...new Set(item.serviceIds)];
+      await assertServices(tx, serviceIds);
+      await assertNameFree(tx, item.name, null);
+      const rows = await tx.$queryRaw<{ id: number }[]>`
+        INSERT INTO counters (name, display_number)
+        VALUES (${item.name}, ${item.displayNumber})
+        RETURNING id
       `;
+      const id = rows[0]?.id;
+      if (!id) throw new AdminError("VALIDATION", "Data tidak valid.");
+      for (const serviceId of serviceIds) {
+        await tx.$executeRaw`
+          INSERT INTO counter_services (counter_id, service_id)
+          VALUES (${id}, ${serviceId})
+        `;
+      }
+      await notifyQueue(tx, { type: "COUNTER_CHANGED", counterId: id });
+      ids.push(id);
     }
-    await notifyQueue(tx, { type: "COUNTER_CHANGED", counterId: id });
-    const created = (await listCounters(tx as unknown as PrismaClient)).find((counter) => counter.id === id);
-    if (!created) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
-    return created;
+    const all = await listCounters(tx as unknown as PrismaClient);
+    return ids.flatMap((id) => all.filter((counter) => counter.id === id));
   });
 }
 
@@ -97,6 +118,9 @@ export async function updateCounter(db: PrismaClient, id: number, body: unknown)
     const serviceIds = parsed.data.serviceIds ? [...new Set(parsed.data.serviceIds)] : existing.serviceIds;
     if (serviceIds.length === 0) throw new AdminError("VALIDATION", "Data tidak valid.");
     await assertServices(tx, serviceIds);
+    if ((parsed.data.isActive ?? existing.isActive) && (parsed.data.name || parsed.data.isActive)) {
+      await assertNameFree(tx, parsed.data.name ?? existing.name, id);
+    }
     await tx.$executeRaw`
       UPDATE counters
       SET name = ${parsed.data.name ?? existing.name},
@@ -118,6 +142,21 @@ export async function updateCounter(db: PrismaClient, id: number, body: unknown)
     if (!updated) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
     return updated;
   });
+}
+
+/** Nama loket aktif harus unik, supaya tidak ada dua "CS 1" di TV dan di layar petugas. */
+async function assertNameFree(
+  tx: { $queryRaw: PrismaClient["$queryRaw"] },
+  name: string,
+  exceptId: number | null,
+): Promise<void> {
+  const rows = await tx.$queryRaw<{ id: number }[]>`
+    SELECT id FROM counters
+    WHERE is_active AND lower(name) = lower(${name.trim()})
+      AND (${exceptId}::int IS NULL OR id <> ${exceptId}::int)
+    LIMIT 1
+  `;
+  if (rows[0]) throw new AdminError("NAME_TAKEN", `Loket "${name.trim()}" sudah ada.`);
 }
 
 async function assertServices(

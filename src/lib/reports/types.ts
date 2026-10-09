@@ -29,6 +29,7 @@ export type HourBucket = {
 };
 
 export type TicketDetail = {
+  id: string;
   number: string;
   serviceName: string;
   counterName: string | null;

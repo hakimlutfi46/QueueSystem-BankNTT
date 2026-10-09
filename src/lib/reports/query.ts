@@ -193,6 +193,7 @@ async function hourBuckets(db: PrismaClient, date: string, timeZone: string): Pr
 async function ticketDetails(db: PrismaClient, date: string, timeZone: string): Promise<TicketDetail[]> {
   const rows = await db.$queryRaw<
     {
+      id: string;
       number: string;
       service_name: string;
       counter_name: string | null;
@@ -208,6 +209,7 @@ async function ticketDetails(db: PrismaClient, date: string, timeZone: string): 
     }[]
   >`
     SELECT
+      t.id::text AS id,
       t.number,
       s.name AS service_name,
       c.name AS counter_name,
@@ -241,6 +243,7 @@ async function ticketDetails(db: PrismaClient, date: string, timeZone: string): 
     ORDER BY t.created_at, t.id
   `;
   return rows.map((row) => ({
+    id: row.id,
     number: row.number,
     serviceName: row.service_name,
     counterName: row.counter_name,

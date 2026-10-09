@@ -1,41 +1,63 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { BrandButton } from "@/components/brand/brand-button";
+import { inputClass } from "@/components/ui/field";
+import { Icon } from "@/components/ui/icon";
 import { loginAction } from "@/app/login/actions";
+import { cn } from "@/lib/cn";
 
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   const [state, action, pending] = useActionState(loginAction, null);
+  const [visible, setVisible] = useState(false);
 
   return (
-    <form action={action} className="mx-auto flex w-full max-w-md flex-col gap-4">
+    <form action={action} className="flex w-full flex-col gap-5">
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
-      <label className="flex flex-col gap-2 text-base font-bold">
+      <label className="flex flex-col gap-1.5 text-sm font-bold">
         Nama pengguna
-        <input
-          name="username"
-          autoComplete="username"
-          required
-          className="min-h-12 rounded-[var(--radius-card)] border border-brand-grey bg-brand-white px-3 font-normal"
-        />
+        <span className="relative">
+          <Icon name="user" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-muted" />
+          <input
+            name="username"
+            autoComplete="username"
+            autoCapitalize="none"
+            required
+            autoFocus
+            className={cn(inputClass, "pl-11")}
+          />
+        </span>
       </label>
-      <label className="flex flex-col gap-2 text-base font-bold">
+      <label className="flex flex-col gap-1.5 text-sm font-bold">
         Kata sandi
-        <input
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className="min-h-12 rounded-[var(--radius-card)] border border-brand-grey bg-brand-white px-3 font-normal"
-        />
+        <span className="relative">
+          <Icon name="lock" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-muted" />
+          <input
+            name="password"
+            type={visible ? "text" : "password"}
+            autoComplete="current-password"
+            required
+            className={cn(inputClass, "px-11")}
+          />
+          <button
+            type="button"
+            onClick={() => setVisible((value) => !value)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold text-brand-blue hover:bg-navy-soft"
+            aria-label={visible ? "Sembunyikan sandi" : "Lihat sandi"}
+          >
+            {visible ? "Sembunyikan" : "Lihat"}
+          </button>
+        </span>
       </label>
       {state?.error ? (
-        <p role="alert" className="font-bold text-danger">
+        <p role="alert" className="flex items-center gap-2 rounded-xl bg-danger-soft px-4 py-3 font-bold text-danger">
+          <Icon name="close" className="size-4" />
           {state.error}
         </p>
       ) : null}
-      <BrandButton type="submit" disabled={pending} className="w-full">
+      <BrandButton type="submit" size="lg" disabled={pending} className="w-full">
         {pending ? "Memeriksa…" : "Masuk"}
+        {pending ? null : <Icon name="arrowRight" />}
       </BrandButton>
     </form>
   );

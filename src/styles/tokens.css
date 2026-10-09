@@ -13,4 +13,15 @@
   --danger: #c62828;
   --radius-card: 16px;
   --font-brand: Arial, Helvetica, sans-serif;
+
+  /* Turunan untuk antarmuka: latar lembut, garis, dan bayangan. */
+  --navy-soft: color-mix(in srgb, var(--brand-navy) 8%, var(--brand-white));
+  --sky-soft: color-mix(in srgb, var(--brand-sky) 12%, var(--brand-white));
+  --orange-soft: color-mix(in srgb, var(--brand-orange) 14%, var(--brand-white));
+  --success-soft: color-mix(in srgb, var(--success) 12%, var(--brand-white));
+  --danger-soft: color-mix(in srgb, var(--danger) 10%, var(--brand-white));
+  --line: color-mix(in srgb, var(--brand-grey) 28%, var(--brand-white));
+  --shadow-card: 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 12px 32px -20px color-mix(in srgb, var(--ink) 35%, transparent);
+  --shadow-glow: 0 0 0 2px var(--brand-sky), 0 0 36px color-mix(in srgb, var(--brand-sky) 70%, transparent);
 }

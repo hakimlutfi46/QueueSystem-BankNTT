@@ -13,7 +13,9 @@ export function BrandHeader({
     <header className="bg-brand-navy text-brand-white">
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
         <div className="flex min-w-0 items-center gap-5">
-          <BrandLogo variant="color" priority className="h-16 shrink-0 sm:h-20" />
+          <div className="shrink-0 rounded-xl bg-brand-white px-3 py-2">
+            <BrandLogo variant="color" priority className="h-12 sm:h-14" />
+          </div>
           <div className="min-w-0">
             <p className="truncate text-lg font-bold sm:text-xl">{branchName}</p>
             <p className="text-sm">melayani lebih sungguh</p>

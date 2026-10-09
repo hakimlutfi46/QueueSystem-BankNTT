@@ -2,6 +2,7 @@ import { cn } from "@/lib/cn";
 
 const sizes = {
   tv: "text-[220px]",
+  tvHero: "text-[260px]",
   kiosk: "text-[140px]",
   counter: "text-[96px]",
   inline: "text-5xl",
