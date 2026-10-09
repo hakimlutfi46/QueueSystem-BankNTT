@@ -1,5 +1,29 @@
 # Keputusan
 
+## 2026-10-09 — Perangkat didaftarkan dari Admin
+
+PLAN.md memakai dua token tetap di `.env`, `KIOSK_TOKEN` dan `DISPLAY_TOKEN`. Cara itu cukup untuk satu kiosk dan satu TV, tapi tidak untuk pemakaian sungguhan: satu cabang bisa punya beberapa kiosk dan beberapa TV, dan satu perangkat yang hilang atau tautannya tersebar tidak bisa dicabut tanpa mengganti token semua perangkat dan menyalakan ulang server.
+
+Halaman Admin → Perangkat (`/admin/devices`) sekarang mendaftarkan setiap kiosk dan TV dengan nama sendiri. Server membuat token acak 32 byte (base64url) dan menampilkannya sekali di tautan pemasangan. Yang disimpan hanya hash SHA-256 dan empat karakter terakhir untuk dikenali di daftar. Admin bisa mengganti nama, membuat tautan baru (token lama langsung tidak berlaku, perangkat yang dicabut aktif lagi), dan mencabut izin. Logikanya di `src/lib/auth/devices.ts`. Cookie di perangkat sekarang berisi token perangkat itu sendiri.
+
+`src/proxy.ts` dan `/api/stream` memeriksa token ke database lewat `deviceMatcher()`. Di Next.js 16, proxy berjalan di runtime Node.js, jadi proxy boleh membuka koneksi database. Ini menggantikan catatan di entri "Sesi dibaca ulang dari database" bahwa proxy tidak menyentuh database. Waktu terakhir aktif dicatat paling sering sekali per menit per perangkat, supaya setiap permintaan tidak menulis ke database.
+
+`KIOSK_TOKEN` dan `DISPLAY_TOKEN` tetap diterima bila diisi, sebagai token cadangan. Keduanya sekarang opsional. Uji end-to-end masih memakainya. Panel tautan di Pengaturan (entri "Tautan perangkat di Pengaturan") diganti tautan ke Perangkat dan Identitas.
+
+Perubahan skema: tabel baru `devices` dan enum `device_kind`, lewat migrasi `20261009090000_add_devices`.
+
+## 2026-10-09 — Identitas lembaga bisa diganti
+
+Aplikasi ini juga ingin dipakai lembaga selain Bank NTT. Ini menyimpang dari PLAN.md, yang menetapkan design system Bank NTT tanpa pilihan. Bawaannya tetap Bank NTT: nama, slogan, logo, dan warna sama seperti sebelumnya bila tidak ada yang diubah.
+
+Halaman Admin → Identitas & tampilan (`/admin/branding`) mengatur nama lembaga, slogan, logo, dan lima warna merek. Nilainya disimpan di tabel `settings` dengan kunci `org_name`, `org_tagline`, `brand_colors`, dan `brand_logo`, jadi skema tidak berubah. `src/styles/tokens.css` menyimpan warna bawaan sebagai `--default-*`, dan `--brand-*` menunjuk ke sana. Layout akar menulis `<style>` penimpa dari database di setiap permintaan, sehingga semua halaman menjadi dinamis. Kiosk, TV, dan layar petugas ikut berubah lewat `CONFIG_CHANGED`.
+
+Hanya lima warna yang bisa diganti: Utama, Sekunder, Aksen terang, Sorotan, dan Latar TV. Warna teks, latar halaman, sukses, bahaya, dan abu-abu tetap, supaya tulisan selalu terbaca dan arti status tidak berubah. Kontras diperiksa dengan aturan di PLAN.md (`src/lib/branding-colors.ts`), tapi hanya diperingatkan, tidak diblokir. Warna merek lembaga kadang memang gagal satu pasangan, dan keputusannya diserahkan ke admin.
+
+Logo (PNG, JPG, WebP, atau SVG, paling besar 512 KB) disimpan di database, bukan di disk. Docker tidak butuh volume tambahan, dan logo ikut tercadang bersama database. Logo dilayani di `/api/brand/logo?v=<hash>` dengan cache panjang. SVG dikirim dengan CSP sandbox supaya skrip di dalamnya tidak jalan.
+
+`prisma/seed.ts` membaca `SEED_ORG_NAME` (bawaan "Bank NTT") untuk nama lembaga, nama cabang, dan teks berjalan awal.
+
 ## 2026-10-09 — Sesi dibaca ulang dari database
 
 Sesi Auth.js berupa cookie JWT yang berlaku 30 hari dan sebelumnya dipercaya begitu saja. Akibatnya petugas yang dinonaktifkan, admin yang diturunkan menjadi petugas, atau nama yang diganti baru berlaku setelah sesi habis. `currentUser()` di `src/lib/auth/session.ts` sekarang membaca nama, peran, dan status aktif dari tabel `users` di setiap permintaan. Akun nonaktif langsung kehilangan akses ke loket dan Admin.

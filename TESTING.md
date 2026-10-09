@@ -13,7 +13,7 @@ Selain itu ada uji manual tampilan di bagian akhir. PLAN.md mewajibkannya untuk 
 ## Yang perlu disiapkan
 
 - PostgreSQL 16 atau lebih baru menyala di mesin ini.
-- `.env` sudah diisi dari `.env.example`, terutama `DATABASE_URL`, `AUTH_SECRET`, `KIOSK_TOKEN`, dan `DISPLAY_TOKEN`.
+- `.env` sudah diisi dari `.env.example`, terutama `DATABASE_URL` dan `AUTH_SECRET`. Untuk uji end-to-end, isi juga `KIOSK_TOKEN` dan `DISPLAY_TOKEN`. Di pemakaian biasa keduanya opsional, tapi uji e2e masih membuka kiosk dan TV dengan token cadangan ini.
 - `npm install` sudah dijalankan.
 
 ## 1. Lint dan typecheck
@@ -62,7 +62,11 @@ Uji berjalan berurutan, tidak paralel, karena semua kasus berbagi satu database.
 | Loket dinamis: tambah beberapa loket, nama unik | `tests/integration/admin.test.ts`, `tests/unit/counter-names.test.ts` |
 | CRUD Admin: pesan galat, akun nonaktif, tutup paksa loket | `tests/integration/admin-crud.test.ts` |
 | Tidak ada warna hex di luar `tokens.css` | `tests/unit/tokens.test.ts` |
+| Perangkat terdaftar: token hanya disimpan hash-nya, tautan baru mematikan tautan lama, cabut menolak perangkat, token cadangan `.env` tetap diterima | `tests/integration/devices.test.ts`, `tests/unit/device.test.ts` |
+| Identitas lembaga: bawaan Bank NTT, simpan nama lain, unggah dan hapus logo | `tests/integration/branding.test.ts` |
+| Warna merek: aturan kontras PLAN.md dan CSS penimpa hanya berisi hex yang sah | `tests/unit/branding-colors.test.ts` |
 | End-to-end dan loket dinamis di TV | `tests/e2e/journey.spec.ts`, `tests/e2e/admin.spec.ts` |
+| Daftarkan, buka, dan cabut perangkat | `tests/e2e/devices.spec.ts` |
 
 ## 3. End-to-end
 
@@ -128,6 +132,7 @@ npx playwright show-report                      # buka laporan uji terakhir
 | `counter.spec.ts` | Dua petugas di dua loket mendapat nomor berbeda; sandi salah ditolak |
 | `display.spec.ts` | Panggilan tampil di TV; dua panggilan berdekatan dibacakan berurutan |
 | `admin.spec.ts` | Loket baru dari Admin muncul di layar petugas dan TV tanpa muat ulang |
+| `devices.spec.ts` | Kiosk didaftarkan di Admin → Perangkat, tautannya dibuka, lalu dicabut sampai layar menolak perangkat |
 | `reports.spec.ts` | Laporan harian, rekap rentang, dan unduhan Excel |
 | `home.spec.ts`, `styleguide.spec.ts` | Beranda dan halaman panduan tampilan |
 
@@ -148,18 +153,18 @@ Lalu ulangi langkah "Siapkan database `queue_e2e`".
 | `Executable doesn't exist ... chrome-headless-shell` | Browser belum dipasang. Jalankan `npx playwright install chromium`. |
 | Login gagal, uji berhenti di `/login` | Database belum di-seed dengan `change-me`, atau Playwright memakai server dev yang tersambung ke database lain. Matikan `npm run dev` atau pakai `E2E_PORT`, lalu ulangi seed. |
 | `Another next dev server is already running` | `E2E_PORT` hanya bisa dipakai bersama build produksi. Jalankan `npm run build` dulu. |
-| `KIOSK_TOKEN is not set` | Isi `KIOSK_TOKEN` dan `DISPLAY_TOKEN` di `.env`. |
+| `KIOSK_TOKEN is not set` | Uji e2e masih memakai token cadangan. Isi `KIOSK_TOKEN` dan `DISPLAY_TOKEN` di `.env` dengan dua string acak yang berbeda. |
 | Uji di layar TV atau loket habis waktu | Pastikan tidak ada loket yang tertinggal terbuka dari percobaan manual; ulangi dari database bersih. |
 | Loket "CS Khusus" muncul di database kerja | Uji e2e pernah dijalankan saat `npm run dev` tersambung ke database kerja. Nonaktifkan dari Admin → Loket. |
 
 ## 4. Uji manual tampilan
 
-Supaya dasbor, laporan, dan grafik langsung terisi, jalankan dulu `npm run db:seed:demo` (lihat bagian Data contoh di README). Lalu jalankan `npm run dev`, masuk sebagai admin, lalu salin tautan kiosk dan TV dari **Admin → Pengaturan → Pasang kiosk dan TV**. Buka di jendela terpisah dengan ukuran target:
+Supaya dasbor, laporan, dan grafik langsung terisi, jalankan dulu `npm run db:seed:demo` (lihat bagian Data contoh di README). Lalu jalankan `npm run dev`, masuk sebagai admin, buka **Admin → Perangkat**, daftarkan satu kiosk dan satu TV, lalu salin tautan dari dialog yang muncul. Buka di jendela terpisah dengan ukuran target:
 
 | Layar | Ukuran target | Alamat |
 | --- | --- | --- |
-| Kiosk | 1280 × 1024 | tautan kiosk dari Pengaturan |
-| TV | 1920 × 1080 | tautan TV dari Pengaturan |
+| Kiosk | 1280 × 1024 | tautan kiosk dari Admin → Perangkat |
+| TV | 1920 × 1080 | tautan TV dari Admin → Perangkat |
 | Loket | 1366 × 768 | `/counter` |
 | Admin | 1440 × 900 dan 390 lebar (HP) | `/admin` |
 
@@ -188,6 +193,24 @@ Di Chrome, ukuran layar diatur dari DevTools → Toggle device toolbar.
 - [ ] Nonaktifkan petugas yang sedang memegang loket: ditolak dengan nama loketnya.
 - [ ] Nonaktifkan petugas yang sedang masuk tapi tidak memegang loket, lalu muat ulang layarnya: petugas langsung diarahkan ke halaman masuk.
 - [ ] Isi nama pengguna dengan spasi atau kata sandi kurang dari 6 karakter: pesan galat menyebut kolom yang salah.
+
+**Perangkat**
+
+- [ ] Admin → Perangkat: daftarkan kiosk "Kiosk Lobi" dan TV "TV Ruang Tunggu". Dialog menampilkan tautan dan perintah Chrome; ganti **Alamat server** dan keduanya ikut berubah.
+- [ ] Tutup dialog. Tautan tidak bisa dilihat lagi; daftar hanya menampilkan empat karakter terakhir token.
+- [ ] Buka tautan kiosk dan TV. Dalam 30 detik, tanpa muat ulang, status keduanya di Admin → Perangkat berubah dari Belum dipasang menjadi Tersambung.
+- [ ] **Tautan baru** pada kiosk, lalu buka tautan lama di jendela privat: halaman menampilkan "Perangkat belum diizinkan". Tautan baru bisa dibuka.
+- [ ] **Cabut** TV yang sedang tampil: layar TV menampilkan "Perangkat belum diizinkan", dan perangkat pindah ke daftar Dicabut. **Aktifkan lagi** memberi tautan baru.
+
+**Identitas lembaga**
+
+- [ ] Admin → Identitas & tampilan: ganti nama lembaga dan slogan, lalu **Simpan identitas**. Kiosk dan TV yang terbuka ikut berubah tanpa muat ulang.
+- [ ] Kosongkan slogan dan simpan: slogan hilang dari kiosk, TV, dan tiket.
+- [ ] Unggah logo PNG atau SVG. Logo baru tampil di kiosk, TV, dan layar petugas. Berkas lebih dari 512 KB ditolak.
+- [ ] **Pakai logo bawaan** mengembalikan logo Bank NTT.
+- [ ] Ganti warna Utama dengan warna pucat, misalnya `#cfe8ff`. Bagian Keterbacaan menandai pasangan yang gagal dengan rasio dan batas minimalnya, tapi penyimpanan tetap bisa.
+- [ ] Ganti beberapa warna dan simpan. Pratinjau, kiosk, dan TV memakai warna baru tanpa muat ulang.
+- [ ] **Kembali ke warna bawaan**, lalu simpan. Warna Bank NTT kembali.
 
 **Admin dan laporan**
 

@@ -23,8 +23,10 @@ services:
     environment:
       DATABASE_URL: postgresql://queue:queue@db:5432/queue
       APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-change-me}
-      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-change-me}
+      # Wajib diisi di .env; Compose berhenti dengan pesan bila kosong.
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Isi SEED_ADMIN_PASSWORD di .env}
+      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:?Isi SEED_STAFF_PASSWORD di .env}
+      SEED_ORG_NAME: ${SEED_ORG_NAME:-}
     depends_on:
       db:
         condition: service_healthy
@@ -37,9 +39,10 @@ services:
     environment:
       DATABASE_URL: postgresql://queue:queue@db:5432/queue
       APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
-      AUTH_SECRET: ${AUTH_SECRET:-dev-only-change-me}
-      KIOSK_TOKEN: ${KIOSK_TOKEN:-dev-kiosk-token}
-      DISPLAY_TOKEN: ${DISPLAY_TOKEN:-dev-display-token}
+      AUTH_SECRET: ${AUTH_SECRET:?Isi AUTH_SECRET di .env dengan string acak yang panjang}
+      # Opsional. Kiosk dan TV didaftarkan dari Admin → Perangkat; kosong berarti tidak ada token cadangan.
+      KIOSK_TOKEN: ${KIOSK_TOKEN:-}
+      DISPLAY_TOKEN: ${DISPLAY_TOKEN:-}
     ports:
       - "3000:3000"
     depends_on:
