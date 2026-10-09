@@ -1,5 +1,17 @@
 # Keputusan
 
+## 2026-10-09 — Layar TV berpusat pada antrean
+
+PLAN membagi TV menjadi panggilan terakhir (kiri) dan grid loket (kanan) yang berganti halaman setelah 8 loket. Dengan 9 loket atau lebih, sebagian loket tersembunyi dan jumlah menunggu nyaris tidak terlihat. TV sekarang berupa kanvas tetap 1920×1080 yang diskalakan ke layar apa pun, dengan tiga kolom: panggilan terakhir dan 4 panggilan sebelumnya, antrean per layanan (jumlah menunggu dan nomor berikutnya, 7 layanan per halaman), dan loket (12 per halaman). `GET /api/queue/state` ikut membawa `nextNumber` per layanan dan `recentCalls`. Loket yang buka tanpa nomor aktif menampilkan "—", bukan "Siap", supaya nasabah tidak mengira loket itu menerima siapa saja.
+
+## 2026-10-09 — Zona waktu diatur dari Admin
+
+`APP_TIMEZONE` di `.env` sulit diganti oleh admin cabang, dan salah zona membuat jam tiket, kiosk, TV, serta pergantian nomor harian bergeser satu atau dua jam. Admin → Pengaturan sekarang memilih WIB, WITA, atau WIT, disimpan di `settings` dengan kunci `time_zone`. `appTimezone()` membaca pilihan itu dari cache server yang diisi saat pengaturan disimpan dan diperbarui tiap menit; bila kosong tetap memakai `APP_TIMEZONE`, lalu Asia/Makassar. Uji otomatis selalu memakai WITA lewat `vitest.config.mts`.
+
+## 2026-10-09 — Tiket tanpa nama lembaga dan slogan
+
+PLAN mencetak logo, nama cabang, dan slogan di tiket. Atas permintaan pengguna, tiket cukup memuat logo di atas NOMOR ANTRIAN; nama lembaga dan slogan tidak dicetak. Pada PDF, nama cabang hanya muncul bila logo tidak bisa disisipkan (misalnya logo unggahan berformat SVG), supaya tiket tetap berkop.
+
 ## 2026-10-09 — Tiket sebagai PDF saat belum ada printer
 
 PLAN mencetak tiket lewat dialog cetak Chrome ke printer thermal. Untuk mencoba kiosk tanpa printer, `TICKET_OUTPUT=pdf` membuat tiket sebagai PDF seukuran kertas thermal (80 atau 58 mm) di server dengan `pdf-lib`, lalu kiosk mengunduhnya. Isinya sama dengan halaman cetak. Bila variabel kosong, `npm run dev` memakai PDF dan build produksi memakai printer, jadi server cabang tetap mencetak langsung tanpa pengaturan tambahan. `printTicket()` tetap satu-satunya jalur ke printer sesuai PLAN.
