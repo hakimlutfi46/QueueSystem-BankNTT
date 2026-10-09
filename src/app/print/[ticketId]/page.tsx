@@ -2,8 +2,6 @@ import { notFound, redirect } from "next/navigation";
 import { AutoPrint } from "@/app/print/[ticketId]/auto-print";
 import { TicketSlip } from "@/components/print/ticket-slip";
 import { currentUser } from "@/lib/auth/session";
-import { readPublicBranding } from "@/lib/branding";
-import { getPrisma } from "@/lib/db";
 import { loadPrintableTicket } from "@/lib/print/load-ticket";
 import { ticketOutput } from "@/lib/print/output";
 
@@ -24,11 +22,10 @@ export default async function ReprintTicketPage({
   if (ticketOutput() === "pdf") redirect(`/print/${encodeURIComponent(ticketId)}/pdf`);
   const ticket = await loadPrintableTicket(ticketId);
   if (!ticket) notFound();
-  const { tagline } = await readPublicBranding(getPrisma());
 
   return (
     <>
-      <TicketSlip ticket={ticket} tagline={tagline} reprint />
+      <TicketSlip ticket={ticket} reprint />
       <AutoPrint />
     </>
   );

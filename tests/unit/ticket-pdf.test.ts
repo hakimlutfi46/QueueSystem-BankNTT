@@ -28,7 +28,7 @@ describe("ticket output", () => {
 describe("renderTicketPdf", () => {
   it("makes one page as wide as the thermal paper", async () => {
     for (const widthMm of [80, 58]) {
-      const bytes = await renderTicketPdf({ ...ticket, widthMm }, { tagline: "melayani lebih sungguh", logo: null });
+      const bytes = await renderTicketPdf({ ...ticket, widthMm }, { logo: null });
       expect(Buffer.from(bytes.slice(0, 5)).toString()).toBe("%PDF-");
       const pdf = await PDFDocument.load(bytes);
       expect(pdf.getPageCount()).toBe(1);
@@ -42,7 +42,7 @@ describe("renderTicketPdf", () => {
   it("still renders text outside the PDF standard font", async () => {
     const bytes = await renderTicketPdf(
       { ...ticket, branchName: "Cabang “Kupang” — Lantai 1 🙂" },
-      { tagline: "", logo: null, reprint: true },
+      { logo: null, reprint: true },
     );
     await expect(PDFDocument.load(bytes)).resolves.toBeTruthy();
   });

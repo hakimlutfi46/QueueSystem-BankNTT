@@ -2,12 +2,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage } from "pdf-lib";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { DEFAULT_BRANDING, readLogo, readPublicBranding } from "@/lib/branding";
+import { DEFAULT_BRANDING, readLogo } from "@/lib/branding";
 import type { PrintableTicketView } from "@/lib/print/load-ticket";
 
 /**
  * Tiket sebagai PDF seukuran kertas thermal (80 atau 58 mm), isinya sama dengan halaman cetak:
- * logo, nama cabang, NOMOR ANTRIAN, nomor besar, layanan, waktu, jumlah di depan, teks kaki, slogan.
+ * logo, NOMOR ANTRIAN, nomor besar, layanan, waktu, jumlah di depan, dan teks kaki.
  */
 
 const MM = 72 / 25.4;
@@ -20,7 +20,7 @@ type Line =
 
 export async function renderTicketPdf(
   ticket: PrintableTicketView,
-  options: { tagline: string; logo: { mime: string; bytes: Uint8Array } | null; reprint?: boolean },
+  options: { logo: { mime: string; bytes: Uint8Array } | null; reprint?: boolean },
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Tiket ${ticket.number}`);
@@ -40,14 +40,14 @@ export async function renderTicketPdf(
       lines.push({ kind: "text", text: part, size, bold: isBold, gapBefore: index === 0 ? gapBefore : 2 });
     }
   };
-  text(ticket.branchName, 11, true, image ? 8 : 0);
+  // Tanpa logo (misalnya logo unggahan SVG), nama cabang menggantikannya supaya tiket tetap berkop.
+  if (!image) text(ticket.branchName, 11, true, 0);
   text("NOMOR ANTRIAN", 9, true, 12);
   text(ticket.number, numberSize, true, 6);
   text(ticket.serviceName, 13, true, 8);
   text(ticket.issuedAt, 9, false, 6);
   text(`${ticket.aheadCount} antrian di depan Anda`, 10, true, 8);
   if (ticket.footer) text(ticket.footer, 8, false, 12);
-  if (options.tagline) text(options.tagline, 8, false, 4);
   if (options.reprint) text("CETAK ULANG", 8, true, 8);
 
   const contentHeight = lines.reduce(
@@ -82,16 +82,15 @@ export async function renderTicketPdf(
 export async function loadTicketPdfOptions(
   db: PrismaClient,
   reprint = false,
-): Promise<{ tagline: string; logo: { mime: string; bytes: Uint8Array } | null; reprint: boolean }> {
-  const branding = await readPublicBranding(db);
+): Promise<{ logo: { mime: string; bytes: Uint8Array } | null; reprint: boolean }> {
   const custom = await readLogo(db).catch(() => null);
   if (custom && (custom.mime === "image/png" || custom.mime === "image/jpeg")) {
-    return { tagline: branding.tagline, logo: { mime: custom.mime, bytes: custom.bytes }, reprint };
+    return { logo: { mime: custom.mime, bytes: custom.bytes }, reprint };
   }
-  if (custom) return { tagline: branding.tagline, logo: null, reprint };
+  if (custom) return { logo: null, reprint };
   const file = path.join(process.cwd(), "public", DEFAULT_BRANDING.defaultLogo);
   const bytes = await readFile(file).catch(() => null);
-  return { tagline: branding.tagline, logo: bytes ? { mime: "image/png", bytes } : null, reprint };
+  return { logo: bytes ? { mime: "image/png", bytes } : null, reprint };
 }
 
 export function ticketPdfResponse(bytes: Uint8Array, number: string): Response {

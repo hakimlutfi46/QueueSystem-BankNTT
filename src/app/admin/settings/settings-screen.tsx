@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitAdmin } from "@/app/admin/submit";
 import { BrandButton } from "@/components/brand/brand-button";
-import { BrandTagline } from "@/components/brand/brand-logo";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { Field, Switch, inputClass } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Alert, PageHeader, Panel } from "@/components/ui/panel";
@@ -171,7 +171,7 @@ export function SettingsScreen({ settings }: { settings: AdminSettings }) {
 
         <div className="flex flex-col gap-4 xl:sticky xl:top-6 xl:self-start">
           <Panel title="Pratinjau tiket" bodyClassName="flex justify-center bg-surface">
-            <TicketPreview branchName={branchName} footer={footer} widthMm={width} />
+            <TicketPreview footer={footer} widthMm={width} />
           </Panel>
           <BrandButton type="submit" size="lg" disabled={pending}>
             <Icon name="check" />
@@ -183,14 +183,14 @@ export function SettingsScreen({ settings }: { settings: AdminSettings }) {
   );
 }
 
-function TicketPreview({ branchName, footer, widthMm }: { branchName: string; footer: string; widthMm: number }) {
+function TicketPreview({ footer, widthMm }: { footer: string; widthMm: number }) {
   return (
     <div
       className="rounded-sm bg-brand-white px-4 py-5 text-center text-ink shadow-card"
       style={{ width: widthMm === 58 ? 180 : 240 }}
       aria-label="Contoh tiket"
     >
-      <p className="text-sm font-bold">{branchName || "Nama cabang"}</p>
+      <BrandLogo className="mx-auto h-10 grayscale" />
       <p className="mt-3 text-[10px] font-bold tracking-widest">NOMOR ANTRIAN</p>
       <p className="mt-1 text-5xl font-bold leading-none tabular-nums">A012</p>
       <p className="mt-2 text-sm font-bold">Customer Service</p>
@@ -198,7 +198,6 @@ function TicketPreview({ branchName, footer, widthMm }: { branchName: string; fo
       <p className="mt-2 text-xs font-bold">3 antrian di depan Anda</p>
       <div className="my-3 border-t border-dashed border-brand-grey" />
       {footer ? <p className="text-[10px]">{footer}</p> : null}
-      <BrandTagline className="text-[10px]" />
       <p className="mt-2 text-[10px] text-ink-muted">Kertas {widthMm} mm</p>
     </div>
   );

@@ -37,7 +37,10 @@ test("one touch issues one ticket and prints it once", async ({ page }) => {
   await page.goto(`/kiosk/print/${ticketId}`);
   await expect(page.getByText("NOMOR ANTRIAN")).toBeVisible();
   await expect(page.getByText("Customer Service")).toBeVisible();
-  await expect(page.getByText("melayani lebih sungguh")).toBeVisible();
+  // Tiket hanya memuat logo di atas nomor; nama lembaga dan slogan tidak dicetak.
+  await expect(page.getByRole("img", { name: "Bank NTT" })).toBeVisible();
+  await expect(page.getByText("melayani lebih sungguh")).toHaveCount(0);
+  await expect(page.getByText("Bank NTT", { exact: true })).toHaveCount(0);
 });
 
 test("a failed request does not print a ticket", async ({ page }) => {
