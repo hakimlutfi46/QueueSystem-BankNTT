@@ -18,18 +18,17 @@ const SETTINGS: Array<{ key: string; value: SettingValue }> = [
   { key: "ticket_width_mm", value: 80 },
 ];
 
-function requiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is not set`);
-  }
-  return value;
+// Kata sandi awal bila SEED_ADMIN_PASSWORD atau SEED_STAFF_PASSWORD kosong. Ganti dari Admin setelah masuk.
+const DEFAULT_PASSWORD = "Password123";
+
+function passwordEnv(name: string): string {
+  return process.env[name]?.trim() || DEFAULT_PASSWORD;
 }
 
 async function main(): Promise<void> {
   const prisma = getPrisma();
-  const adminPassword = requiredEnv("SEED_ADMIN_PASSWORD");
-  const staffPassword = requiredEnv("SEED_STAFF_PASSWORD");
+  const adminPassword = passwordEnv("SEED_ADMIN_PASSWORD");
+  const staffPassword = passwordEnv("SEED_STAFF_PASSWORD");
 
   const customerService = await prisma.service.upsert({
     where: { prefix: "A" },
