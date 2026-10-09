@@ -29,7 +29,12 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     // Uji kiosk memeriksa cetak ke printer, jadi mode PDF untuk dev tidak dipakai di sini.
-    env: { ...serverEnv, TICKET_OUTPUT: process.env.TICKET_OUTPUT ?? "printer" },
+    env: {
+      ...serverEnv,
+      TICKET_OUTPUT: process.env.TICKET_OUTPUT ?? "printer",
+      // Build produksi untuk E2E_PORT ada di .next-e2e, terpisah dari cache npm run dev.
+      ...(separatePort ? { NEXT_DIST_DIR: process.env.NEXT_DIST_DIR ?? ".next-e2e" } : {}),
+    },
   },
   projects: [
     {

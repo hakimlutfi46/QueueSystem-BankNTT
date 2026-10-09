@@ -110,7 +110,7 @@ Playwright menyalakan `next dev` sendiri di port 3000 dengan `DATABASE_URL` dari
 **Bila `npm run dev` harus tetap menyala**, jalankan uji di port lain dengan build produksi. Next.js hanya mengizinkan satu `next dev` per proyek, jadi uji memakai `next start`:
 
 ```bash
-npm run build
+NEXT_DIST_DIR=.next-e2e npm run build
 E2E_PORT=3100 npm run test:e2e
 ```
 
@@ -152,7 +152,8 @@ Lalu ulangi langkah "Siapkan database `queue_e2e`".
 | --- | --- |
 | `Executable doesn't exist ... chrome-headless-shell` | Browser belum dipasang. Jalankan `npx playwright install chromium`. |
 | Login gagal, uji berhenti di `/login` | Database belum di-seed dengan `change-me`, atau Playwright memakai server dev yang tersambung ke database lain. Matikan `npm run dev` atau pakai `E2E_PORT`, lalu ulangi seed. |
-| `Another next dev server is already running` | `E2E_PORT` hanya bisa dipakai bersama build produksi. Jalankan `npm run build` dulu. |
+| `Another next dev server is already running` | `E2E_PORT` hanya bisa dipakai bersama build produksi. Jalankan `NEXT_DIST_DIR=.next-e2e npm run build` dulu. |
+| Halaman `npm run dev` dimuat ulang terus-menerus, log berisi "Compiled in 0ms" berulang | Cache dev di `.next` rusak, biasanya karena `npm run build` dijalankan ke `.next` saat dev hidup. Matikan dev, hapus folder `.next`, nyalakan lagi. Build untuk uji pakai `NEXT_DIST_DIR=.next-e2e`. |
 | `KIOSK_TOKEN is not set` | Uji e2e masih memakai token cadangan. Isi `KIOSK_TOKEN` dan `DISPLAY_TOKEN` di `.env` dengan dua string acak yang berbeda. |
 | Uji di layar TV atau loket habis waktu | Pastikan tidak ada loket yang tertinggal terbuka dari percobaan manual; ulangi dari database bersih. |
 | Loket "CS Khusus" muncul di database kerja | Uji e2e pernah dijalankan saat `npm run dev` tersambung ke database kerja. Nonaktifkan dari Admin → Loket. |
