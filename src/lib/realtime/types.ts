@@ -39,6 +39,8 @@ export type QueueServiceState = {
   name: string;
   prefix: string;
   waitingCount: number;
+  /** Nomor menunggu paling awal hari ini, yang akan dipanggil berikutnya untuk layanan ini. */
+  nextNumber: string | null;
 };
 
 export type QueueLastCall = {
@@ -67,6 +69,8 @@ export type QueueState = {
   services: QueueServiceState[];
   counters: QueueCounterState[];
   lastCall: QueueLastCall | null;
+  /** Panggilan terakhir hari ini, satu per tiket, terbaru dulu. Yang pertama sama dengan lastCall. */
+  recentCalls: QueueLastCall[];
   settings: QueueDisplaySettings;
   asOf: string;
 };

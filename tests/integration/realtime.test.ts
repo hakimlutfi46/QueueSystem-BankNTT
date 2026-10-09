@@ -2,7 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { callNext, issueTicket } from "@/lib/queue";
+import { callNext, issueTicket, recallTicket } from "@/lib/queue";
 import { publish } from "@/lib/realtime/hub";
 import { QueueListener, type ListenerStatus } from "@/lib/realtime/listen";
 import { loadQueueState } from "@/lib/realtime/state";
@@ -148,7 +148,7 @@ describe("realtime", { concurrent: false }, () => {
 
     const state = await loadQueueState(prisma);
     expect(state.services).toEqual([
-      expect.objectContaining({ name: "Customer Service", prefix: "A", waitingCount: 1 }),
+      expect.objectContaining({ name: "Customer Service", prefix: "A", waitingCount: 1, nextNumber: "A002" }),
     ]);
     expect(state.counters).toEqual([
       expect.objectContaining({
@@ -168,6 +168,15 @@ describe("realtime", { concurrent: false }, () => {
         displayNumber: 1,
       }),
     );
+    expect(state.recentCalls.map((call) => call.ticketNumber)).toEqual(["A001"]);
+
+    // Panggil ulang tidak menambah baris; nomor berikutnya menggeser yang lama ke "panggilan sebelumnya".
+    await recallTicket(prisma, { counterId, userId });
+    await callNext(prisma, { counterId, userId });
+    const later = await loadQueueState(prisma);
+    expect(later.recentCalls.map((call) => call.ticketNumber)).toEqual(["A002", "A001"]);
+    expect(later.services[0]?.nextNumber).toBeNull();
+
     expect(state.settings).toMatchObject({
       branchName: "Cabang Kupang",
       runningText: "Selamat datang",

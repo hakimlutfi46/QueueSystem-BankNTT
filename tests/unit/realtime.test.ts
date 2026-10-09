@@ -10,6 +10,7 @@ const sampleState: QueueState = {
   services: [],
   counters: [],
   lastCall: null,
+  recentCalls: [],
   settings: {
     branchName: "Bank NTT",
     runningText: "",

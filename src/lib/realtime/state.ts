@@ -10,6 +10,8 @@ import type {
   QueueState,
 } from "@/lib/realtime/types";
 
+const RECENT_CALLS = 6;
+
 const DEFAULT_SETTINGS: QueueDisplaySettings = {
   branchName: DEFAULT_BRANDING.orgName,
   runningText: "",
@@ -24,7 +26,7 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
   return db.$transaction(async (tx) => {
     const today = await serviceDate(tx, undefined);
     const services = await tx.$queryRaw<
-        { id: number; name: string; prefix: string; waiting_count: number }[]
+        { id: number; name: string; prefix: string; waiting_count: number; next_number: string | null }[]
       >`
         SELECT
           s.id,
@@ -36,7 +38,16 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
             WHERE ticket.service_id = s.id
               AND ticket.status = 'WAITING'
               AND ticket.service_date = ${today}::date
-          ) AS waiting_count
+          ) AS waiting_count,
+          (
+            SELECT ticket.number
+            FROM tickets AS ticket
+            WHERE ticket.service_id = s.id
+              AND ticket.status = 'WAITING'
+              AND ticket.service_date = ${today}::date
+            ORDER BY ticket.created_at, ticket.id
+            LIMIT 1
+          ) AS next_number
         FROM services AS s
         WHERE s.is_active
         ORDER BY s.sort_order, s.id
@@ -117,7 +128,7 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
         WHERE event.type IN ('CALLED', 'RECALLED')
           AND ticket.service_date = ${today}::date
         ORDER BY event.created_at DESC, event.id DESC
-        LIMIT 1
+        LIMIT 40
       `;
     const settings = await tx.$queryRaw<{ key: string; value: unknown }[]>`
       SELECT key, value FROM settings
@@ -145,6 +156,17 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
       });
     }
 
+    // Satu baris per tiket: panggil ulang tidak mendorong nomor lain keluar dari daftar panggilan terakhir.
+    const seenTickets = new Set<string>();
+    const recentCalls: QueueLastCall[] = [];
+    for (const row of calls) {
+      if (seenTickets.has(row.ticket_id)) continue;
+      seenTickets.add(row.ticket_id);
+      const call = mapLastCall(row);
+      if (call) recentCalls.push(call);
+      if (recentCalls.length === RECENT_CALLS) break;
+    }
+
     const asOf = clock[0]?.as_of ?? new Date();
     return {
       services: services.map((service) => ({
@@ -152,6 +174,7 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
         name: service.name,
         prefix: service.prefix,
         waitingCount: Number(service.waiting_count),
+        nextNumber: service.next_number,
       })),
       counters: counters.map((counter) => ({
         id: counter.id,
@@ -163,7 +186,8 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
         serviceIds: servicesByCounter.get(counter.id) ?? [],
         activeTicket: activeByCounter.get(counter.id) ?? null,
       })),
-      lastCall: mapLastCall(calls[0]),
+      lastCall: recentCalls[0] ?? null,
+      recentCalls,
       settings: mapSettings(settings),
       asOf: asOf.toISOString(),
     };

@@ -68,7 +68,7 @@ function state(input: {
   status?: "OPEN" | "PAUSED" | "CLOSED";
 }): QueueState {
   return {
-    services: [{ id: 1, name: "Customer Service", prefix: "A", waitingCount: input.waitingCount }],
+    services: [{ id: 1, name: "Customer Service", prefix: "A", waitingCount: input.waitingCount, nextNumber: null }],
     counters: [
       {
         id: 1,
@@ -82,6 +82,7 @@ function state(input: {
       },
     ],
     lastCall: null,
+    recentCalls: [],
     settings: {
       branchName: "Bank NTT",
       runningText: "",
