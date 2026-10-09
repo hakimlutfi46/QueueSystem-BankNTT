@@ -52,5 +52,10 @@
     "prisma@7.10.0": true,
     "@prisma/engines@7.10.0": true,
     "esbuild@0.28.2": true
+  },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "deepmerge-ts": "^8.0.2",
+    "mysql2": "^3.24.5"
   }
 }
