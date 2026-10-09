@@ -1,5 +1,9 @@
 # Keputusan
 
+## 2026-10-09 — Tombol kiosk menyesuaikan jumlah layanan
+
+PLAN menetapkan tombol layanan setinggi minimal 160 px dengan nama, huruf awalan, dan jumlah menunggu. Dengan delapan layanan bank, tombol setinggi itu meluber dari layar dan menutupi judul. Kiosk sekarang menghitung jumlah kolom dan baris dari ruang yang tersedia (`src/lib/kiosk/layout.ts`), sehingga semua tombol sama besar dan muat tanpa digulir; bila tombol akan lebih pendek dari 96 px, kiosk beralih ke daftar yang bisa digulir. Ukuran huruf tiap tombol dikecilkan otomatis sampai nama dan jumlah menunggu muat utuh, jadi tulisan tidak pernah terpotong. Atas permintaan pengguna, huruf awalan tidak ditampilkan di tombol; nomor tiket tetap memakainya.
+
 ## 2026-10-09 — Layanan dihubungkan ke loket dari dua arah
 
 Loket memanggil tiket paling awal di antara layanan yang terhubung dengannya; aturan ini tidak berubah. Selain dari Admin → Loket, hubungan bisa diatur dari Admin → Layanan lewat `PUT /api/admin/services/:id/counters`. Penyimpanan mengunci baris layanan dan semua loket yang terlibat (urut id) dalam satu transaksi, dan menolak perubahan yang membuat sebuah loket tanpa layanan. `updateCounter` ikut mengunci barisnya, jadi dua admin yang mengubah dari dua arah bersamaan tidak bisa meninggalkan loket tanpa layanan.
