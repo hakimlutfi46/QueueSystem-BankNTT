@@ -1,5 +1,17 @@
 # Keputusan
 
+## 2026-10-09 — Layanan dihubungkan ke loket dari dua arah
+
+Loket memanggil tiket paling awal di antara layanan yang terhubung dengannya; aturan ini tidak berubah. Selain dari Admin → Loket, hubungan bisa diatur dari Admin → Layanan lewat `PUT /api/admin/services/:id/counters`. Penyimpanan mengunci baris layanan dan semua loket yang terlibat (urut id) dalam satu transaksi, dan menolak perubahan yang membuat sebuah loket tanpa layanan. `updateCounter` ikut mengunci barisnya, jadi dua admin yang mengubah dari dua arah bersamaan tidak bisa meninggalkan loket tanpa layanan.
+
+## 2026-10-09 — TV menampilkan semua loket beserta statusnya
+
+TV kini menampilkan semua loket aktif dengan status Buka, Istirahat, atau Tutup, bukan hanya yang buka. Tiap loket yang buka menampilkan nomor yang akan dipanggilnya berikutnya, dihitung di server dengan urutan yang sama seperti `callNext`. Bila dua loket melayani layanan yang sama, keduanya menampilkan nomor yang sama sampai salah satu memanggilnya; `FOR UPDATE SKIP LOCKED` tetap menjamin nomor itu hanya diambil satu loket.
+
+## 2026-10-09 — Suara TV menyala sendiri
+
+Satu AudioContext dipakai bersama untuk semua pengumuman. Sebelumnya setiap pengumuman membuat konteks baru yang ditahan browser di luar klik, sehingga hanya panggilan pertama berbunyi dan antrean macet; panggil ulang tidak pernah terdengar. Lonceng, ucapan, dan rekaman kini punya batas waktu supaya antrean tidak bisa macet. TV mencoba menyalakan suara saat dibuka; dengan Chrome `--autoplay-policy=no-user-gesture-required` suara langsung aktif, dan tombol Aktifkan suara hanya muncul bila browser menolak.
+
 ## 2026-10-09 — Layar TV berpusat pada antrean
 
 PLAN membagi TV menjadi panggilan terakhir (kiri) dan grid loket (kanan) yang berganti halaman setelah 8 loket. Dengan 9 loket atau lebih, sebagian loket tersembunyi dan jumlah menunggu nyaris tidak terlihat. TV sekarang berupa kanvas tetap 1920×1080 yang diskalakan ke layar apa pun, dengan tiga kolom: panggilan terakhir dan 4 panggilan sebelumnya, antrean per layanan (jumlah menunggu dan nomor berikutnya, 7 layanan per halaman), dan loket (12 per halaman). `GET /api/queue/state` ikut membawa `nextNumber` per layanan dan `recentCalls`. Loket yang buka tanpa nomor aktif menampilkan "—", bukan "Siap", supaya nasabah tidak mengira loket itu menerima siapa saja.
@@ -56,7 +68,7 @@ Petugas yang masih memegang loket tidak bisa dinonaktifkan. Admin diminta menutu
 
 ## 2026-10-09 — Data contoh terpisah dari seed
 
-`prisma/seed.ts` tetap berisi data awal yang aman untuk cabang, dan itu yang dijalankan Docker. Data contoh untuk mencoba aplikasi ada di `prisma/seed-demo.ts` (`npm run db:seed:demo`): dua layanan, tiga loket, tujuh akun tambahan, dan riwayat tiket tujuh hari kerja terakhir. Hasilnya tetap sama setiap kali dijalankan, dan tanggal yang sudah punya tiket dilewati, jadi tidak pernah menimpa data sungguhan.
+`prisma/seed.ts` tetap berisi data awal yang aman untuk cabang, dan itu yang dijalankan Docker. Data contoh untuk mencoba aplikasi ada di `prisma/seed-demo.ts` (`npm run db:seed:demo`): delapan layanan bank, lima loket CS dan lima loket Teller, sepuluh petugas, dan riwayat tiket tujuh hari kerja terakhir. Hasilnya tetap sama setiap kali dijalankan, dan tanggal yang sudah punya tiket dilewati, jadi tidak pernah menimpa data sungguhan.
 
 ## 2026-10-08 — Loket dinamis per cabang
 
