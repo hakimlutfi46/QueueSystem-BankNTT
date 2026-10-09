@@ -114,7 +114,7 @@ npm run db:seed
 npm run db:seed:demo
 ```
 
-Perintah kedua menambah layanan Kredit (`C`) dan Pembukaan Rekening (`D`), sehingga ada 3 loket CS, 4 loket Teller, dan 1 loket Kredit. Ada 10 petugas (`petugas.cs`, `petugas.cs2`, `petugas.cs3`, `petugas.teller` sampai `petugas.teller4`, `petugas.kredit`, `petugas.cadangan1`, `petugas.cadangan2`) dan satu akun `supervisor` (admin), serta riwayat tiket tujuh hari kerja terakhir untuk laporan. Kata sandi semua akun tambahan sama dengan `SEED_STAFF_PASSWORD`. Jangan jalankan perintah ini di server cabang.
+Perintah kedua mengisi cabang contoh yang hanya punya loket Teller dan Customer Service. Ada 8 layanan: Setor Tunai (`B`), Tarik Tunai (`E`), Transfer & Pembayaran (`F`), dan Pembukaan Rekening (`D`) dilayani Teller; Pengaduan Layanan (`A`), Kartu ATM & Mobile Banking (`G`), Informasi Produk & Kredit (`C`), dan Perubahan Data Nasabah (`H`) dilayani CS. Ada 5 loket CS dan 5 loket Teller, 10 petugas (`petugas.cs` sampai `petugas.cs5` untuk CS 1–5, `petugas.teller` sampai `petugas.teller5` untuk Teller 1–5) dan satu akun `supervisor` (admin), serta riwayat tiket tujuh hari kerja terakhir untuk laporan. Kata sandi akun baru sama dengan `SEED_STAFF_PASSWORD`; kata sandi akun yang sudah ada tidak diubah. Layanan dengan awalan yang sama diberi nama baru, sedangkan layanan, loket, dan akun contoh lama lainnya (misalnya Kredit 1 dan `petugas.kredit`) dinonaktifkan, tidak dihapus. Jangan jalankan perintah ini di server cabang.
 
 ## Pengujian
 

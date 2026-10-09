@@ -1,7 +1,10 @@
 /**
- * Data contoh untuk mencoba aplikasi di laptop: 3 loket CS, 4 loket Teller, 1 loket Kredit, 10 petugas,
- * dan satu supervisor, plus riwayat tiket
- * tujuh hari kerja terakhir supaya dasbor, laporan, dan grafik langsung terisi.
+ * Data contoh untuk mencoba aplikasi di laptop, meniru cabang yang hanya punya loket Teller dan
+ * Customer Service: 8 layanan, 5 loket CS, 5 loket Teller, 10 petugas, dan satu supervisor, plus riwayat
+ * tiket tujuh hari kerja terakhir supaya dasbor, laporan, dan grafik langsung terisi.
+ *
+ * Layanan, loket, dan akun contoh lama yang tidak ada di daftar ini dinonaktifkan, tidak dihapus,
+ * supaya laporan lama tetap utuh. Layanan dengan awalan yang sama diberi nama baru.
  *
  * Jalankan setelah `npm run db:seed`: `npm run db:seed:demo`. Jangan dijalankan di server cabang.
  * Aman diulang: data yang sudah ada tidak digandakan, dan hari yang sudah punya tiket dilewati.
@@ -14,38 +17,43 @@ import { appTimezone } from "../src/lib/env";
 
 const HISTORY_DAYS = 7;
 
+/** Layanan teller singkat (2–6 menit), layanan CS lebih lama (6–20 menit). Urutan kiosk: paling ramai dulu. */
 const SERVICES = [
-  { prefix: "A", name: "Customer Service", sortOrder: 1, perDay: [28, 45], handle: [4, 12] },
-  { prefix: "B", name: "Teller", sortOrder: 2, perDay: [55, 90], handle: [2, 6] },
-  { prefix: "C", name: "Kredit", sortOrder: 3, perDay: [5, 12], handle: [10, 25] },
-  { prefix: "D", name: "Pembukaan Rekening", sortOrder: 4, perDay: [6, 14], handle: [8, 18] },
+  { prefix: "B", name: "Setor Tunai", sortOrder: 1, perDay: [90, 130], handle: [2, 5] },
+  { prefix: "E", name: "Tarik Tunai", sortOrder: 2, perDay: [70, 100], handle: [2, 4] },
+  { prefix: "F", name: "Transfer & Pembayaran", sortOrder: 3, perDay: [45, 70], handle: [3, 6] },
+  { prefix: "D", name: "Pembukaan Rekening", sortOrder: 4, perDay: [10, 18], handle: [4, 6] },
+  { prefix: "A", name: "Pengaduan Layanan", sortOrder: 5, perDay: [8, 14], handle: [10, 20] },
+  { prefix: "G", name: "Kartu ATM & Mobile Banking", sortOrder: 6, perDay: [30, 45], handle: [6, 12] },
+  { prefix: "C", name: "Informasi Produk & Kredit", sortOrder: 7, perDay: [20, 32], handle: [8, 18] },
+  { prefix: "H", name: "Perubahan Data Nasabah", sortOrder: 8, perDay: [12, 20], handle: [6, 14] },
 ] as const;
 
-/** Sepuluh petugas: delapan bertugas tetap di riwayat contoh, dua cadangan untuk dicoba ditugaskan. */
-const STAFF = [
-  { username: "petugas.cs", name: "Petugas CS", counter: "CS 1" },
-  { username: "petugas.cs2", name: "Maria Lodo", counter: "CS 2" },
-  { username: "petugas.cs3", name: "Agustina Ndun", counter: "CS 3" },
-  { username: "petugas.teller", name: "Petugas Teller", counter: "Teller 1" },
-  { username: "petugas.teller2", name: "Fransiskus Lake", counter: "Teller 2" },
-  { username: "petugas.teller3", name: "Debora Tefa", counter: "Teller 3" },
-  { username: "petugas.teller4", name: "Yosef Manek", counter: "Teller 4" },
-  { username: "petugas.kredit", name: "Yohanes Bria", counter: "Kredit 1" },
-  { username: "petugas.cadangan1", name: "Theresia Seran", counter: null },
-  { username: "petugas.cadangan2", name: "Paulus Koli", counter: null },
-] as const;
+const CS_SERVICES = ["A", "C", "G", "H"] as const;
+const TELLER_SERVICES = ["B", "D", "E", "F"] as const;
 
-/** Tiga loket CS dan empat loket Teller, ditambah satu loket Kredit. */
+/** Lima loket CS dan lima loket Teller. */
 const COUNTERS = [
-  { name: "CS 1", displayNumber: 1, services: ["A"] },
-  { name: "CS 2", displayNumber: 2, services: ["A"] },
-  { name: "CS 3", displayNumber: 3, services: ["A", "D"] },
-  { name: "Teller 1", displayNumber: 1, services: ["B"] },
-  { name: "Teller 2", displayNumber: 2, services: ["B"] },
-  { name: "Teller 3", displayNumber: 3, services: ["B"] },
-  { name: "Teller 4", displayNumber: 4, services: ["B"] },
-  { name: "Kredit 1", displayNumber: 1, services: ["C"] },
+  ...[1, 2, 3, 4, 5].map((n) => ({ name: `CS ${n}`, displayNumber: n, services: CS_SERVICES })),
+  ...[1, 2, 3, 4, 5].map((n) => ({ name: `Teller ${n}`, displayNumber: n, services: TELLER_SERVICES })),
+];
+
+/** Sepuluh petugas, satu per loket. */
+const STAFF = [
+  { username: "petugas.cs", name: "Maria Lodo", counter: "CS 1" },
+  { username: "petugas.cs2", name: "Agustina Ndun", counter: "CS 2" },
+  { username: "petugas.cs3", name: "Theresia Seran", counter: "CS 3" },
+  { username: "petugas.cs4", name: "Margaretha Bili", counter: "CS 4" },
+  { username: "petugas.cs5", name: "Elisabeth Nenobais", counter: "CS 5" },
+  { username: "petugas.teller", name: "Fransiskus Lake", counter: "Teller 1" },
+  { username: "petugas.teller2", name: "Debora Tefa", counter: "Teller 2" },
+  { username: "petugas.teller3", name: "Yosef Manek", counter: "Teller 3" },
+  { username: "petugas.teller4", name: "Yohanes Bria", counter: "Teller 4" },
+  { username: "petugas.teller5", name: "Paulus Koli", counter: "Teller 5" },
 ] as const;
+
+/** Akun contoh dari versi sebelumnya yang sekarang dinonaktifkan. */
+const RETIRED_STAFF = ["petugas.kredit", "petugas.cadangan1", "petugas.cadangan2"];
 
 /** Bobot kedatangan per jam, 08.00 sampai 15.00: ramai pagi menjelang siang. */
 const HOUR_WEIGHTS: Record<number, number> = { 8: 3, 9: 6, 10: 7, 11: 6, 12: 3, 13: 4, 14: 4, 15: 2 };
@@ -57,13 +65,14 @@ type SimTicket = { prefix: string; created: number; seq: number };
 
 async function main(): Promise<void> {
   const prisma = getPrisma();
-  const password = process.env.SEED_STAFF_PASSWORD?.trim();
-  if (!password) throw new Error("SEED_STAFF_PASSWORD is not set");
+  const password = process.env.SEED_STAFF_PASSWORD?.trim() || "Password123";
   const timeZone = appTimezone();
 
   const serviceIds = await seedServices(prisma);
   const userIds = await seedUsers(prisma, password);
   const counterIds = await seedCounters(prisma, serviceIds);
+  const retiredCounters = await retireCounters(prisma, counterIds);
+  const retiredUsers = await retireStaff(prisma);
 
   const todayRows = await prisma.$queryRaw<{ today: string }[]>`
     SELECT to_char((now() AT TIME ZONE ${timeZone})::date, 'YYYY-MM-DD') AS today
@@ -86,26 +95,35 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Selesai: ${SERVICES.length} layanan, ${COUNTERS.length} loket, ${STAFF.length + 1} akun, ${created} tiket riwayat.`,
+    `Selesai: ${SERVICES.length} layanan, ${COUNTERS.length} loket, ${STAFF.length + 1} akun, ${created} tiket riwayat` +
+      ` (dinonaktifkan: ${retiredCounters} loket lama, ${retiredUsers} akun lama).`,
   );
 }
 
+/** Upsert per awalan: nama dan urutan ikut daftar di atas. Layanan aktif lain dinonaktifkan, tidak dihapus. */
 async function seedServices(prisma: Prisma): Promise<Map<string, number>> {
   const ids = new Map<string, number>();
   for (const service of SERVICES) {
     const rows = await prisma.$queryRaw<{ id: number }[]>`
-      INSERT INTO services (name, prefix, sort_order)
-      VALUES (${service.name}, ${service.prefix}, ${service.sortOrder})
-      ON CONFLICT (prefix) DO UPDATE SET prefix = EXCLUDED.prefix
+      INSERT INTO services (name, prefix, sort_order, is_active)
+      VALUES (${service.name}, ${service.prefix}, ${service.sortOrder}, true)
+      ON CONFLICT (prefix) DO UPDATE
+        SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order, is_active = true
       RETURNING id
     `;
     const id = rows[0]?.id;
     if (!id) throw new Error(`Could not seed service ${service.prefix}`);
     ids.set(service.prefix, id);
   }
+  const off = await prisma.service.updateMany({
+    where: { isActive: true, prefix: { notIn: SERVICES.map((service) => service.prefix) } },
+    data: { isActive: false },
+  });
+  if (off.count > 0) console.log(`${off.count} layanan lama dinonaktifkan`);
   return ids;
 }
 
+/** Akun yang sudah ada tidak diganti kata sandinya; nama dan status aktif ikut daftar di atas. */
 async function seedUsers(prisma: Prisma, password: string): Promise<Map<string, number>> {
   const hash = await argon2.hash(password);
   const accounts = [
@@ -117,7 +135,7 @@ async function seedUsers(prisma: Prisma, password: string): Promise<Map<string, 
     const rows = await prisma.$queryRaw<{ id: number }[]>`
       INSERT INTO users (username, name, password_hash, role)
       VALUES (${account.username}, ${account.name}, ${hash}, ${account.role}::user_role)
-      ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username
+      ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username, name = EXCLUDED.name, is_active = true
       RETURNING id
     `;
     const id = rows[0]?.id;
@@ -127,6 +145,7 @@ async function seedUsers(prisma: Prisma, password: string): Promise<Map<string, 
   return ids;
 }
 
+/** Sepuluh loket dengan layanan persis seperti daftar: tautan ke layanan lain dilepas. */
 async function seedCounters(prisma: Prisma, serviceIds: Map<string, number>): Promise<Map<string, number>> {
   const ids = new Map<string, number>();
   for (const counter of COUNTERS) {
@@ -141,8 +160,13 @@ async function seedCounters(prisma: Prisma, serviceIds: Map<string, number>): Pr
       id = rows[0]?.id;
     }
     if (!id) throw new Error(`Could not seed counter ${counter.name}`);
-    for (const prefix of counter.services) {
+    const wanted = counter.services.map((prefix) => {
       const serviceId = serviceIds.get(prefix);
+      if (!serviceId) throw new Error(`Unknown service prefix ${prefix}`);
+      return serviceId;
+    });
+    await prisma.counterService.deleteMany({ where: { counterId: id, serviceId: { notIn: wanted } } });
+    for (const serviceId of wanted) {
       await prisma.$executeRaw`
         INSERT INTO counter_services (counter_id, service_id) VALUES (${id}, ${serviceId})
         ON CONFLICT DO NOTHING
@@ -151,6 +175,57 @@ async function seedCounters(prisma: Prisma, serviceIds: Map<string, number>): Pr
     ids.set(counter.name, id);
   }
   return ids;
+}
+
+/** Loket aktif lain (misalnya "Kredit 1") ditutup lalu dinonaktifkan, kecuali sedang melayani tiket. */
+async function retireCounters(prisma: Prisma, counterIds: Map<string, number>): Promise<number> {
+  const keep = [...counterIds.values()];
+  const others = await prisma.counter.findMany({
+    where: { isActive: true, id: { notIn: keep } },
+    select: { id: true, name: true },
+    orderBy: { id: "asc" },
+  });
+  let retired = 0;
+  for (const counter of others) {
+    const serving = await prisma.ticket.count({ where: { counterId: counter.id, status: "SERVING" } });
+    if (serving > 0) {
+      console.warn(`Peringatan: loket ${counter.name} sedang melayani tiket, tidak dinonaktifkan`);
+      continue;
+    }
+    await prisma.counter.update({
+      where: { id: counter.id },
+      data: { status: "CLOSED", currentUserId: null, isActive: false },
+    });
+    retired += 1;
+  }
+  return retired;
+}
+
+/**
+ * Akun contoh lama dinonaktifkan. Loket yang masih dipegangnya dan tidak sedang melayani tiket dilepas dulu;
+ * bila masih memegang loket yang buka atau jeda, akun itu dibiarkan aktif.
+ */
+async function retireStaff(prisma: Prisma): Promise<number> {
+  let retired = 0;
+  for (const username of RETIRED_STAFF) {
+    const user = await prisma.user.findUnique({ where: { username }, select: { id: true, isActive: true } });
+    if (!user?.isActive) continue;
+    await prisma.$executeRaw`
+      UPDATE counters c SET status = 'CLOSED', current_user_id = NULL
+      WHERE c.current_user_id = ${user.id}
+        AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.counter_id = c.id AND t.status = 'SERVING')
+    `;
+    const holding = await prisma.counter.count({
+      where: { currentUserId: user.id, status: { in: ["OPEN", "PAUSED"] } },
+    });
+    if (holding > 0) {
+      console.warn(`Peringatan: ${username} masih memegang loket yang buka, tidak dinonaktifkan`);
+      continue;
+    }
+    await prisma.user.update({ where: { id: user.id }, data: { isActive: false } });
+    retired += 1;
+  }
+  return retired;
 }
 
 /**
