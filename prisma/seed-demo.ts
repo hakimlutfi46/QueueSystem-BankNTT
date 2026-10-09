@@ -1,5 +1,6 @@
 /**
- * Data contoh untuk mencoba aplikasi di laptop: layanan, loket, dan petugas tambahan, plus riwayat tiket
+ * Data contoh untuk mencoba aplikasi di laptop: 3 loket CS, 4 loket Teller, 1 loket Kredit, 10 petugas,
+ * dan satu supervisor, plus riwayat tiket
  * tujuh hari kerja terakhir supaya dasbor, laporan, dan grafik langsung terisi.
  *
  * Jalankan setelah `npm run db:seed`: `npm run db:seed:demo`. Jangan dijalankan di server cabang.
@@ -14,12 +15,13 @@ import { appTimezone } from "../src/lib/env";
 const HISTORY_DAYS = 7;
 
 const SERVICES = [
-  { prefix: "A", name: "Customer Service", sortOrder: 1, perDay: [22, 38], handle: [4, 12] },
-  { prefix: "B", name: "Teller", sortOrder: 2, perDay: [40, 70], handle: [2, 6] },
+  { prefix: "A", name: "Customer Service", sortOrder: 1, perDay: [28, 45], handle: [4, 12] },
+  { prefix: "B", name: "Teller", sortOrder: 2, perDay: [55, 90], handle: [2, 6] },
   { prefix: "C", name: "Kredit", sortOrder: 3, perDay: [5, 12], handle: [10, 25] },
   { prefix: "D", name: "Pembukaan Rekening", sortOrder: 4, perDay: [6, 14], handle: [8, 18] },
 ] as const;
 
+/** Sepuluh petugas: delapan bertugas tetap di riwayat contoh, dua cadangan untuk dicoba ditugaskan. */
 const STAFF = [
   { username: "petugas.cs", name: "Petugas CS", counter: "CS 1" },
   { username: "petugas.cs2", name: "Maria Lodo", counter: "CS 2" },
@@ -27,9 +29,13 @@ const STAFF = [
   { username: "petugas.teller", name: "Petugas Teller", counter: "Teller 1" },
   { username: "petugas.teller2", name: "Fransiskus Lake", counter: "Teller 2" },
   { username: "petugas.teller3", name: "Debora Tefa", counter: "Teller 3" },
+  { username: "petugas.teller4", name: "Yosef Manek", counter: "Teller 4" },
   { username: "petugas.kredit", name: "Yohanes Bria", counter: "Kredit 1" },
+  { username: "petugas.cadangan1", name: "Theresia Seran", counter: null },
+  { username: "petugas.cadangan2", name: "Paulus Koli", counter: null },
 ] as const;
 
+/** Tiga loket CS dan empat loket Teller, ditambah satu loket Kredit. */
 const COUNTERS = [
   { name: "CS 1", displayNumber: 1, services: ["A"] },
   { name: "CS 2", displayNumber: 2, services: ["A"] },
@@ -37,6 +43,7 @@ const COUNTERS = [
   { name: "Teller 1", displayNumber: 1, services: ["B"] },
   { name: "Teller 2", displayNumber: 2, services: ["B"] },
   { name: "Teller 3", displayNumber: 3, services: ["B"] },
+  { name: "Teller 4", displayNumber: 4, services: ["B"] },
   { name: "Kredit 1", displayNumber: 1, services: ["C"] },
 ] as const;
 
