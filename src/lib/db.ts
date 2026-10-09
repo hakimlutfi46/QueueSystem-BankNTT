@@ -1,7 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient; prismaSession?: string };
 
 /**
  * Sesi database selalu UTC. Adapter Prisma membuang offset zona waktu saat membaca timestamptz dari
@@ -22,6 +22,13 @@ function createPrisma(): PrismaClient {
 }
 
 export function getPrisma(): PrismaClient {
+  // Klien disimpan di globalThis supaya hot reload `npm run dev` tidak membuka koneksi baru terus-menerus.
+  // Bila pengaturan sesi berubah, klien lama diganti; tanpa ini perbaikan sesi baru berlaku setelah restart.
+  if (globalForPrisma.prisma && globalForPrisma.prismaSession !== DB_SESSION_OPTIONS) {
+    void globalForPrisma.prisma.$disconnect().catch(() => undefined);
+    globalForPrisma.prisma = undefined;
+  }
   globalForPrisma.prisma ??= createPrisma();
+  globalForPrisma.prismaSession = DB_SESSION_OPTIONS;
   return globalForPrisma.prisma;
 }
