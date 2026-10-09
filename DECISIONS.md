@@ -1,5 +1,9 @@
 # Keputusan
 
+## 2026-10-09 — Tiket sebagai PDF saat belum ada printer
+
+PLAN mencetak tiket lewat dialog cetak Chrome ke printer thermal. Untuk mencoba kiosk tanpa printer, `TICKET_OUTPUT=pdf` membuat tiket sebagai PDF seukuran kertas thermal (80 atau 58 mm) di server dengan `pdf-lib`, lalu kiosk mengunduhnya. Isinya sama dengan halaman cetak. Bila variabel kosong, `npm run dev` memakai PDF dan build produksi memakai printer, jadi server cabang tetap mencetak langsung tanpa pengaturan tambahan. `printTicket()` tetap satu-satunya jalur ke printer sesuai PLAN.
+
 ## 2026-10-09 — Perangkat didaftarkan dari Admin
 
 PLAN.md memakai dua token tetap di `.env`, `KIOSK_TOKEN` dan `DISPLAY_TOKEN`. Cara itu cukup untuk satu kiosk dan satu TV, tapi tidak untuk pemakaian sungguhan: satu cabang bisa punya beberapa kiosk dan beberapa TV, dan satu perangkat yang hilang atau tautannya tersebar tidak bisa dicabut tanpa mengganti token semua perangkat dan menyalakan ulang server.

@@ -77,6 +77,8 @@ Kalau kiosk dibuka tanpa token yang berlaku, halaman menolak perangkat itu.
 
 Nasabah memilih layanan. Satu sentuhan menghasilkan satu nomor dan satu cetakan. Sentuhan ganda tidak membuat nomor kedua.
 
+Belum punya printer? Isi `TICKET_OUTPUT=pdf` di `.env`: setiap tiket diunduh sebagai PDF seukuran kertas thermal, dan tombol **Ulang** di laporan harian membuka PDF-nya. Bila kosong, `npm run dev` memakai PDF dan build produksi langsung mencetak ke printer. Isi `TICKET_OUTPUT=printer` untuk memaksa cetak ke printer.
+
 ## TV
 
 Perintah untuk TV dari dialog Perangkat:

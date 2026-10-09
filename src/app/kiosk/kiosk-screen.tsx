@@ -8,7 +8,8 @@ import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { QueueNumber } from "@/components/brand/queue-number";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
-import { printTicket } from "@/lib/print/print-ticket";
+import type { TicketOutput } from "@/lib/print/output";
+import { downloadTicketPdf, printTicket } from "@/lib/print/print-ticket";
 import { newRequestId } from "@/lib/request-id";
 import { useQueueState } from "@/lib/realtime/use-queue-state";
 import { useNow } from "@/lib/use-now";
@@ -31,7 +32,7 @@ function gridFor(count: number): { grid: string; compact: boolean } {
   return { grid: "grid-cols-2 lg:grid-cols-3", compact: true };
 }
 
-export function KioskScreen({ timeZone }: { timeZone: string }) {
+export function KioskScreen({ timeZone, output }: { timeZone: string; output: TicketOutput }) {
   const { state, error } = useQueueState();
   const pending = useRef(false);
   const [busy, setBusy] = useState<number | null>(null);
@@ -71,7 +72,11 @@ export function KioskScreen({ timeZone }: { timeZone: string }) {
         aheadCount: payload.aheadCount,
       };
       setIssued(view);
-      void printTicket({ id: view.id }).catch(() => undefined);
+      if (output === "pdf") {
+        downloadTicketPdf(view);
+      } else {
+        void printTicket({ id: view.id }).catch(() => undefined);
+      }
     } catch {
       pending.current = false;
       setBusy(null);
@@ -106,8 +111,8 @@ export function KioskScreen({ timeZone }: { timeZone: string }) {
                   <span className="text-brand-navy tabular-nums">{issued.aheadCount}</span> antrian di depan Anda
                 </p>
                 <p className="mt-4 flex items-center justify-center gap-2 text-xl text-ink-muted">
-                  <Icon name="printer" className="size-6" />
-                  Silakan ambil tiket yang tercetak
+                  <Icon name={output === "pdf" ? "download" : "printer"} className="size-6" />
+                  {output === "pdf" ? "Tiket diunduh sebagai PDF (mode uji tanpa printer)" : "Silakan ambil tiket yang tercetak"}
                 </p>
               </div>
               <div className="h-2 bg-surface" aria-hidden="true">

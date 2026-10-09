@@ -28,7 +28,8 @@ export default defineConfig({
     command: separatePort ? `npx next start --port ${port}` : `npm run dev -- --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    env: serverEnv,
+    // Uji kiosk memeriksa cetak ke printer, jadi mode PDF untuk dev tidak dipakai di sini.
+    env: { ...serverEnv, TICKET_OUTPUT: process.env.TICKET_OUTPUT ?? "printer" },
   },
   projects: [
     {

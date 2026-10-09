@@ -5,6 +5,7 @@ import { currentUser } from "@/lib/auth/session";
 import { readPublicBranding } from "@/lib/branding";
 import { getPrisma } from "@/lib/db";
 import { loadPrintableTicket } from "@/lib/print/load-ticket";
+import { ticketOutput } from "@/lib/print/output";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export default async function ReprintTicketPage({
   const user = await currentUser();
   if (!user) redirect(`/login?callbackUrl=/print/${encodeURIComponent(ticketId)}`);
   if (user.role !== "ADMIN") redirect("/counter");
+  // Mode uji tanpa printer: tampilkan tiket sebagai PDF.
+  if (ticketOutput() === "pdf") redirect(`/print/${encodeURIComponent(ticketId)}/pdf`);
   const ticket = await loadPrintableTicket(ticketId);
   if (!ticket) notFound();
   const { tagline } = await readPublicBranding(getPrisma());

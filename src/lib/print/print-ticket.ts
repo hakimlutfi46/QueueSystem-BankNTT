@@ -58,3 +58,16 @@ export function printTicket(ticket: PrintableTicket, target?: PrintTarget): Prom
 function browserTarget(): PrintTarget {
   return document;
 }
+
+/**
+ * Mode TICKET_OUTPUT=pdf: unduh tiket sebagai PDF, sebagai pengganti printer saat mencoba tanpa printer.
+ */
+export function downloadTicketPdf(ticket: { id: string; number: string }, target: Pick<Document, "createElement" | "body"> = document): void {
+  const link = target.createElement("a");
+  link.href = `/kiosk/print/${encodeURIComponent(ticket.id)}/pdf`;
+  link.download = `tiket-${ticket.number}.pdf`;
+  link.rel = "noopener";
+  target.body.append(link);
+  link.click();
+  link.remove();
+}
