@@ -11,9 +11,17 @@ const cookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
   path: "/",
-  secure: process.env.NODE_ENV === "production",
   maxAge: 60 * 60 * 24 * 400,
 };
+
+/**
+ * Cookie bertanda Secure hanya disimpan browser lewat HTTPS. Server cabang sering dibuka lewat
+ * http://192.168.x.x, jadi tanda itu dipasang mengikuti protokol permintaan, bukan NODE_ENV.
+ */
+function isHttps(request: { nextUrl: URL; headers: Headers }): boolean {
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return (forwarded ?? request.nextUrl.protocol.replace(":", "")) === "https";
+}
 
 export const proxy = auth(async (request) => {
   const decision = await decideDevice({
@@ -38,7 +46,7 @@ export const proxy = auth(async (request) => {
     const url = request.nextUrl.clone();
     url.searchParams.delete("token");
     const response = NextResponse.redirect(url);
-    response.cookies.set(cookieName(decision.kind), decision.token, cookieOptions);
+    response.cookies.set(cookieName(decision.kind), decision.token, { ...cookieOptions, secure: isHttps(request) });
     return response;
   }
 
