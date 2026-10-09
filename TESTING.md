@@ -60,6 +60,7 @@ Uji berjalan berurutan, tidak paralel, karena semua kasus berbagi satu database.
 | Terbilang | `tests/unit/speech.test.ts` |
 | Realtime di bawah 2 detik dan pulih setelah putus | `tests/integration/realtime.test.ts` |
 | Loket dinamis: tambah beberapa loket, nama unik | `tests/integration/admin.test.ts`, `tests/unit/counter-names.test.ts` |
+| CRUD Admin: pesan galat, akun nonaktif, tutup paksa loket | `tests/integration/admin-crud.test.ts` |
 | Tidak ada warna hex di luar `tokens.css` | `tests/unit/tokens.test.ts` |
 | End-to-end dan loket dinamis di TV | `tests/e2e/journey.spec.ts`, `tests/e2e/admin.spec.ts` |
 
@@ -102,6 +103,13 @@ npm run test:e2e
 
 Playwright menyalakan `next dev` sendiri di port 3000 dengan `DATABASE_URL` dari terminal itu, menjalankan semua uji satu per satu, lalu mematikan server.
 
+**Bila `npm run dev` harus tetap menyala**, jalankan uji di port lain dengan build produksi. Next.js hanya mengizinkan satu `next dev` per proyek, jadi uji memakai `next start`:
+
+```bash
+npm run build
+E2E_PORT=3100 npm run test:e2e
+```
+
 Perintah lain yang berguna:
 
 ```bash
@@ -138,14 +146,15 @@ Lalu ulangi langkah "Siapkan database `queue_e2e`".
 | Gejala | Penyebab dan jalan keluar |
 | --- | --- |
 | `Executable doesn't exist ... chrome-headless-shell` | Browser belum dipasang. Jalankan `npx playwright install chromium`. |
-| Login gagal, uji berhenti di `/login` | Database belum di-seed dengan `change-me`, atau Playwright memakai server dev yang tersambung ke database lain. Matikan `npm run dev`, ulangi seed. |
+| Login gagal, uji berhenti di `/login` | Database belum di-seed dengan `change-me`, atau Playwright memakai server dev yang tersambung ke database lain. Matikan `npm run dev` atau pakai `E2E_PORT`, lalu ulangi seed. |
+| `Another next dev server is already running` | `E2E_PORT` hanya bisa dipakai bersama build produksi. Jalankan `npm run build` dulu. |
 | `KIOSK_TOKEN is not set` | Isi `KIOSK_TOKEN` dan `DISPLAY_TOKEN` di `.env`. |
 | Uji di layar TV atau loket habis waktu | Pastikan tidak ada loket yang tertinggal terbuka dari percobaan manual; ulangi dari database bersih. |
 | Loket "CS Khusus" muncul di database kerja | Uji e2e pernah dijalankan saat `npm run dev` tersambung ke database kerja. Nonaktifkan dari Admin → Loket. |
 
 ## 4. Uji manual tampilan
 
-Jalankan `npm run dev`, masuk sebagai admin, lalu salin tautan kiosk dan TV dari **Admin → Pengaturan → Pasang kiosk dan TV**. Buka di jendela terpisah dengan ukuran target:
+Supaya dasbor, laporan, dan grafik langsung terisi, jalankan dulu `npm run db:seed:demo` (lihat bagian Data contoh di README). Lalu jalankan `npm run dev`, masuk sebagai admin, lalu salin tautan kiosk dan TV dari **Admin → Pengaturan → Pasang kiosk dan TV**. Buka di jendela terpisah dengan ukuran target:
 
 | Layar | Ukuran target | Alamat |
 | --- | --- | --- |
@@ -172,7 +181,13 @@ Di Chrome, ukuran layar diatur dari DevTools → Toggle device toolbar.
 - [ ] Setelah disimpan, kedua loket muncul di layar pilih loket petugas tanpa muat ulang.
 - [ ] Tambah loket dengan nama yang sudah dipakai loket aktif. Penyimpanan ditolak dengan pesan "sudah ada".
 - [ ] Buka loket baru dari layar petugas. Status di Admin → Loket berubah menjadi Buka, dan loket muncul di TV.
-- [ ] Nonaktifkan loket yang sedang buka: tombolnya mati sampai petugas menutup loket itu.
+- [ ] Loket yang sedang buka menampilkan **Tutup paksa**, bukan Nonaktifkan. Tutup paksa saat petugas sedang melayani: layar petugas kembali ke Pilih loket, dan nomornya tampil "Selesai (tutup otomatis)" di laporan harian.
+
+**Petugas**
+
+- [ ] Nonaktifkan petugas yang sedang memegang loket: ditolak dengan nama loketnya.
+- [ ] Nonaktifkan petugas yang sedang masuk tapi tidak memegang loket, lalu muat ulang layarnya: petugas langsung diarahkan ke halaman masuk.
+- [ ] Isi nama pengguna dengan spasi atau kata sandi kurang dari 6 karakter: pesan galat menyebut kolom yang salah.
 
 **Admin dan laporan**
 

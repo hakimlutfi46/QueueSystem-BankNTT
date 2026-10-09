@@ -8,7 +8,7 @@ export function displayEntry(): string {
   return withToken("/display", "DISPLAY_TOKEN");
 }
 
-export function ticketEndpoint(base = "http://127.0.0.1:3000"): string {
+export function ticketEndpoint(base = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000"): string {
   const token = process.env.KIOSK_TOKEN?.trim();
   if (!token) throw new Error("KIOSK_TOKEN is not set");
   return `${base}/api/tickets?token=${encodeURIComponent(token)}`;

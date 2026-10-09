@@ -79,7 +79,7 @@ async function callNext(page: Page): Promise<string> {
 }
 
 function baseUrl(): string {
-  return "http://127.0.0.1:3000";
+  return process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
 }
 
 async function serviceA(): Promise<number> {

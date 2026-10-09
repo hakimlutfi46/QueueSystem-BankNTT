@@ -1,5 +1,23 @@
 # Keputusan
 
+## 2026-10-09 — Sesi dibaca ulang dari database
+
+Sesi Auth.js berupa cookie JWT yang berlaku 30 hari dan sebelumnya dipercaya begitu saja. Akibatnya petugas yang dinonaktifkan, admin yang diturunkan menjadi petugas, atau nama yang diganti baru berlaku setelah sesi habis. `currentUser()` di `src/lib/auth/session.ts` sekarang membaca nama, peran, dan status aktif dari tabel `users` di setiap permintaan. Akun nonaktif langsung kehilangan akses ke loket dan Admin.
+
+Proxy di `src/proxy.ts` tetap memakai cookie untuk mengizinkan baca `GET /api/queue/state` dan `/api/stream`, karena proxy tidak membuka koneksi database. Isinya hanya data yang juga tampil di TV.
+
+## 2026-10-09 — Tutup paksa loket dari Admin
+
+Hanya petugas pemegang loket yang bisa menutup loketnya, dan Admin tidak bisa menonaktifkan loket yang masih buka. Bila petugas pulang tanpa menutup loket, Admin tidak punya jalan keluar. Admin sekarang bisa menutup paksa lewat `POST /api/admin/counters/:id/close`, ditangani `forceCloseCounter()` di `src/lib/queue/desk.ts`.
+
+Tiket yang masih dilayani loket itu ditutup sebagai `DONE` dengan `auto_closed`, sama seperti tiket yang lupa ditutup saat ganti hari. Tiket itu tetap tampil di laporan dengan tanda tutup otomatis dan tidak masuk rata-rata. Jejaknya dicatat di `ticket_events` atas nama admin.
+
+Petugas yang masih memegang loket tidak bisa dinonaktifkan. Admin diminta menutup paksa loketnya dulu, supaya tidak ada loket buka tanpa petugas aktif.
+
+## 2026-10-09 — Data contoh terpisah dari seed
+
+`prisma/seed.ts` tetap berisi data awal yang aman untuk cabang, dan itu yang dijalankan Docker. Data contoh untuk mencoba aplikasi ada di `prisma/seed-demo.ts` (`npm run db:seed:demo`): dua layanan, tiga loket, tujuh akun tambahan, dan riwayat tiket tujuh hari kerja terakhir. Hasilnya tetap sama setiap kali dijalankan, dan tanggal yang sudah punya tiket dilewati, jadi tidak pernah menimpa data sungguhan.
+
 ## 2026-10-08 — Loket dinamis per cabang
 
 Halaman Admin → Loket bisa membuat beberapa loket sekaligus (misalnya Teller 3 sampai Teller 6) dalam satu transaksi lewat `POST /api/admin/counters` dengan isi `{ items: [...] }`. Bentuk lama dengan satu loket tetap diterima. Satu permintaan dibatasi 20 loket supaya satu salah ketik tidak membanjiri TV.
