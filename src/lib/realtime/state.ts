@@ -60,6 +60,7 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
           status: string;
           officer_id: number | null;
           officer_name: string | null;
+          next_number: string | null;
         }[]
       >`
         SELECT
@@ -68,7 +69,18 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
           counter.display_number,
           counter.status::text AS status,
           counter.current_user_id AS officer_id,
-          officer.name AS officer_name
+          officer.name AS officer_name,
+          (
+            SELECT ticket.number
+            FROM tickets AS ticket
+            WHERE ticket.status = 'WAITING'
+              AND ticket.service_date = ${today}::date
+              AND ticket.service_id IN (
+                SELECT link.service_id FROM counter_services AS link WHERE link.counter_id = counter.id
+              )
+            ORDER BY ticket.created_at, ticket.id
+            LIMIT 1
+          ) AS next_number
         FROM counters AS counter
         LEFT JOIN users AS officer ON officer.id = counter.current_user_id
         WHERE counter.is_active
@@ -185,6 +197,7 @@ export async function loadQueueState(db: PrismaClient = getPrisma()): Promise<Qu
         officerName: counter.officer_name,
         serviceIds: servicesByCounter.get(counter.id) ?? [],
         activeTicket: activeByCounter.get(counter.id) ?? null,
+        nextNumber: counter.next_number,
       })),
       lastCall: recentCalls[0] ?? null,
       recentCalls,

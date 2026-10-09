@@ -16,8 +16,9 @@ import {
   stageFit,
 } from "@/lib/display/layout";
 import { announcementScript } from "@/lib/speech/announcement";
-import { createBrowserPlayer } from "@/lib/speech/browser-player";
+import { createBrowserPlayer, unlockAudio } from "@/lib/speech/browser-player";
 import { createAnnouncementQueue } from "@/lib/speech/queue";
+import type { QueueCounterState } from "@/lib/realtime/types";
 import { subscribeQueueEvents, useQueueState } from "@/lib/realtime/use-queue-state";
 import { useNow } from "@/lib/use-now";
 
@@ -32,12 +33,47 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
     announcements.getServerHighlight,
   );
   const [soundOn, setSoundOn] = useState(false);
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const primed = useRef(false);
   const audible = useRef(true);
 
   useEffect(() => {
     audible.current = state?.settings.voiceEnabled !== false;
   }, [state]);
+
+  // Suara menyala sendiri. TV yang dijalankan dengan --autoplay-policy=no-user-gesture-required langsung
+  // berbunyi; bila browser menolak, sentuhan atau tombol apa pun pertama kali di layar ini menyalakannya.
+  useEffect(() => {
+    let active = true;
+    const turnOn = async () => {
+      const allowed = await unlockAudio();
+      if (!active) return allowed;
+      if (allowed) {
+        announcements.enable();
+        setSoundOn(true);
+        setSoundBlocked(false);
+      } else {
+        setSoundBlocked(true);
+      }
+      return allowed;
+    };
+    void turnOn();
+    const onGesture = () => {
+      void turnOn().then((allowed) => {
+        if (allowed) removeListeners();
+      });
+    };
+    const removeListeners = () => {
+      window.removeEventListener("pointerdown", onGesture);
+      window.removeEventListener("keydown", onGesture);
+    };
+    window.addEventListener("pointerdown", onGesture);
+    window.addEventListener("keydown", onGesture);
+    return () => {
+      active = false;
+      removeListeners();
+    };
+  }, [announcements]);
 
   useEffect(() => {
     if (!state || primed.current) return;
@@ -63,8 +99,11 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
     });
   }, [announcements]);
 
-  const openCounters = state?.counters.filter((counter) => counter.status === "OPEN") ?? [];
-  const counterPages = paginate(openCounters, COUNTERS_PER_PAGE);
+  // Semua loket aktif tampil dengan statusnya; urut nama supaya CS dan Teller berkelompok.
+  const allCounters = [...(state?.counters ?? [])].sort((left, right) =>
+    left.name.localeCompare(right.name, "id", { numeric: true }),
+  );
+  const counterPages = paginate(allCounters, COUNTERS_PER_PAGE);
   const servicePages = paginate(state?.services ?? [], SERVICES_PER_PAGE);
   const counterPage = useRotatingPage(counterPages.length);
   const servicePage = useRotatingPage(servicePages.length);
@@ -98,12 +137,14 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
             <p className="truncate text-[34px] font-bold leading-tight">{state.settings.branchName}</p>
             <BrandTagline className="truncate text-xl font-bold opacity-90" />
           </div>
-          {state.settings.voiceEnabled && !soundOn ? (
+          {state.settings.voiceEnabled && !soundOn && soundBlocked ? (
             <BrandButton
               className="shrink-0 shadow-glow"
               onClick={() => {
-                announcements.enable();
-                setSoundOn(true);
+                void unlockAudio().then(() => {
+                  announcements.enable();
+                  setSoundOn(true);
+                });
               }}
             >
               <Icon name="volume" className="size-5" />
@@ -196,14 +237,14 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
                   <span className="text-right">Menunggu</span>
                   <span className="text-right">Berikutnya</span>
                 </div>
-                <ul className="flex min-h-0 flex-1 flex-col gap-2.5" data-testid="service-queues">
+                <ul className="flex min-h-0 flex-1 flex-col gap-2" data-testid="service-queues">
                   {services.map((service) => (
                     <li
                       key={service.id}
-                      className="grid h-[92px] shrink-0 grid-cols-[minmax(0,1fr)_120px_150px] items-center gap-3 rounded-[var(--radius-card)] bg-brand-navy px-4"
+                      className="grid h-[84px] shrink-0 grid-cols-[minmax(0,1fr)_120px_150px] items-center gap-3 rounded-[var(--radius-card)] bg-brand-navy px-4"
                     >
                       <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-brand-white text-2xl font-bold text-brand-navy">
+                        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-white text-2xl font-bold text-brand-navy">
                           {service.prefix}
                         </span>
                         <p className="line-clamp-2 min-w-0 text-[22px] font-bold leading-tight">{service.name}</p>
@@ -225,33 +266,16 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
               Loket
             </SectionTitle>
             {counters.length === 0 ? (
-              <p className="text-2xl opacity-80">Belum ada loket yang buka.</p>
+              <p className="text-2xl opacity-80">Belum ada loket.</p>
             ) : (
-              <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-3">
-                {counters.map((counter) => {
-                  const latest = lastCall?.counterId === counter.id && counter.activeTicket != null;
-                  return (
-                    <article
-                      key={counter.id}
-                      data-testid={`counter-${counter.id}`}
-                      className={cn(
-                        "relative flex h-[118px] flex-col justify-between overflow-hidden rounded-[var(--radius-card)] bg-brand-white px-5 py-3 text-brand-navy",
-                        latest ? "shadow-[0_0_0_4px_var(--brand-orange)]" : "shadow-glow",
-                      )}
-                    >
-                      {latest ? <span className="absolute inset-y-0 left-0 w-2 bg-brand-orange" aria-hidden="true" /> : null}
-                      <p className="truncate text-2xl font-bold">{counter.name}</p>
-                      <p
-                        className={cn(
-                          "self-end font-bold leading-none tabular-nums",
-                          counter.activeTicket ? "text-[52px]" : "text-[40px] text-brand-grey",
-                        )}
-                      >
-                        {counter.activeTicket?.number ?? "—"}
-                      </p>
-                    </article>
-                  );
-                })}
+              <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-5 gap-3">
+                {counters.map((counter) => (
+                  <CounterCard
+                    key={counter.id}
+                    counter={counter}
+                    latest={lastCall?.counterId === counter.id && counter.activeTicket != null}
+                  />
+                ))}
               </div>
             )}
           </section>
@@ -271,6 +295,61 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
         <DiagonalStripes className="shrink-0" />
       </div>
     </Stage>
+  );
+}
+
+const COUNTER_STATUS: Record<QueueCounterState["status"], { label: string; className: string }> = {
+  OPEN: { label: "Buka", className: "bg-success-soft text-success" },
+  PAUSED: { label: "Istirahat", className: "bg-orange-soft text-ink" },
+  CLOSED: { label: "Tutup", className: "bg-surface text-ink-muted" },
+};
+
+/**
+ * Satu loket di TV: nama, status, nomor yang sedang dilayani, dan nomor yang akan dipanggilnya berikutnya.
+ * Loket istirahat atau tutup tidak menampilkan nomor berikutnya karena tidak sedang memanggil.
+ */
+function CounterCard({ counter, latest }: { counter: QueueCounterState; latest: boolean }) {
+  const status = COUNTER_STATUS[counter.status];
+  const open = counter.status === "OPEN";
+  return (
+    <article
+      data-testid={`counter-${counter.id}`}
+      className={cn(
+        "relative flex min-h-0 flex-col justify-between overflow-hidden rounded-[var(--radius-card)] px-5 py-3",
+        open ? "bg-brand-white text-brand-navy" : "bg-brand-white/85 text-brand-navy",
+        latest ? "shadow-[0_0_0_4px_var(--brand-orange)]" : open ? "shadow-glow" : null,
+      )}
+    >
+      {latest ? <span className="absolute inset-y-0 left-0 w-2 bg-brand-orange" aria-hidden="true" /> : null}
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-2xl font-bold">{counter.name}</p>
+        <span className={cn("shrink-0 rounded-full px-3 py-1 text-base font-bold", status.className)}>{status.label}</span>
+      </div>
+      <div className="flex items-end justify-between gap-3">
+        <p
+          className={cn(
+            "min-w-0 font-bold leading-none tabular-nums",
+            counter.activeTicket ? "text-[52px]" : "text-[40px] text-brand-grey",
+          )}
+        >
+          {counter.activeTicket?.number ?? "—"}
+        </p>
+        <div className="shrink-0 text-right">
+          {open ? (
+            <>
+              <p className="text-sm font-bold uppercase tracking-wide text-ink-muted">Berikutnya</p>
+              <p className={cn("text-[26px] font-bold leading-tight tabular-nums", counter.nextNumber ? "text-ink" : "text-brand-grey")}>
+                {counter.nextNumber ?? "—"}
+              </p>
+            </>
+          ) : (
+            <p className="pb-1 text-lg font-bold text-ink-muted">
+              {counter.status === "PAUSED" ? "Sedang istirahat" : "Tidak melayani"}
+            </p>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 

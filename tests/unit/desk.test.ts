@@ -79,6 +79,7 @@ function state(input: {
         officerName: "Petugas",
         serviceIds: [1],
         activeTicket: null,
+        nextNumber: null,
       },
     ],
     lastCall: null,
