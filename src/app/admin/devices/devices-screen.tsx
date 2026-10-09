@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestAdmin, submitAdmin } from "@/app/admin/submit";
 import { BrandButton } from "@/components/brand/brand-button";
@@ -11,6 +11,7 @@ import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/pan
 import type { DeviceKind } from "@/lib/auth/device";
 import type { AdminDevice, IssuedDevice } from "@/lib/auth/devices";
 import { cn } from "@/lib/cn";
+import { copyText, selectContents } from "@/lib/copy-text";
 import { useNow } from "@/lib/use-now";
 
 const KINDS: { kind: DeviceKind; label: string; icon: "touch" | "tv"; path: string; hint: string }[] = [
@@ -316,6 +317,9 @@ function DeviceRow({
 function IssuedModal({ issued, onClose }: { issued: IssuedDevice; onClose: () => void }) {
   const [origin, setOrigin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
   const [copied, setCopied] = useState<"link" | "command" | null>(null);
+  const [manual, setManual] = useState<"link" | "command" | null>(null);
+  const linkRef = useRef<HTMLElement>(null);
+  const commandRef = useRef<HTMLElement>(null);
   const kind = KINDS.find((item) => item.kind === issued.device.kind) ?? KINDS[0];
   const base = origin.trim().replace(/\/+$/, "");
   const link = `${base}${kind.path}?token=${encodeURIComponent(issued.token)}`;
@@ -324,11 +328,17 @@ function IssuedModal({ issued, onClose }: { issued: IssuedDevice; onClose: () =>
       ? `google-chrome --kiosk --kiosk-printing --app="${link}"`
       : `google-chrome --kiosk --autoplay-policy=no-user-gesture-required --app="${link}"`;
 
-  function copy(text: string, what: "link" | "command") {
-    void navigator.clipboard?.writeText(text).then(() => {
+  async function copy(text: string, what: "link" | "command") {
+    if (await copyText(text)) {
+      setManual(null);
       setCopied(what);
-      window.setTimeout(() => setCopied(null), 2000);
-    });
+      window.setTimeout(() => setCopied((current) => (current === what ? null : current)), 2000);
+      return;
+    }
+    // Browser menolak menyalin: pilih teksnya supaya admin tinggal menekan Ctrl+C atau Cmd+C.
+    setCopied(null);
+    setManual(what);
+    selectContents(what === "link" ? linkRef.current : commandRef.current);
   }
 
   return (
@@ -344,24 +354,26 @@ function IssuedModal({ issued, onClose }: { issued: IssuedDevice; onClose: () =>
         <div>
           <p className="mb-1.5 text-sm font-bold">Tautan</p>
           <div className="flex gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-xl bg-surface px-3 py-3 text-xs" data-testid="device-link">
+            <code
+              ref={linkRef}
+              className="min-w-0 flex-1 select-all break-all rounded-xl bg-surface px-3 py-3 text-xs"
+              data-testid="device-link"
+            >
               {link}
             </code>
-            <BrandButton variant="outline" onClick={() => copy(link, "link")}>
-              <Icon name={copied === "link" ? "check" : "copy"} className="size-4" />
-              {copied === "link" ? "Tersalin" : "Salin"}
-            </BrandButton>
+            <CopyButton state={copied === "link" ? "copied" : "idle"} onClick={() => void copy(link, "link")} />
           </div>
+          {manual === "link" ? <ManualCopyHint /> : null}
         </div>
         <div>
           <p className="mb-1.5 text-sm font-bold">Perintah Chrome layar penuh</p>
           <div className="flex gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-xl bg-surface px-3 py-3 text-xs">{command}</code>
-            <BrandButton variant="outline" onClick={() => copy(command, "command")}>
-              <Icon name={copied === "command" ? "check" : "copy"} className="size-4" />
-              {copied === "command" ? "Tersalin" : "Salin"}
-            </BrandButton>
+            <code ref={commandRef} className="min-w-0 flex-1 select-all break-all rounded-xl bg-surface px-3 py-3 text-xs">
+              {command}
+            </code>
+            <CopyButton state={copied === "command" ? "copied" : "idle"} onClick={() => void copy(command, "command")} />
           </div>
+          {manual === "command" ? <ManualCopyHint /> : null}
         </div>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
           <li>Buka tautan di perangkat {issued.device.kind === "kiosk" ? "kiosk" : "TV"} sekali. Browser menyimpan izinnya.</li>
@@ -380,6 +392,23 @@ function IssuedModal({ issued, onClose }: { issued: IssuedDevice; onClose: () =>
         </div>
       </div>
     </Modal>
+  );
+}
+
+function CopyButton({ state, onClick }: { state: "idle" | "copied"; onClick: () => void }) {
+  return (
+    <BrandButton variant={state === "copied" ? "primary" : "outline"} onClick={onClick}>
+      <Icon name={state === "copied" ? "check" : "copy"} className="size-4" />
+      <span aria-live="polite">{state === "copied" ? "Tersalin" : "Salin"}</span>
+    </BrandButton>
+  );
+}
+
+function ManualCopyHint() {
+  return (
+    <p role="status" className="mt-1.5 text-xs font-bold text-ink">
+      Browser menolak menyalin otomatis. Teksnya sudah dipilih, tekan Ctrl+C (Windows) atau Cmd+C (Mac).
+    </p>
   );
 }
 
