@@ -10,3 +10,23 @@ export async function submitAdmin(url: string, method: string, body: unknown): P
   const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
   return payload?.error?.message ?? "Perubahan gagal disimpan.";
 }
+
+/** Seperti submitAdmin, tetapi mengembalikan isi jawaban, misalnya token perangkat yang baru dibuat. */
+export async function requestAdmin<T>(
+  url: string,
+  method: string,
+  body: unknown,
+): Promise<{ data: T; error: null } | { data: null; error: string }> {
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = (await response.json().catch(() => null)) as (T & { error?: { message?: string } }) | null;
+    if (response.ok && payload) return { data: payload, error: null };
+    return { data: null, error: payload?.error?.message ?? "Perubahan gagal disimpan." };
+  } catch {
+    return { data: null, error: "Server tidak terjangkau." };
+  }
+}

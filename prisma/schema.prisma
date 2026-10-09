@@ -26,6 +26,13 @@ enum CounterStatus {
   @@map("counter_status")
 }
 
+enum DeviceKind {
+  KIOSK
+  DISPLAY
+
+  @@map("device_kind")
+}
+
 enum UserRole {
   ADMIN
   STAFF
@@ -141,6 +148,20 @@ model TicketEvent {
   user    User?    @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@map("ticket_events")
+}
+
+/// Kiosk atau TV yang diizinkan Admin. Token mentah hanya ditampilkan sekali; yang disimpan hanya hash SHA-256.
+model Device {
+  id         Int        @id @default(autoincrement())
+  kind       DeviceKind
+  name       String
+  tokenHash  String     @unique @map("token_hash")
+  tokenHint  String     @map("token_hint")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt DateTime?  @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt  DateTime?  @map("revoked_at") @db.Timestamptz(6)
+
+  @@map("devices")
 }
 
 model Setting {

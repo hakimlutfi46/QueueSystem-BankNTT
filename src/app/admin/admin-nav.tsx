@@ -20,8 +20,9 @@ const groups: { label: string; links: { href: string; label: string; icon: IconN
     label: "Atur cabang",
     links: [
       { href: "/admin/counters", label: "Loket", icon: "desk" },
-      { href: "/admin/services", label: "Layanan", icon: "layers" },
+      { href: "/admin/services", label: "Layanan", icon: "ticket" },
       { href: "/admin/users", label: "Petugas", icon: "users" },
+      { href: "/admin/devices", label: "Perangkat", icon: "tv" },
       { href: "/admin/settings", label: "Pengaturan", icon: "settings" },
     ],
   },

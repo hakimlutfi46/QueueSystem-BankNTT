@@ -1,13 +1,9 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
-import {
-  decideDevice,
-  deviceToken,
-  DISPLAY_COOKIE,
-  KIOSK_COOKIE,
-  type DeviceKind,
-} from "@/lib/auth/device";
+import { decideDevice, DISPLAY_COOKIE, KIOSK_COOKIE, type DeviceKind } from "@/lib/auth/device";
+import { deviceMatcher } from "@/lib/auth/devices";
+import { getPrisma } from "@/lib/db";
 
 const { auth } = NextAuth(authConfig);
 
@@ -19,14 +15,14 @@ const cookieOptions = {
   maxAge: 60 * 60 * 24 * 400,
 };
 
-export const proxy = auth((request) => {
-  const decision = decideDevice({
+export const proxy = auth(async (request) => {
+  const decision = await decideDevice({
     pathname: request.nextUrl.pathname,
     token: request.nextUrl.searchParams.get("token"),
     kioskCookie: request.cookies.get(KIOSK_COOKIE)?.value,
     displayCookie: request.cookies.get(DISPLAY_COOKIE)?.value,
     hasSession: Boolean(request.auth),
-  });
+  }, deviceMatcher(getPrisma()));
 
   if (decision.type === "allow") return NextResponse.next();
   if (decision.type === "deny-api") {
@@ -42,7 +38,7 @@ export const proxy = auth((request) => {
     const url = request.nextUrl.clone();
     url.searchParams.delete("token");
     const response = NextResponse.redirect(url);
-    response.cookies.set(cookieName(decision.kind), deviceToken(decision.kind) ?? "", cookieOptions);
+    response.cookies.set(cookieName(decision.kind), decision.token, cookieOptions);
     return response;
   }
 

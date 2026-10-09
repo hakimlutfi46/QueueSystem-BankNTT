@@ -10,8 +10,12 @@ export type DeviceDecision =
   | { type: "allow" }
   | { type: "deny-api" }
   | { type: "deny-page" }
-  | { type: "set-cookie"; kind: DeviceKind };
+  | { type: "set-cookie"; kind: DeviceKind; token: string };
 
+/** Benar bila token berlaku untuk jenis perangkat itu: perangkat terdaftar di Admin, atau token cadangan di .env. */
+export type DeviceMatcher = (kind: DeviceKind, token: string) => Promise<boolean>;
+
+/** Token cadangan dari .env (KIOSK_TOKEN, DISPLAY_TOKEN). Opsional; perangkat biasanya didaftarkan dari Admin. */
 export function deviceToken(kind: DeviceKind): string | undefined {
   const value = kind === "kiosk" ? process.env.KIOSK_TOKEN : process.env.DISPLAY_TOKEN;
   const trimmed = value?.trim();
@@ -26,29 +30,36 @@ export function tokenMatches(provided: string | null | undefined, expected: stri
   return timingSafeEqual(left, right);
 }
 
-export function decideDevice(input: {
-  pathname: string;
-  token: string | null;
-  kioskCookie: string | undefined;
-  displayCookie: string | undefined;
-  hasSession: boolean;
-}): DeviceDecision {
+export async function decideDevice(
+  input: {
+    pathname: string;
+    token: string | null;
+    kioskCookie: string | undefined;
+    displayCookie: string | undefined;
+    hasSession: boolean;
+  },
+  matches: DeviceMatcher,
+): Promise<DeviceDecision> {
   const kind = deviceKind(input.pathname);
   if (!kind) return { type: "skip" };
   if (kind === "shared") {
-    if (input.hasSession || cookieMatches("kiosk", input.kioskCookie) || cookieMatches("display", input.displayCookie)) {
-      return { type: "allow" };
-    }
+    if (input.hasSession) return { type: "allow" };
+    if (input.kioskCookie && (await matches("kiosk", input.kioskCookie))) return { type: "allow" };
+    if (input.displayCookie && (await matches("display", input.displayCookie))) return { type: "allow" };
     return { type: "deny-api" };
   }
-  if (tokenMatches(input.token, deviceToken(kind))) {
-    return input.pathname.startsWith("/api/") ? { type: "allow" } : { type: "set-cookie", kind };
+  if (input.token && (await matches(kind, input.token))) {
+    return input.pathname.startsWith("/api/")
+      ? { type: "allow" }
+      : { type: "set-cookie", kind, token: input.token };
   }
-  if (cookieMatches(kind, kind === "kiosk" ? input.kioskCookie : input.displayCookie)) {
-    return { type: "allow" };
-  }
+  const cookie = kind === "kiosk" ? input.kioskCookie : input.displayCookie;
+  if (cookie && (await matches(kind, cookie))) return { type: "allow" };
   return input.pathname.startsWith("/api/") ? { type: "deny-api" } : { type: "deny-page" };
 }
+
+/** Pencocok untuk token cadangan .env saja. */
+export const envDeviceMatcher: DeviceMatcher = async (kind, token) => tokenMatches(token, deviceToken(kind));
 
 function deviceKind(pathname: string): DeviceKind | "shared" | null {
   if (pathname === "/kiosk" || pathname.startsWith("/kiosk/")) return "kiosk";
@@ -56,8 +67,4 @@ function deviceKind(pathname: string): DeviceKind | "shared" | null {
   if (pathname === "/api/tickets" || pathname.startsWith("/api/tickets/")) return "kiosk";
   if (pathname === "/api/queue/state" || pathname === "/api/stream") return "shared";
   return null;
-}
-
-function cookieMatches(kind: DeviceKind, cookie: string | undefined): boolean {
-  return tokenMatches(cookie, deviceToken(kind));
 }
