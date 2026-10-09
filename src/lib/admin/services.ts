@@ -114,3 +114,118 @@ function mapService(row: {
     isActive: row.is_active,
   };
 }
+
+const serviceCountersBody = z.object({
+  counterIds: z.array(
+    z.number({ error: "Nomor loket tidak valid." }).int("Nomor loket tidak valid.").positive("Nomor loket tidak valid."),
+    { error: "Daftar loket wajib diisi." },
+  ),
+});
+
+/** Daftar loket yang melayani tiap layanan, dikunci dengan id layanan. */
+export async function listServiceCounters(db: PrismaClient): Promise<Map<number, number[]>> {
+  const rows = await db.$queryRaw<{ service_id: number; counter_id: number }[]>`
+    SELECT service_id, counter_id FROM counter_services ORDER BY service_id, counter_id
+  `;
+  const result = new Map<number, number[]>();
+  for (const row of rows) {
+    const current = result.get(row.service_id) ?? [];
+    current.push(row.counter_id);
+    result.set(row.service_id, current);
+  }
+  return result;
+}
+
+/**
+ * Mengganti loket aktif yang melayani satu layanan. Tautan ke loket nonaktif dibiarkan.
+ * Semua baris yang terlibat dikunci dulu (layanan, lalu loket berurutan id) supaya dua admin
+ * yang menyimpan bersamaan tidak bisa membuat satu loket tanpa layanan sama sekali.
+ */
+export async function setServiceCounters(
+  db: PrismaClient,
+  serviceId: number,
+  body: unknown,
+): Promise<{ serviceId: number; counterIds: number[] }> {
+  const parsed = serviceCountersBody.safeParse(body);
+  if (!parsed.success) throw validationError(parsed.error);
+  const wanted = [...new Set(parsed.data.counterIds)].sort((a, b) => a - b);
+
+  return db.$transaction(async (tx) => {
+    const service = await tx.$queryRaw<{ id: number }[]>`
+      SELECT id FROM services WHERE id = ${serviceId} FOR UPDATE
+    `;
+    if (!service[0]) throw new AdminError("NOT_FOUND", "Layanan tidak ditemukan.");
+
+    // Kunci semua loket yang terlibat dengan urutan id naik agar tidak terjadi deadlock.
+    // Diulang bila tautan berubah sebelum kunci didapat (misalnya dari menu Loket).
+    const locked = new Map<number, { id: number; name: string; is_active: boolean }>();
+    for (;;) {
+      const linked = await linkedCounterIds(tx, serviceId);
+      const pending = [...new Set([...wanted, ...linked])]
+        .filter((id) => !locked.has(id))
+        .sort((a, b) => a - b);
+      if (pending.length === 0) break;
+      for (const id of pending) {
+        const rows = await tx.$queryRaw<{ id: number; name: string; is_active: boolean }[]>`
+          SELECT id, name, is_active FROM counters WHERE id = ${id} FOR UPDATE
+        `;
+        const counter = rows[0];
+        if (!counter) {
+          if (wanted.includes(id)) throw new AdminError("VALIDATION", "Loket yang dipilih tidak ditemukan. Muat ulang halaman.");
+          continue;
+        }
+        locked.set(id, counter);
+      }
+      if (wanted.some((id) => !locked.has(id))) {
+        throw new AdminError("VALIDATION", "Loket yang dipilih tidak ditemukan. Muat ulang halaman.");
+      }
+    }
+
+    for (const id of wanted) {
+      const counter = locked.get(id);
+      if (!counter) throw new AdminError("VALIDATION", "Loket yang dipilih tidak ditemukan. Muat ulang halaman.");
+      if (!counter.is_active) {
+        throw new AdminError("VALIDATION", `${counter.name} sedang nonaktif. Aktifkan dulu di menu Loket.`);
+      }
+    }
+
+    const current = await linkedCounterIds(tx, serviceId);
+    const toRemove = current.filter((id) => !wanted.includes(id) && locked.get(id)?.is_active);
+    const toAdd = wanted.filter((id) => !current.includes(id));
+
+    for (const id of toRemove) {
+      const others = await tx.$queryRaw<{ total: number }[]>`
+        SELECT count(*)::int AS total
+        FROM counter_services
+        WHERE counter_id = ${id} AND service_id <> ${serviceId}
+      `;
+      if ((others[0]?.total ?? 0) === 0) {
+        const name = locked.get(id)?.name ?? "Loket";
+        throw new AdminError(
+          "COUNTER_LAST_SERVICE",
+          `${name} tidak punya layanan lain. Tambahkan layanan lain ke ${name} dulu di menu Loket.`,
+        );
+      }
+    }
+
+    for (const id of toRemove) {
+      await tx.$executeRaw`DELETE FROM counter_services WHERE counter_id = ${id} AND service_id = ${serviceId}`;
+    }
+    for (const id of toAdd) {
+      await tx.$executeRaw`
+        INSERT INTO counter_services (counter_id, service_id)
+        VALUES (${id}, ${serviceId})
+        ON CONFLICT DO NOTHING
+      `;
+    }
+    await notifyQueue(tx, { type: "COUNTER_CHANGED", serviceId });
+    return { serviceId, counterIds: await linkedCounterIds(tx, serviceId) };
+  });
+}
+
+async function linkedCounterIds(tx: { $queryRaw: PrismaClient["$queryRaw"] }, serviceId: number): Promise<number[]> {
+  const rows = await tx.$queryRaw<{ counter_id: number }[]>`
+    SELECT counter_id FROM counter_services WHERE service_id = ${serviceId} ORDER BY counter_id
+  `;
+  return rows.map((row) => row.counter_id);
+}

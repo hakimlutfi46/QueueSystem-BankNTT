@@ -113,6 +113,8 @@ export async function updateCounter(db: PrismaClient, id: number, body: unknown)
   if (!parsed.success) throw validationError(parsed.error);
   if (Object.keys(parsed.data).length === 0) throw new AdminError("VALIDATION", "Tidak ada yang diubah.");
   return db.$transaction(async (tx) => {
+    // Kunci baris loket dulu, supaya tidak bentrok dengan pengaturan loket dari menu Layanan.
+    await tx.$queryRaw`SELECT id FROM counters WHERE id = ${id} FOR UPDATE`;
     const existing = (await listCounters(tx as unknown as PrismaClient)).find((counter) => counter.id === id);
     if (!existing) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
     if (parsed.data.isActive === false && (existing.status === "OPEN" || existing.status === "PAUSED")) {

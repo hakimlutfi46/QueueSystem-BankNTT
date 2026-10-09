@@ -20,6 +20,7 @@ const clientErrors: Record<string, { status: number; message: string | null }> =
   COUNTER_BUSY: { status: 409, message: "Tutup loket terlebih dahulu." },
   CANNOT_CHANGE_SELF: { status: 409, message: "Anda tidak dapat menonaktifkan akun sendiri." },
   USER_ON_DUTY: { status: 409, message: null },
+  COUNTER_LAST_SERVICE: { status: 409, message: null },
 };
 
 export function adminErrorResponse(error: unknown): Response | null {

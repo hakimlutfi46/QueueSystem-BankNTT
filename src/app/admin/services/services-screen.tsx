@@ -6,7 +6,7 @@ import { submitAdmin } from "@/app/admin/submit";
 import { useLiveRefresh } from "@/app/admin/use-live-refresh";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge, PrefixTile } from "@/components/ui/badge";
-import { Field, Switch, inputClass } from "@/components/ui/field";
+import { ChipCheckbox, Field, Switch, inputClass } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
 import type { AdminCounter } from "@/lib/admin/counters";
@@ -38,6 +38,7 @@ export function ServicesScreen({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<AdminService | null>(null);
+  const [assigning, setAssigning] = useState<AdminService | null>(null);
   const [formKey, setFormKey] = useState(0);
 
   const waitingById = new Map((state?.services ?? []).map((service) => [service.id, service.waitingCount]));
@@ -122,6 +123,18 @@ export function ServicesScreen({
                           </dd>
                         </div>
                       </dl>
+                      {serving.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-sm">
+                          <span className="font-bold text-ink-muted">Dilayani di:</span>
+                          <ul className="contents" aria-label={`Loket yang melayani ${service.name}`}>
+                            {serving.map((counter) => (
+                              <li key={counter.id}>
+                                <Badge tone="sky">{counter.name}</Badge>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                       {service.isActive && serving.length === 0 ? (
                         <p className="mt-3 flex items-center gap-2 rounded-xl bg-orange-soft px-3 py-2 text-sm font-bold text-ink">
                           <Icon name="desk" className="size-4" />
@@ -132,6 +145,15 @@ export function ServicesScreen({
                         <BrandButton size="sm" variant="outline" onClick={() => setEditing(service)} ariaLabel={`Ubah ${service.name}`}>
                           <Icon name="edit" className="size-4" />
                           Ubah
+                        </BrandButton>
+                        <BrandButton
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAssigning(service)}
+                          ariaLabel={`Atur loket untuk ${service.name}`}
+                        >
+                          <Icon name="desk" className="size-4" />
+                          Atur loket
                         </BrandButton>
                         <BrandButton
                           size="sm"
@@ -186,8 +208,136 @@ export function ServicesScreen({
           </form>
         </Modal>
       ) : null}
+
+      {assigning ? (
+        <AssignCountersModal
+          service={assigning}
+          counters={counters}
+          onClose={() => setAssigning(null)}
+          onSave={async (counterIds) => {
+            const message = await submitAdmin(`/api/admin/services/${assigning.id}/counters`, "PUT", { counterIds });
+            if (done(message, `Loket untuk ${assigning.name} disimpan.`)) setAssigning(null);
+            return message;
+          }}
+        />
+      ) : null}
     </section>
   );
+}
+
+function AssignCountersModal({
+  service,
+  counters,
+  onClose,
+  onSave,
+}: {
+  service: AdminService;
+  counters: AdminCounter[];
+  onClose: () => void;
+  onSave: (counterIds: number[]) => Promise<string | null>;
+}) {
+  const active = counters.filter((counter) => counter.isActive);
+  const [selected, setSelected] = useState<Set<number>>(
+    () => new Set(active.filter((counter) => counter.serviceIds.includes(service.id)).map((counter) => counter.id)),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const groups = groupCounters(active);
+
+  function toggle(id: number, checked: boolean) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function selectPrefix(prefix: string) {
+    const matching = active.filter((counter) => counter.name.trim().toLowerCase().startsWith(prefix.toLowerCase()));
+    setSelected((current) => new Set([...current, ...matching.map((counter) => counter.id)]));
+  }
+
+  return (
+    <Modal
+      title={`Atur loket untuk ${service.name}`}
+      description="Centang loket yang boleh memanggil nomor layanan ini. Satu loket bisa melayani beberapa layanan."
+      onClose={onClose}
+      wide
+    >
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setSaving(true);
+          const message = await onSave([...selected].sort((a, b) => a - b));
+          setSaving(false);
+          setError(message);
+        }}
+      >
+        {error ? <Alert>{error}</Alert> : null}
+        {active.length === 0 ? (
+          <p className="text-sm text-ink-muted">Belum ada loket aktif. Tambahkan loket dulu di menu Loket.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              <BrandButton size="sm" variant="outline" onClick={() => selectPrefix("CS")}>
+                Pilih semua CS
+              </BrandButton>
+              <BrandButton size="sm" variant="outline" onClick={() => selectPrefix("Teller")}>
+                Pilih semua Teller
+              </BrandButton>
+              <BrandButton size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                Kosongkan
+              </BrandButton>
+            </div>
+            {groups.map((group) => (
+              <fieldset key={group.label} className="flex flex-col gap-2">
+                <legend className="mb-2 text-sm font-bold text-brand-navy">{group.label}</legend>
+                <div className="flex flex-wrap gap-2">
+                  {group.counters.map((counter) => (
+                    <ChipCheckbox
+                      key={counter.id}
+                      value={counter.id}
+                      label={counter.name}
+                      checked={selected.has(counter.id)}
+                      onChange={(checked) => toggle(counter.id, checked)}
+                    />
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+            <p className="text-sm text-ink-muted" aria-live="polite">
+              {selected.size === 0
+                ? "Belum ada loket dipilih. Nomor layanan ini tidak akan dipanggil."
+                : `${selected.size} loket dipilih.`}
+            </p>
+          </>
+        )}
+        <div className="flex justify-end gap-2 border-t border-line pt-4">
+          <BrandButton variant="ghost" onClick={onClose}>
+            Batal
+          </BrandButton>
+          <BrandButton type="submit" disabled={saving}>
+            {saving ? "Menyimpan…" : "Simpan loket"}
+          </BrandButton>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Mengelompokkan loket berdasarkan nama tanpa nomor di belakang, misalnya "CS 1" dan "CS 2" menjadi "CS". */
+function groupCounters(counters: AdminCounter[]): { label: string; counters: AdminCounter[] }[] {
+  const groups = new Map<string, { label: string; counters: AdminCounter[] }>();
+  for (const counter of counters) {
+    const base = counter.name.trim().replace(/\s*\d+$/, "") || counter.name.trim();
+    const key = base.toLowerCase();
+    const group = groups.get(key) ?? { label: base, counters: [] };
+    group.counters.push(counter);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
 }
 
 function ServiceFields({ defaults }: { defaults: ServiceBody }) {
