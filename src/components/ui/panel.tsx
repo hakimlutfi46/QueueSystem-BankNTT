@@ -149,7 +149,10 @@ export function Modal({
     const first = dialog.current?.querySelector<HTMLElement>("input, select, textarea, button");
     first?.focus();
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      // Dengan dua dialog bertumpuk (misalnya konfirmasi di atas dialog ubah), hanya yang paling atas ditutup.
+      const open = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (open[open.length - 1] === dialog.current) onClose();
     }
     window.addEventListener("keydown", onKey);
     return () => {

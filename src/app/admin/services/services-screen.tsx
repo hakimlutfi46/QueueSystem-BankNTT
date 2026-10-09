@@ -7,6 +7,7 @@ import { useLiveRefresh } from "@/app/admin/use-live-refresh";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge, PrefixTile } from "@/components/ui/badge";
 import { ChipCheckbox, Field, Switch, inputClass } from "@/components/ui/field";
+import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
 import type { AdminCounter } from "@/lib/admin/counters";
@@ -33,6 +34,7 @@ export function ServicesScreen({
   counters: AdminCounter[];
 }) {
   const router = useRouter();
+  const { confirm, dialog } = useConfirm();
   const { state } = useQueueState();
   useLiveRefresh(["CONFIG_CHANGED", "COUNTER_CHANGED"]);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +61,21 @@ export function ServicesScreen({
   }
 
   async function toggle(service: AdminService) {
+    const ok = await confirm(
+      service.isActive
+        ? {
+            title: `Nonaktifkan ${service.name}?`,
+            message: "Tombol layanan ini hilang dari kiosk, jadi nasabah tidak bisa mengambil nomornya. Tiket yang sudah diambil tetap bisa dipanggil, dan riwayatnya tetap tersimpan.",
+            confirmLabel: "Nonaktifkan",
+          }
+        : {
+            title: `Aktifkan ${service.name}?`,
+            message: "Tombol layanan ini muncul lagi di kiosk.",
+            confirmLabel: "Aktifkan",
+            tone: "primary",
+          },
+    );
+    if (!ok) return;
     const message = await submitAdmin(`/api/admin/services/${service.id}`, "PATCH", { isActive: !service.isActive });
     done(message, service.isActive ? `${service.name} disembunyikan dari kiosk.` : `${service.name} tampil lagi di kiosk.`);
   }
@@ -221,6 +238,7 @@ export function ServicesScreen({
           }}
         />
       ) : null}
+      {dialog}
     </section>
   );
 }

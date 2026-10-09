@@ -7,6 +7,7 @@ import { submitAdmin } from "@/app/admin/submit";
 import { BrandButton } from "@/components/brand/brand-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Field, Switch, inputClass } from "@/components/ui/field";
+import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, PageHeader, Panel } from "@/components/ui/panel";
 import type { AdminSettings } from "@/lib/admin/settings";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/cn";
 
 export function SettingsScreen({ settings }: { settings: AdminSettings }) {
   const router = useRouter();
+  const { confirm, dialog } = useConfirm();
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
@@ -24,6 +26,18 @@ export function SettingsScreen({ settings }: { settings: AdminSettings }) {
   const [runningText, setRunningText] = useState(settings.runningText);
 
   async function save(formData: FormData) {
+    const timeZone = String(formData.get("timeZone") ?? settings.timeZone);
+    if (timeZone !== settings.timeZone) {
+      const next = INDONESIA_TIME_ZONES.find((zone) => zone.id === timeZone);
+      const ok = await confirm({
+        title: `Ganti zona waktu ke ${next?.label ?? timeZone}?`,
+        message:
+          "Jam di kiosk, TV, dan tiket ikut berganti. Bila diganti saat cabang sedang buka, tanggal antrian bisa bergeser dan nomor dimulai lagi dari 001. Sebaiknya diganti sebelum cabang buka.",
+        confirmLabel: "Ganti zona waktu",
+        icon: "clock",
+      });
+      if (!ok) return;
+    }
     setPending(true);
     const message = await submitAdmin("/api/admin/settings", "PUT", {
       branchName: String(formData.get("branchName") ?? ""),
@@ -179,6 +193,7 @@ export function SettingsScreen({ settings }: { settings: AdminSettings }) {
           </BrandButton>
         </div>
       </form>
+      {dialog}
     </section>
   );
 }

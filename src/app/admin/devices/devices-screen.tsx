@@ -6,6 +6,7 @@ import { requestAdmin, submitAdmin } from "@/app/admin/submit";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge } from "@/components/ui/badge";
 import { Field, inputClass } from "@/components/ui/field";
+import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
 import type { DeviceKind } from "@/lib/auth/device";
@@ -30,6 +31,7 @@ export function DevicesScreen({
   envFallback: { kiosk: boolean; display: boolean };
 }) {
   const router = useRouter();
+  const { confirm, dialog } = useConfirm();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [issued, setIssued] = useState<IssuedDevice | null>(null);
@@ -63,6 +65,23 @@ export function DevicesScreen({
   }
 
   async function rotate(device: AdminDevice) {
+    const ok = await confirm(
+      device.revokedAt
+        ? {
+            title: `Aktifkan lagi ${device.name}?`,
+            message: "Tautan pemasangan baru dibuat. Buka tautan itu di perangkatnya supaya bisa dipakai lagi.",
+            confirmLabel: "Buat tautan",
+            tone: "primary",
+            icon: "link",
+          }
+        : {
+            title: `Buat tautan baru untuk ${device.name}?`,
+            message: "Tautan lama langsung tidak berlaku. Perangkat yang sedang terpasang akan menampilkan \"Perangkat belum diizinkan\" sampai tautan baru dibuka di perangkat itu.",
+            confirmLabel: "Buat tautan baru",
+            icon: "repeat",
+          },
+    );
+    if (!ok) return;
     const result = await requestAdmin<IssuedDevice>(`/api/admin/devices/${device.id}/rotate`, "POST", {});
     if (done(result.error, `Tautan baru untuk ${device.name} dibuat. Tautan lama tidak berlaku lagi.`) && result.data) {
       setIssued(result.data);
@@ -239,6 +258,7 @@ export function DevicesScreen({
           </div>
         </Modal>
       ) : null}
+      {dialog}
     </section>
   );
 }

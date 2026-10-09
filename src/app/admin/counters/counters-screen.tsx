@@ -7,6 +7,7 @@ import { useLiveRefresh } from "@/app/admin/use-live-refresh";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge, CounterStatusBadge, PrefixTile } from "@/components/ui/badge";
 import { ChipCheckbox, Field, inputClass } from "@/components/ui/field";
+import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
 import { counterBaseName, nextCounterNumber, planCounters, splitCounterName } from "@/lib/admin/counter-names";
@@ -36,6 +37,7 @@ export function CountersScreen({
   services: AdminService[];
 }) {
   const router = useRouter();
+  const { confirm, dialog } = useConfirm();
   const { state } = useQueueState();
   useLiveRefresh(["COUNTER_CHANGED", "CONFIG_CHANGED"]);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,21 @@ export function CountersScreen({
   }
 
   async function toggle(counter: AdminCounter) {
+    const ok = await confirm(
+      counter.isActive
+        ? {
+            title: `Nonaktifkan ${counter.name}?`,
+            message: "Loket ini hilang dari layar pilih loket petugas dan dari TV. Riwayat dan laporannya tetap tersimpan, dan loket bisa diaktifkan lagi kapan saja.",
+            confirmLabel: "Nonaktifkan",
+          }
+        : {
+            title: `Aktifkan ${counter.name}?`,
+            message: "Loket ini muncul lagi di layar pilih loket petugas dan di TV.",
+            confirmLabel: "Aktifkan",
+            tone: "primary",
+          },
+    );
+    if (!ok) return;
     const message = await submitAdmin(`/api/admin/counters/${counter.id}`, "PATCH", {
       isActive: !counter.isActive,
     });
@@ -288,6 +305,7 @@ export function CountersScreen({
           }}
         />
       ) : null}
+      {dialog}
     </section>
   );
 }

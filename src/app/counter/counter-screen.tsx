@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { logout } from "@/app/counter/actions";
+import { LogoutButton } from "@/components/ui/logout-button";
 import { BrandButton } from "@/components/brand/brand-button";
 import { BrandHeader } from "@/components/brand/brand-header";
 import { QueueNumber } from "@/components/brand/queue-number";
@@ -106,12 +106,22 @@ export function CounterScreen({
               <Icon name="user" className="size-4" />
               {officerName}
             </span>
-            <form action={logout}>
-              <BrandButton type="submit" variant="outline" size="sm">
-                <Icon name="logout" className="size-4" />
-                Keluar
-              </BrandButton>
-            </form>
+            <LogoutButton
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-card)] border border-line bg-brand-white px-3 text-sm font-bold text-brand-navy hover:border-brand-blue hover:bg-navy-soft"
+              warning={
+                view.mode === "desk" ? (
+                  <>
+                    <strong>{view.counter.name}</strong> masih{" "}
+                    {view.counter.status === "PAUSED" ? "istirahat" : "buka"} atas nama Anda dan tetap tampil di TV.
+                    {view.activeTicket ? ` Nomor ${view.activeTicket.number} masih dilayani.` : ""} Tutup loket dulu bila
+                    Anda selesai bertugas.
+                  </>
+                ) : undefined
+              }
+            >
+              <Icon name="logout" className="size-4" />
+              Keluar
+            </LogoutButton>
           </div>
         }
       />

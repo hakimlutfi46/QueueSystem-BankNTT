@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { logout } from "@/app/counter/actions";
+import { LogoutButton } from "@/components/ui/logout-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -88,16 +88,9 @@ export function AdminNav({ name, branchName }: { name: string; branchName: strin
               <p className="truncate font-bold">{name}</p>
               <p className="text-xs opacity-80">Admin</p>
             </div>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="rounded-lg p-2 hover:bg-brand-blue"
-                aria-label="Keluar"
-                title="Keluar"
-              >
-                <Icon name="logout" />
-              </button>
-            </form>
+            <LogoutButton className="rounded-lg p-2 hover:bg-brand-blue">
+              <Icon name="logout" />
+            </LogoutButton>
           </div>
         </div>
       </aside>
@@ -108,11 +101,9 @@ export function AdminNav({ name, branchName }: { name: string; branchName: strin
             <BrandLogo variant="color" className="h-7" />
           </div>
           <p className="min-w-0 flex-1 truncate font-bold">{branchName}</p>
-          <form action={logout}>
-            <button type="submit" className="rounded-lg p-2 hover:bg-brand-blue" aria-label="Keluar">
-              <Icon name="logout" />
-            </button>
-          </form>
+          <LogoutButton className="rounded-lg p-2 hover:bg-brand-blue">
+            <Icon name="logout" />
+          </LogoutButton>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3" aria-label="Menu admin">
           {links.map((link) => {

@@ -7,6 +7,7 @@ import { useLiveRefresh } from "@/app/admin/use-live-refresh";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge } from "@/components/ui/badge";
 import { Field, Switch, inputClass } from "@/components/ui/field";
+import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, Modal, PageHeader, Panel } from "@/components/ui/panel";
 import type { AdminUser } from "@/lib/admin/users";
@@ -17,6 +18,7 @@ type RoleFilter = "all" | "STAFF" | "ADMIN";
 
 export function UsersScreen({ users }: { users: AdminUser[] }) {
   const router = useRouter();
+  const { confirm, dialog } = useConfirm();
   const { state } = useQueueState();
   useLiveRefresh(["COUNTER_CHANGED"]);
   const [error, setError] = useState<string | null>(null);
@@ -198,11 +200,39 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
             action={async (formData) => {
               const password = String(formData.get("password") ?? "");
               const name = String(formData.get("name") ?? "");
+              const role = String(formData.get("role") ?? editing.role);
+              const isActive = formData.get("isActive") === "on";
+              const warnings: string[] = [];
+              if (editing.isActive && !isActive) warnings.push("Akun ini tidak bisa masuk lagi dan langsung keluar dari semua perangkat.");
+              if (role !== editing.role) {
+                warnings.push(
+                  role === "ADMIN"
+                    ? "Akun ini akan bisa mengatur loket, layanan, petugas, perangkat, dan laporan."
+                    : "Akun ini tidak bisa membuka halaman Admin lagi.",
+                );
+              }
+              if (password) warnings.push("Kata sandi lama tidak berlaku lagi.");
+              if (warnings.length > 0) {
+                const ok = await confirm({
+                  title: `Simpan perubahan ${editing.name}?`,
+                  message: (
+                    <ul className="list-disc space-y-1 pl-4">
+                      {warnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  ),
+                  confirmLabel: "Simpan",
+                  tone: editing.isActive && !isActive ? "danger" : "primary",
+                  icon: "user",
+                });
+                if (!ok) return;
+              }
               const message = await submitAdmin(`/api/admin/users/${editing.id}`, "PATCH", {
                 username: String(formData.get("username") ?? ""),
                 name,
-                role: String(formData.get("role") ?? editing.role),
-                isActive: formData.get("isActive") === "on",
+                role,
+                isActive,
                 ...(password ? { password } : {}),
               });
               if (done(message, password ? `${name} disimpan, kata sandi diganti.` : `${name} disimpan.`)) setEditing(null);
@@ -235,6 +265,7 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
           </form>
         </Modal>
       ) : null}
+      {dialog}
     </section>
   );
 }

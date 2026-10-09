@@ -7,6 +7,7 @@ import { BrandButton } from "@/components/brand/brand-button";
 import { useBranding } from "@/components/brand/branding-provider";
 import { Badge } from "@/components/ui/badge";
 import { Field, inputClass } from "@/components/ui/field";
+import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, PageHeader, Panel } from "@/components/ui/panel";
 import type { Branding } from "@/lib/branding";
@@ -36,6 +37,7 @@ const noSubscribe = () => () => undefined;
 
 export function BrandingScreen({ branding }: { branding: Branding }) {
   const router = useRouter();
+  const { confirm, dialog } = useConfirm();
   const live = useBranding();
   const defaultsJson = useSyncExternalStore(noSubscribe, readDefaults, () => "");
   const defaults = useMemo(
@@ -141,7 +143,14 @@ export function BrandingScreen({ branding }: { branding: Branding }) {
                 {branding.logoVersion ? (
                   <BrandButton
                     variant="outline"
-                    onClick={async () => done(await submitAdmin("/api/admin/branding/logo", "DELETE", {}), "Logo kembali ke bawaan.")}
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "Hapus logo unggahan?",
+                        message: "Logo yang diunggah dihapus dan semua layar kembali memakai logo bawaan. Untuk memakai logo itu lagi, unggah ulang berkasnya.",
+                        confirmLabel: "Hapus logo",
+                      });
+                      if (ok) done(await submitAdmin("/api/admin/branding/logo", "DELETE", {}), "Logo kembali ke bawaan.");
+                    }}
                   >
                     Pakai logo bawaan
                   </BrandButton>
@@ -260,6 +269,7 @@ export function BrandingScreen({ branding }: { branding: Branding }) {
           </BrandButton>
         </div>
       </div>
+      {dialog}
     </section>
   );
 }
