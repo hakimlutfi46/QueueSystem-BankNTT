@@ -1,11 +1,18 @@
 :root {
-  --brand-navy: #004ea2;
-  --brand-blue: #0075c2;
-  --brand-sky: #0097e0;
-  --brand-orange: #f08300;
+  /* Warna bawaan (Bank NTT). Admin → Identitas & tampilan bisa menimpa lima warna merek di bawah. */
+  --default-navy: #004ea2;
+  --default-blue: #0075c2;
+  --default-sky: #0097e0;
+  --default-orange: #f08300;
+  --default-deep: #00088f;
+
+  --brand-navy: var(--default-navy);
+  --brand-blue: var(--default-blue);
+  --brand-sky: var(--default-sky);
+  --brand-orange: var(--default-orange);
   --brand-grey: #898989;
   --brand-white: #ffffff;
-  --brand-deep: #00088f;
+  --brand-deep: var(--default-deep);
   --ink: #1a2433;
   --ink-muted: #5b6470;
   --surface: #f4f6f9;

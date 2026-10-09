@@ -1,14 +1,19 @@
+"use client";
+
 import type { ReactNode } from "react";
-import { BrandLogo } from "@/components/brand/brand-logo";
+import { useBranding } from "@/components/brand/branding-provider";
+import { BrandLogo, BrandTagline } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 
 export function BrandHeader({
   branchName,
   trailing,
 }: {
-  branchName: string;
+  /** Nama cabang; bila kosong dipakai nama lembaga. */
+  branchName?: string;
   trailing?: ReactNode;
 }) {
+  const { orgName } = useBranding();
   return (
     <header className="bg-brand-navy text-brand-white">
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
@@ -17,8 +22,8 @@ export function BrandHeader({
             <BrandLogo variant="color" priority className="h-12 sm:h-14" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold sm:text-xl">{branchName}</p>
-            <p className="text-sm">melayani lebih sungguh</p>
+            <p className="truncate text-lg font-bold sm:text-xl">{branchName || orgName}</p>
+            <BrandTagline className="text-sm" />
           </div>
         </div>
         {trailing ? <div className="sm:ml-auto">{trailing}</div> : null}

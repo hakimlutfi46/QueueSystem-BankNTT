@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BrandButton } from "@/components/brand/brand-button";
 import { BrandHeader } from "@/components/brand/brand-header";
+import { useBranding } from "@/components/brand/branding-provider";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { QueueNumber } from "@/components/brand/queue-number";
 import { Icon } from "@/components/ui/icon";
@@ -77,7 +78,8 @@ export function KioskScreen({ timeZone }: { timeZone: string }) {
     }
   }
 
-  const branchName = state?.settings.branchName || "Bank NTT";
+  const { orgName } = useBranding();
+  const branchName = state?.settings.branchName || orgName;
   const services = state?.services ?? [];
   const layout = gridFor(services.length);
 

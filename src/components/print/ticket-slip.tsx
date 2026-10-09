@@ -2,7 +2,15 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import type { PrintableTicketView } from "@/lib/print/load-ticket";
 
 /** Isi tiket thermal, hitam-putih. Dipakai kiosk dan cetak ulang dari Admin. */
-export function TicketSlip({ ticket, reprint = false }: { ticket: PrintableTicketView; reprint?: boolean }) {
+export function TicketSlip({
+  ticket,
+  tagline,
+  reprint = false,
+}: {
+  ticket: PrintableTicketView;
+  tagline: string;
+  reprint?: boolean;
+}) {
   const contentWidth = Math.max(ticket.widthMm - 8, 40);
 
   return (
@@ -22,7 +30,7 @@ export function TicketSlip({ ticket, reprint = false }: { ticket: PrintableTicke
       <p className="mt-2 text-sm">{ticket.issuedAt}</p>
       <p className="mt-3 text-sm font-bold">{ticket.aheadCount} antrian di depan Anda</p>
       {ticket.footer ? <p className="mt-4 text-xs">{ticket.footer}</p> : null}
-      <p className="mt-2 text-xs">melayani lebih sungguh</p>
+      {tagline ? <p className="mt-2 text-xs">{tagline}</p> : null}
       {reprint ? <p className="mt-3 text-[9pt]">CETAK ULANG</p> : null}
     </main>
   );

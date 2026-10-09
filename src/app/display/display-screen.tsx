@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { BrandButton } from "@/components/brand/brand-button";
-import { BrandLogo } from "@/components/brand/brand-logo";
+import { BrandLogo, BrandTagline } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { QueueNumber } from "@/components/brand/queue-number";
 import { Icon } from "@/components/ui/icon";
@@ -91,7 +91,7 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
         </div>
         <div className="min-w-0">
           <p className="truncate text-3xl font-bold">{state.settings.branchName}</p>
-          <p className="text-lg font-bold opacity-90">melayani lebih sungguh</p>
+          <BrandTagline className="text-lg font-bold opacity-90" />
         </div>
         <div className="ml-auto text-right">
           <DisplayClock timeZone={timeZone} />

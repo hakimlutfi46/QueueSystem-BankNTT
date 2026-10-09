@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { DEFAULT_BRANDING } from "@/lib/branding";
 import { validationError } from "@/lib/admin/errors";
 import { notifyQueue } from "@/lib/queue/sql";
 
@@ -24,7 +25,7 @@ const settingsBody = z.object({
 export type AdminSettings = z.infer<typeof settingsBody>;
 
 const DEFAULTS: AdminSettings = {
-  branchName: "Bank NTT",
+  branchName: DEFAULT_BRANDING.orgName,
   runningText: "",
   voiceEnabled: true,
   maxRecall: 3,

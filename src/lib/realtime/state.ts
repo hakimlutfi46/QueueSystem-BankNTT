@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
+import { DEFAULT_BRANDING } from "@/lib/branding";
 import { getPrisma } from "@/lib/db";
 import { serviceDate } from "@/lib/queue/sql";
 import type {
@@ -10,7 +11,7 @@ import type {
 } from "@/lib/realtime/types";
 
 const DEFAULT_SETTINGS: QueueDisplaySettings = {
-  branchName: "Bank NTT",
+  branchName: DEFAULT_BRANDING.orgName,
   runningText: "",
   voiceEnabled: true,
   maxRecall: 3,

@@ -4,9 +4,13 @@ import { getPrisma } from "../src/lib/db";
 
 type SettingValue = string | number | boolean;
 
+// Nama lembaga untuk data awal. Isi SEED_ORG_NAME bila aplikasi dipasang untuk lembaga selain Bank NTT.
+const ORG_NAME = process.env.SEED_ORG_NAME?.trim() || "Bank NTT";
+
 const SETTINGS: Array<{ key: string; value: SettingValue }> = [
-  { key: "branch_name", value: "Bank NTT" },
-  { key: "running_text", value: "Selamat datang di Bank NTT" },
+  { key: "org_name", value: ORG_NAME },
+  { key: "branch_name", value: ORG_NAME },
+  { key: "running_text", value: `Selamat datang di ${ORG_NAME}` },
   { key: "voice_enabled", value: true },
   { key: "max_recall", value: 3 },
   { key: "target_service_minutes", value: 10 },

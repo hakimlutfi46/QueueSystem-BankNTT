@@ -1,38 +1,32 @@
-import Image from "next/image";
+"use client";
+
+import { useBranding } from "@/components/brand/branding-provider";
 import { cn } from "@/lib/cn";
 
-const LOGOS = {
-  color: {
-    src: "/brand/Logo_Bank_NTT.png",
-    width: 1600,
-    height: 948,
-  },
-  onBlue: {
-    src: "/brand/Logo-Bank-NTT-featured-237-design-1.png",
-    width: 740,
-    height: 416,
-  },
-} as const;
-
+/** Logo lembaga dari Admin → Identitas & tampilan, atau logo bawaan. */
 export function BrandLogo({
-  variant = "color",
   className,
   priority = false,
 }: {
-  variant?: keyof typeof LOGOS;
+  variant?: "color" | "onBlue";
   className?: string;
   priority?: boolean;
 }) {
-  const logo = LOGOS[variant];
-
+  const { logoSrc, orgName } = useBranding();
   return (
-    <Image
-      src={logo.src}
-      alt="Bank NTT"
-      width={logo.width}
-      height={logo.height}
-      priority={priority}
-      className={cn("w-auto", className ?? "h-16")}
+    // Logo unggahan berukuran bebas dan sudah disimpan kecil, jadi tidak lewat pengoptimal gambar Next.js.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={logoSrc}
+      alt={orgName}
+      fetchPriority={priority ? "high" : undefined}
+      className={cn("w-auto object-contain", className ?? "h-16")}
     />
   );
+}
+
+/** Slogan lembaga, misalnya "melayani lebih sungguh". Kosong bila admin mengosongkannya. */
+export function BrandTagline({ className }: { className?: string }) {
+  const { tagline } = useBranding();
+  return tagline ? <p className={className}>{tagline}</p> : null;
 }

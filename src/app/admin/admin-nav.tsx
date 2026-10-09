@@ -23,6 +23,7 @@ const groups: { label: string; links: { href: string; label: string; icon: IconN
       { href: "/admin/services", label: "Layanan", icon: "ticket" },
       { href: "/admin/users", label: "Petugas", icon: "users" },
       { href: "/admin/devices", label: "Perangkat", icon: "tv" },
+      { href: "/admin/branding", label: "Identitas & tampilan", icon: "layers" },
       { href: "/admin/settings", label: "Pengaturan", icon: "settings" },
     ],
   },

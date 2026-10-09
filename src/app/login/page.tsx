@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { BrandLogo } from "@/components/brand/brand-logo";
+import { BrandLogo, BrandTagline } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { LoginForm } from "@/app/login/login-form";
@@ -57,7 +57,7 @@ export default async function LoginPage({
           </ul>
         </div>
         <div>
-          <p className="mb-3 font-bold">melayani lebih sungguh</p>
+          <BrandTagline className="mb-3 font-bold" />
           <DiagonalStripes className="-mx-12" />
         </div>
       </section>

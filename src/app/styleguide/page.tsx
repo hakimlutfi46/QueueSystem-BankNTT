@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { BrandButton } from "@/components/brand/brand-button";
 import { BrandCard } from "@/components/brand/brand-card";
 import { BrandHeader } from "@/components/brand/brand-header";
-import { BrandLogo } from "@/components/brand/brand-logo";
+import { BrandLogo, BrandTagline } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { QueueNumber } from "@/components/brand/queue-number";
 import { TokenSwatches } from "@/components/brand/token-swatch";
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function StyleguidePage() {
   return (
     <main>
-      <BrandHeader branchName="Bank NTT" trailing={<span className="text-sm">Panduan tampilan</span>} />
+      <BrandHeader trailing={<span className="text-sm">Panduan tampilan</span>} />
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-8">
         <section className="flex flex-col gap-4">
           <h1 className="text-3xl font-bold text-brand-navy">Panduan tampilan</h1>
@@ -36,12 +36,12 @@ export default function StyleguidePage() {
             <BrandCard>
               <p className="mb-4 text-sm text-ink-muted">Latar terang</p>
               <BrandLogo variant="color" />
-              <p className="mt-3 font-bold">melayani lebih sungguh</p>
+              <BrandTagline className="mt-3 font-bold" />
             </BrandCard>
             <div className="rounded-[var(--radius-card)] bg-brand-deep p-6">
               <p className="mb-4 text-sm text-brand-white">Latar biru</p>
               <BrandLogo variant="onBlue" />
-              <p className="mt-3 font-bold text-brand-white">melayani lebih sungguh</p>
+              <BrandTagline className="mt-3 font-bold text-brand-white" />
             </div>
           </div>
         </section>

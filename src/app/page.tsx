@@ -36,7 +36,7 @@ const screens: { href: string; title: string; description: string; icon: IconNam
 export default function Home() {
   return (
     <main className="min-h-screen bg-surface">
-      <BrandHeader branchName="Bank NTT" />
+      <BrandHeader />
       <section className="mx-auto max-w-5xl px-6 py-10">
         <h1 className="text-3xl font-bold text-brand-navy">Sistem Antrian</h1>
         <p className="mt-2 text-ink-muted">Aplikasi cabang siap dijalankan.</p>

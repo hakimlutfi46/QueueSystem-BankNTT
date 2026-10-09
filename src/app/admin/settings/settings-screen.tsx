@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitAdmin } from "@/app/admin/submit";
 import { BrandButton } from "@/components/brand/brand-button";
+import { BrandTagline } from "@/components/brand/brand-logo";
 import { Field, Switch, inputClass } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Alert, PageHeader, Panel } from "@/components/ui/panel";
@@ -127,11 +128,16 @@ export function SettingsScreen({ settings }: { settings: AdminSettings }) {
             </div>
           </Panel>
 
-          <Panel title="Kiosk dan TV">
+          <Panel title="Kiosk, TV, dan tampilan">
             <div className="flex flex-col gap-3 text-sm sm:flex-row">
               <Link href="/admin/devices" className="flex flex-1 items-center gap-3 rounded-xl border border-line p-3 font-bold text-brand-navy hover:bg-navy-soft">
                 <Icon name="tv" />
                 <span className="flex-1">Pasang kiosk dan TV di menu Perangkat</span>
+                <Icon name="arrowRight" className="size-4" />
+              </Link>
+              <Link href="/admin/branding" className="flex flex-1 items-center gap-3 rounded-xl border border-line p-3 font-bold text-brand-navy hover:bg-navy-soft">
+                <Icon name="layers" />
+                <span className="flex-1">Nama lembaga, logo, dan warna</span>
                 <Icon name="arrowRight" className="size-4" />
               </Link>
             </div>
@@ -167,7 +173,7 @@ function TicketPreview({ branchName, footer, widthMm }: { branchName: string; fo
       <p className="mt-2 text-xs font-bold">3 antrian di depan Anda</p>
       <div className="my-3 border-t border-dashed border-brand-grey" />
       {footer ? <p className="text-[10px]">{footer}</p> : null}
-      <p className="text-[10px]">melayani lebih sungguh</p>
+      <BrandTagline className="text-[10px]" />
       <p className="mt-2 text-[10px] text-ink-muted">Kertas {widthMm} mm</p>
     </div>
   );
