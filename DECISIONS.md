@@ -1,5 +1,9 @@
 # Keputusan
 
+## 2026-10-09 — Sesi database selalu UTC
+
+Adapter `@prisma/adapter-pg` membuang offset zona waktu saat membaca `timestamptz` dari `$queryRaw`. Pada server PostgreSQL ber-TimeZone `Asia/Jakarta`, `15:31+07` terbaca sebagai `15:31Z`, sehingga waktu tiket, timer loket, dan status perangkat maju tujuh jam. Semua koneksi aplikasi dan uji integrasi kini membuka sesi dengan `-c TimeZone=UTC` (`DB_SESSION_OPTIONS` di `src/lib/db.ts`), jadi offset selalu nol. Tanggal dan jam cabang tetap dihitung dengan `AT TIME ZONE` dan `APP_TIMEZONE` atau pilihan Admin, tidak bergantung pada zona sesi.
+
 ## 2026-10-09 — Tombol kiosk menyesuaikan jumlah layanan
 
 PLAN menetapkan tombol layanan setinggi minimal 160 px dengan nama, huruf awalan, dan jumlah menunggu. Dengan delapan layanan bank, tombol setinggi itu meluber dari layar dan menutupi judul. Kiosk sekarang menghitung jumlah kolom dan baris dari ruang yang tersedia (`src/lib/kiosk/layout.ts`), sehingga semua tombol sama besar dan muat tanpa digulir; bila tombol akan lebih pendek dari 96 px, kiosk beralih ke daftar yang bisa digulir. Ukuran huruf tiap tombol dikecilkan otomatis sampai nama dan jumlah menunggu muat utuh, jadi tulisan tidak pernah terpotong. Atas permintaan pengguna, huruf awalan tidak ditampilkan di tombol; nomor tiket tetap memakainya.
