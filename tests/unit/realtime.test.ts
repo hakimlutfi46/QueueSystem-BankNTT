@@ -61,6 +61,14 @@ describe("queue events", () => {
     expect(stateRoute.dynamic).toBe("force-dynamic");
   });
 
+  it("sends a first line at once so the browser sees the connection open", async () => {
+    const stream = createQueueEventStream({ heartbeatMs: 60_000 });
+    const reader = stream.getReader();
+    const first = await reader.read();
+    expect(new TextDecoder().decode(first.value)).toBe("retry: 3000\n\n");
+    await reader.cancel();
+  });
+
   it("writes a heartbeat and a published event to the stream", async () => {
     const stream = createQueueEventStream({ heartbeatMs: 20 });
     const reader = stream.getReader();

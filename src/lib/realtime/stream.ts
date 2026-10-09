@@ -35,6 +35,10 @@ export function createQueueEventStream(options?: {
         }
       };
 
+      // Kirim satu baris segera. Tanpa byte pertama, header respons tertahan sampai heartbeat 25 detik
+      // kemudian, dan browser menganggap koneksi belum terbuka. "retry" juga mempercepat sambung ulang.
+      send("retry: 3000\n\n");
+
       unsubscribe = subscribe((event) => {
         send(formatQueueEvent(event));
       });
