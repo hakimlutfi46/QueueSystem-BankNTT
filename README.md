@@ -65,3 +65,7 @@ Pada tayangan pertama, tekan **Aktifkan suara** supaya nomor yang dipanggil diba
 ## Loket petugas
 
 Petugas membuka `http://192.168.1.10:3000/counter`, masuk, lalu memilih loket. Tombol utama memanggil nomor berikutnya. Nomor yang sama tidak bisa diambil dua loket.
+
+## Pengujian
+
+Cara menjalankan lint, uji unit dan integrasi, uji end-to-end, dan daftar periksa tampilan ada di [TESTING.md](TESTING.md).
