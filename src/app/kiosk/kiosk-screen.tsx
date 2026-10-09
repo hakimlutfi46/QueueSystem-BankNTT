@@ -173,7 +173,7 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
                       {busy === service.id ? (
                         <span className="size-[min(22cqh,9cqw)] shrink-0 animate-spin rounded-full border-4 border-brand-white/30 border-t-brand-white" aria-hidden="true" />
                       ) : (
-                        <Icon name="arrowRight" className="size-[min(22cqh,9cqw)] shrink-0 transition-transform group-hover:translate-x-1 @max-[340px]:hidden" />
+                        <Icon name="arrowRight" className="size-[min(18cqh,7cqw)] shrink-0 transition-transform group-hover:translate-x-1 @max-[340px]:hidden" />
                       )}
                     </button>
                   </li>
@@ -191,18 +191,20 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
 const GRID_GAP = 20;
 
 /**
- * Nama layanan dan jumlah menunggu. Ukuran huruf dikecilkan otomatis sampai semuanya muat di tombol,
- * jadi nama panjang seperti "Kartu ATM & Mobile Banking" tidak pernah terpotong.
+ * Nama layanan, dan jumlah menunggu bila ada. Ukuran huruf paling besar 32 px dan dikecilkan otomatis
+ * sampai semuanya muat di tombol, jadi nama panjang seperti "Kartu ATM & Mobile Banking" tidak terpotong.
  */
 function ServiceLabel({ name, waitingCount }: { name: string; waitingCount: number }) {
-  const ref = useFitText<HTMLSpanElement>(44, 14, [name, waitingCount]);
+  const ref = useFitText<HTMLSpanElement>(32, 14, [name, waitingCount]);
   return (
-    <span ref={ref} className="flex h-full min-w-0 flex-1 flex-col justify-center gap-[0.2em] overflow-hidden py-[6cqh]">
-      <span className="font-bold leading-tight [overflow-wrap:break-word]">{name}</span>
-      <span className="flex items-center gap-2 text-[0.6em] opacity-90">
-        <Icon name="users" className="size-[1.1em] shrink-0" />
-        {waitingCount === 0 ? "Tanpa antrian" : `${waitingCount} menunggu`}
-      </span>
+    <span ref={ref} className="flex h-full min-w-0 flex-1 flex-col justify-center gap-[0.25em] overflow-hidden py-[8cqh]">
+      <span className="font-bold leading-snug [overflow-wrap:break-word]">{name}</span>
+      {waitingCount > 0 ? (
+        <span className="flex items-center gap-2 text-[0.62em] opacity-90">
+          <Icon name="users" className="size-[1.1em] shrink-0" />
+          {waitingCount} menunggu
+        </span>
+      ) : null}
     </span>
   );
 }
