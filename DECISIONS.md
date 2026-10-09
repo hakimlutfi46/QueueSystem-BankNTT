@@ -4,9 +4,9 @@
 
 PLAN hanya meminta konfirmasi untuk Tidak hadir dan Tutup loket. Atas permintaan pengguna, aksi lain yang sulit dibatalkan atau berdampak ke layar lain kini juga meminta konfirmasi lewat satu komponen bersama (`src/components/ui/confirm.tsx`): keluar dari akun (dengan peringatan bila loket masih buka), menonaktifkan atau mengaktifkan loket dan layanan, membuat tautan perangkat baru, menyimpan petugas yang dinonaktifkan, diganti perannya, atau diganti sandinya, menghapus logo unggahan, dan mengganti zona waktu. Tombol utama layar loket (Panggil berikutnya) sengaja tetap tanpa konfirmasi supaya pelayanan tidak melambat.
 
-## 2026-10-09 — TV: nomor panggilan di tengah, tanpa kolom antrean
+## 2026-10-09 — TV: dua panel, tanpa kolom antrean
 
-Atas permintaan pengguna, kolom antrean per layanan dihapus dari TV karena loket sudah menampilkan nomor yang sedang dilayani. Nomor yang dipanggil kini berada di tengah layar dengan empat panggilan sebelumnya di bawahnya; loket dibagi ke kolom kiri dan kanan (enam per sisi, berganti halaman setelah dua belas). Dengan urutan nama, loket CS berada di kiri dan Teller di kanan. `nextNumber` per layanan ikut dihapus dari state karena tidak dipakai lagi. Di kiosk, ukuran huruf tombol paling besar 32 px dan jumlah menunggu hanya tampil bila ada antrean.
+Atas permintaan pengguna, kolom antrean per layanan dihapus dari TV karena loket sudah menampilkan nomor yang sedang dilayani. TV dibagi dua: nomor yang dipanggil dan empat panggilan sebelumnya di kiri, semua loket di kanan dalam dua kolom yang diisi per kolom (dua belas per halaman). Dengan urutan nama, loket CS berada di kolom kiri dan Teller di kolom kanan. Susunan tiga kolom dengan loket di kedua sisi sempat dicoba lalu ditolak pengguna. `nextNumber` per layanan ikut dihapus dari state karena tidak dipakai lagi. Di kiosk, ukuran huruf tombol paling besar 32 px dan jumlah menunggu hanya tampil bila ada antrean.
 
 ## 2026-10-09 — Sesi database selalu UTC
 

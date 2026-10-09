@@ -2,7 +2,7 @@
 export const STAGE_WIDTH = 1920;
 export const STAGE_HEIGHT = 1080;
 
-/** Loket per halaman: enam di kolom kiri dan enam di kolom kanan, nomor panggilan di tengah. */
+/** Loket per halaman di panel kanan TV: dua kolom × enam baris. */
 export const COUNTERS_PER_PAGE = 12;
 
 /** Bagi daftar menjadi halaman yang bergantian otomatis di TV. Daftar kosong tetap satu halaman. */

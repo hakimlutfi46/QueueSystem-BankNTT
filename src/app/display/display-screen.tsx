@@ -121,9 +121,6 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
   const lastService = lastCall ? state.services.find((service) => service.id === lastCall.serviceId) : undefined;
   const previousCalls = state.recentCalls.filter((call) => call.ticketId !== lastCall?.ticketId).slice(0, 4);
   const counters = counterPages[counterPage] ?? [];
-  // Setengah pertama di kiri, sisanya di kanan; dengan urutan nama, CS di kiri dan Teller di kanan.
-  const leftCounters = counters.slice(0, Math.ceil(counters.length / 2));
-  const rightCounters = counters.slice(Math.ceil(counters.length / 2));
 
   return (
     <Stage>
@@ -162,12 +159,9 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
         </header>
         <DiagonalStripes className="h-2 shrink-0" />
 
-        <div className="grid min-h-0 flex-1 grid-cols-[500px_minmax(0,1fr)_500px]">
-          {/* Kiri dan kanan: loket beserta status dan nomor yang sedang dilayani. Tengah: nomor yang dipanggil. */}
-          <CounterColumn counters={leftCounters} lastCall={lastCall} title="Loket" pages={counterPages.length} page={counterPage} side="left" />
-
+        <div className="grid min-h-0 flex-1 grid-cols-2">
+          {/* Kiri: nomor yang dipanggil dan panggilan sebelumnya. Kanan: semua loket. */}
           <section className="relative flex min-h-0 flex-col px-10 pb-8 pt-6">
-            <span className="absolute inset-y-6 left-0 w-1.5 rounded-full bg-brand-orange/80" aria-hidden="true" />
             <span className="absolute inset-y-6 right-0 w-1.5 rounded-full bg-brand-orange/80" aria-hidden="true" />
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
               <p className="text-[28px] font-bold uppercase tracking-[0.25em] opacity-90">
@@ -221,7 +215,28 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
 
           </section>
 
-          <CounterColumn counters={rightCounters} lastCall={lastCall} title="Loket" pages={counterPages.length} page={counterPage} side="right" />
+          <section className="flex min-h-0 flex-col pb-8 pl-8 pr-10 pt-6">
+            <SectionTitle pages={counterPages.length} page={counterPage}>
+              Loket
+            </SectionTitle>
+            {counters.length === 0 ? (
+              <p className="text-2xl opacity-80">Belum ada loket.</p>
+            ) : (
+              <div
+                className="grid min-h-0 flex-1 grid-flow-col grid-cols-2 gap-3"
+                // Isi per kolom: dengan urutan nama, CS di kolom kiri dan Teller di kolom kanan.
+                style={{ gridTemplateRows: `repeat(${Math.min(6, Math.max(4, Math.ceil(counters.length / 2)))}, minmax(0, 1fr))` }}
+              >
+                {counters.map((counter) => (
+                  <CounterCard
+                    key={counter.id}
+                    counter={counter}
+                    latest={lastCall?.counterId === counter.id && counter.activeTicket != null}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         {state.settings.runningText ? (
@@ -238,43 +253,6 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
         <DiagonalStripes className="shrink-0" />
       </div>
     </Stage>
-  );
-}
-
-function CounterColumn({
-  counters,
-  lastCall,
-  title,
-  pages,
-  page,
-  side,
-}: {
-  counters: QueueCounterState[];
-  lastCall: { counterId: number | null } | null;
-  title: string;
-  pages: number;
-  page: number;
-  side: "left" | "right";
-}) {
-  return (
-    <section className={cn("flex min-h-0 flex-col pb-8 pt-6", side === "left" ? "pl-10 pr-6" : "pl-6 pr-10")}>
-      <SectionTitle pages={side === "right" ? pages : 1} page={page}>
-        {title}
-      </SectionTitle>
-      {counters.length === 0 ? (
-        <p className="text-2xl opacity-80">{side === "left" ? "Belum ada loket." : ""}</p>
-      ) : (
-        <div className="grid min-h-0 flex-1 grid-rows-6 gap-3">
-          {counters.map((counter) => (
-            <CounterCard
-              key={counter.id}
-              counter={counter}
-              latest={lastCall?.counterId === counter.id && counter.activeTicket != null}
-            />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
