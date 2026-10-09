@@ -68,7 +68,7 @@ function state(input: {
   status?: "OPEN" | "PAUSED" | "CLOSED";
 }): QueueState {
   return {
-    services: [{ id: 1, name: "Customer Service", prefix: "A", waitingCount: input.waitingCount, nextNumber: null }],
+    services: [{ id: 1, name: "Customer Service", prefix: "A", waitingCount: input.waitingCount }],
     counters: [
       {
         id: 1,

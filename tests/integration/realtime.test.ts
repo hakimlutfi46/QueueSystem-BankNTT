@@ -148,7 +148,7 @@ describe("realtime", { concurrent: false }, () => {
 
     const state = await loadQueueState(prisma);
     expect(state.services).toEqual([
-      expect.objectContaining({ name: "Customer Service", prefix: "A", waitingCount: 1, nextNumber: "A002" }),
+      expect.objectContaining({ name: "Customer Service", prefix: "A", waitingCount: 1 }),
     ]);
     expect(state.counters).toEqual([
       expect.objectContaining({
@@ -175,7 +175,6 @@ describe("realtime", { concurrent: false }, () => {
     await callNext(prisma, { counterId, userId });
     const later = await loadQueueState(prisma);
     expect(later.recentCalls.map((call) => call.ticketNumber)).toEqual(["A002", "A001"]);
-    expect(later.services[0]?.nextNumber).toBeNull();
 
     expect(state.settings).toMatchObject({
       branchName: "Cabang Kupang",

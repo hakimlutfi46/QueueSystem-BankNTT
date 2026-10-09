@@ -10,7 +10,6 @@ import {
   COUNTERS_PER_PAGE,
   heroNumberSize,
   paginate,
-  SERVICES_PER_PAGE,
   STAGE_HEIGHT,
   STAGE_WIDTH,
   stageFit,
@@ -104,9 +103,7 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
     left.name.localeCompare(right.name, "id", { numeric: true }),
   );
   const counterPages = paginate(allCounters, COUNTERS_PER_PAGE);
-  const servicePages = paginate(state?.services ?? [], SERVICES_PER_PAGE);
   const counterPage = useRotatingPage(counterPages.length);
-  const servicePage = useRotatingPage(servicePages.length);
 
   if (!state) {
     return (
@@ -124,7 +121,9 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
   const lastService = lastCall ? state.services.find((service) => service.id === lastCall.serviceId) : undefined;
   const previousCalls = state.recentCalls.filter((call) => call.ticketId !== lastCall?.ticketId).slice(0, 4);
   const counters = counterPages[counterPage] ?? [];
-  const services = servicePages[servicePage] ?? [];
+  // Setengah pertama di kiri, sisanya di kanan; dengan urutan nama, CS di kiri dan Teller di kanan.
+  const leftCounters = counters.slice(0, Math.ceil(counters.length / 2));
+  const rightCounters = counters.slice(Math.ceil(counters.length / 2));
 
   return (
     <Stage>
@@ -163,9 +162,13 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
         </header>
         <DiagonalStripes className="h-2 shrink-0" />
 
-        <div className="grid min-h-0 flex-1 grid-cols-[640px_minmax(0,1fr)_minmax(0,1fr)]">
-          {/* Kiri: nomor yang sedang dipanggil, lalu panggilan sebelumnya. */}
+        <div className="grid min-h-0 flex-1 grid-cols-[500px_minmax(0,1fr)_500px]">
+          {/* Kiri dan kanan: loket beserta status dan nomor yang sedang dilayani. Tengah: nomor yang dipanggil. */}
+          <CounterColumn counters={leftCounters} lastCall={lastCall} title="Loket" pages={counterPages.length} page={counterPage} side="left" />
+
           <section className="relative flex min-h-0 flex-col px-10 pb-8 pt-6">
+            <span className="absolute inset-y-6 left-0 w-1.5 rounded-full bg-brand-orange/80" aria-hidden="true" />
+            <span className="absolute inset-y-6 right-0 w-1.5 rounded-full bg-brand-orange/80" aria-hidden="true" />
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
               <p className="text-[28px] font-bold uppercase tracking-[0.25em] opacity-90">
                 {lastCall ? "Nomor antrian" : "Selamat datang"}
@@ -205,80 +208,20 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
                   Belum ada panggilan lain hari ini.
                 </p>
               ) : (
-                <ul className="grid grid-cols-2 gap-3" data-testid="previous-calls">
+                <ul className="grid grid-cols-4 gap-3" data-testid="previous-calls">
                   {previousCalls.map((call) => (
-                    <li key={call.ticketId} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] bg-brand-navy px-5 py-3">
+                    <li key={call.ticketId} className="rounded-[var(--radius-card)] bg-brand-navy px-3 py-3 text-center">
                       <p className="text-[40px] font-bold leading-none tabular-nums">{call.ticketNumber}</p>
-                      <p className="min-w-0 truncate text-right text-xl font-bold opacity-90">{call.counterName ?? "Loket"}</p>
+                      <p className="mt-1 truncate text-xl font-bold opacity-90">{call.counterName ?? "Loket"}</p>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
 
-            <div
-              className="absolute inset-y-0 right-0 w-4 bg-brand-orange"
-              style={{ clipPath: "polygon(45% 0, 100% 0, 55% 100%, 0 100%)" }}
-              aria-hidden="true"
-            />
           </section>
 
-          {/* Tengah: antrean per layanan. */}
-          <section className="flex min-h-0 flex-col px-8 pb-8 pt-6">
-            <SectionTitle pages={servicePages.length} page={servicePage}>
-              Antrian
-            </SectionTitle>
-            {services.length === 0 ? (
-              <p className="text-2xl opacity-80">Belum ada layanan.</p>
-            ) : (
-              <>
-                <div className="mb-2 grid grid-cols-[minmax(0,1fr)_120px_150px] gap-3 px-4 text-sm font-bold uppercase tracking-wider opacity-70">
-                  <span>Layanan</span>
-                  <span className="text-right">Menunggu</span>
-                  <span className="text-right">Berikutnya</span>
-                </div>
-                <ul className="flex min-h-0 flex-1 flex-col gap-2" data-testid="service-queues">
-                  {services.map((service) => (
-                    <li
-                      key={service.id}
-                      className="grid h-[84px] shrink-0 grid-cols-[minmax(0,1fr)_120px_150px] items-center gap-3 rounded-[var(--radius-card)] bg-brand-navy px-4"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-white text-2xl font-bold text-brand-navy">
-                          {service.prefix}
-                        </span>
-                        <p className="line-clamp-2 min-w-0 text-[22px] font-bold leading-tight">{service.name}</p>
-                      </div>
-                      <p className="text-right text-[44px] font-bold leading-none tabular-nums">{service.waitingCount}</p>
-                      <p className="text-right text-[34px] font-bold leading-none text-brand-orange tabular-nums">
-                        {service.nextNumber ?? <span className="text-brand-white/40">—</span>}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
-
-          {/* Kanan: loket yang buka dan nomor yang sedang dilayani. */}
-          <section className="flex min-h-0 flex-col pb-8 pl-2 pr-10 pt-6">
-            <SectionTitle pages={counterPages.length} page={counterPage}>
-              Loket
-            </SectionTitle>
-            {counters.length === 0 ? (
-              <p className="text-2xl opacity-80">Belum ada loket.</p>
-            ) : (
-              <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-5 gap-3">
-                {counters.map((counter) => (
-                  <CounterCard
-                    key={counter.id}
-                    counter={counter}
-                    latest={lastCall?.counterId === counter.id && counter.activeTicket != null}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+          <CounterColumn counters={rightCounters} lastCall={lastCall} title="Loket" pages={counterPages.length} page={counterPage} side="right" />
         </div>
 
         {state.settings.runningText ? (
@@ -295,6 +238,43 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
         <DiagonalStripes className="shrink-0" />
       </div>
     </Stage>
+  );
+}
+
+function CounterColumn({
+  counters,
+  lastCall,
+  title,
+  pages,
+  page,
+  side,
+}: {
+  counters: QueueCounterState[];
+  lastCall: { counterId: number | null } | null;
+  title: string;
+  pages: number;
+  page: number;
+  side: "left" | "right";
+}) {
+  return (
+    <section className={cn("flex min-h-0 flex-col pb-8 pt-6", side === "left" ? "pl-10 pr-6" : "pl-6 pr-10")}>
+      <SectionTitle pages={side === "right" ? pages : 1} page={page}>
+        {title}
+      </SectionTitle>
+      {counters.length === 0 ? (
+        <p className="text-2xl opacity-80">{side === "left" ? "Belum ada loket." : ""}</p>
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-rows-6 gap-3">
+          {counters.map((counter) => (
+            <CounterCard
+              key={counter.id}
+              counter={counter}
+              latest={lastCall?.counterId === counter.id && counter.activeTicket != null}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

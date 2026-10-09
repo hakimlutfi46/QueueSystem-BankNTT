@@ -2,9 +2,8 @@
 export const STAGE_WIDTH = 1920;
 export const STAGE_HEIGHT = 1080;
 
-/** Loket per halaman (dua kolom × lima baris) dan layanan per halaman di panel antrean. */
-export const COUNTERS_PER_PAGE = 10;
-export const SERVICES_PER_PAGE = 8;
+/** Loket per halaman: enam di kolom kiri dan enam di kolom kanan, nomor panggilan di tengah. */
+export const COUNTERS_PER_PAGE = 12;
 
 /** Bagi daftar menjadi halaman yang bergantian otomatis di TV. Daftar kosong tetap satu halaman. */
 export function paginate<T>(items: T[], perPage: number): T[][] {

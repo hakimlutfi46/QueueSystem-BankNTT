@@ -39,8 +39,6 @@ export type QueueServiceState = {
   name: string;
   prefix: string;
   waitingCount: number;
-  /** Nomor menunggu paling awal hari ini, yang akan dipanggil berikutnya untuk layanan ini. */
-  nextNumber: string | null;
 };
 
 export type QueueLastCall = {

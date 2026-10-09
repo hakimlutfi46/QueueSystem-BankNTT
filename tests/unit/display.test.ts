@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { COUNTERS_PER_PAGE, heroNumberSize, paginate, SERVICES_PER_PAGE, stageFit } from "@/lib/display/layout";
+import { COUNTERS_PER_PAGE, heroNumberSize, paginate, stageFit } from "@/lib/display/layout";
 
 describe("TV layout", () => {
-  it("shows up to ten counters and eight services per page", () => {
+  it("shows up to twelve counters per page, six on each side", () => {
     expect(paginate([], COUNTERS_PER_PAGE)).toEqual([[]]);
     expect(paginate(Array.from({ length: 9 }, (_, i) => i), COUNTERS_PER_PAGE)).toHaveLength(1);
-    expect(paginate(Array.from({ length: 14 }, (_, i) => i), COUNTERS_PER_PAGE).map((page) => page.length)).toEqual([10, 4]);
-    expect(paginate(Array.from({ length: 10 }, (_, i) => i), SERVICES_PER_PAGE).map((page) => page.length)).toEqual([8, 2]);
+    expect(paginate(Array.from({ length: 14 }, (_, i) => i), COUNTERS_PER_PAGE).map((page) => page.length)).toEqual([12, 2]);
   });
 
   it("scales the 1920×1080 stage to fit any screen without cropping", () => {
