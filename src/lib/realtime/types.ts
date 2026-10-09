@@ -32,11 +32,6 @@ export type QueueCounterState = {
   officerName: string | null;
   serviceIds: number[];
   activeTicket: QueueActiveTicket | null;
-  /**
-   * Nomor yang akan dipanggil loket ini berikutnya: tiket menunggu paling awal di antara layanannya,
-   * dengan urutan yang sama seperti callNext. Loket lain yang melayani layanan sama bisa mendahului.
-   */
-  nextNumber: string | null;
 };
 
 export type QueueServiceState = {

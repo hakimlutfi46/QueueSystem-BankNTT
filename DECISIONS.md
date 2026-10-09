@@ -6,7 +6,7 @@ Loket memanggil tiket paling awal di antara layanan yang terhubung dengannya; at
 
 ## 2026-10-09 — TV menampilkan semua loket beserta statusnya
 
-TV kini menampilkan semua loket aktif dengan status Buka, Istirahat, atau Tutup, bukan hanya yang buka. Tiap loket yang buka menampilkan nomor yang akan dipanggilnya berikutnya, dihitung di server dengan urutan yang sama seperti `callNext`. Bila dua loket melayani layanan yang sama, keduanya menampilkan nomor yang sama sampai salah satu memanggilnya; `FOR UPDATE SKIP LOCKED` tetap menjamin nomor itu hanya diambil satu loket.
+TV kini menampilkan semua loket aktif dengan status Buka, Istirahat, atau Tutup, bukan hanya yang buka. Nomor berikutnya hanya tampil per layanan di kolom Antrian, tidak per loket, karena beberapa loket bisa melayani layanan yang sama dan `FOR UPDATE SKIP LOCKED` menentukan loket mana yang mengambilnya.
 
 ## 2026-10-09 — Suara TV menyala sendiri
 

@@ -304,10 +304,7 @@ const COUNTER_STATUS: Record<QueueCounterState["status"], { label: string; class
   CLOSED: { label: "Tutup", className: "bg-surface text-ink-muted" },
 };
 
-/**
- * Satu loket di TV: nama, status, nomor yang sedang dilayani, dan nomor yang akan dipanggilnya berikutnya.
- * Loket istirahat atau tutup tidak menampilkan nomor berikutnya karena tidak sedang memanggil.
- */
+/** Satu loket di TV: nama, status, dan nomor yang sedang dilayani. Nomor berikutnya ada di kolom Antrian. */
 function CounterCard({ counter, latest }: { counter: QueueCounterState; latest: boolean }) {
   const status = COUNTER_STATUS[counter.status];
   const open = counter.status === "OPEN";
@@ -334,20 +331,11 @@ function CounterCard({ counter, latest }: { counter: QueueCounterState; latest: 
         >
           {counter.activeTicket?.number ?? "—"}
         </p>
-        <div className="shrink-0 text-right">
-          {open ? (
-            <>
-              <p className="text-sm font-bold uppercase tracking-wide text-ink-muted">Berikutnya</p>
-              <p className={cn("text-[26px] font-bold leading-tight tabular-nums", counter.nextNumber ? "text-ink" : "text-brand-grey")}>
-                {counter.nextNumber ?? "—"}
-              </p>
-            </>
-          ) : (
-            <p className="pb-1 text-lg font-bold text-ink-muted">
-              {counter.status === "PAUSED" ? "Sedang istirahat" : "Tidak melayani"}
-            </p>
-          )}
-        </div>
+        {open ? null : (
+          <p className="shrink-0 pb-1 text-lg font-bold text-ink-muted">
+            {counter.status === "PAUSED" ? "Sedang istirahat" : "Tidak melayani"}
+          </p>
+        )}
       </div>
     </article>
   );
