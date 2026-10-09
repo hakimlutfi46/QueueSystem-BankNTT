@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { auth } from "@/auth";
 import { LoginForm } from "@/app/login/login-form";
 import { readSettings } from "@/lib/admin/settings";
+import { currentUser } from "@/lib/auth/session";
 import { getPrisma } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -21,13 +21,13 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
-  const session = await auth();
+  const user = await currentUser();
   const params = await searchParams;
   const callbackUrl =
     params.callbackUrl?.startsWith("/") && !params.callbackUrl.startsWith("//")
       ? params.callbackUrl
       : "/counter";
-  if (session?.user) redirect(callbackUrl);
+  if (user) redirect(user.role !== "ADMIN" && callbackUrl.startsWith("/admin") ? "/counter" : callbackUrl);
   const { branchName } = await readSettings(getPrisma());
   const forAdmin = callbackUrl.startsWith("/admin");
 

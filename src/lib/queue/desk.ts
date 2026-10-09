@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { QueueError } from "@/lib/queue/errors";
-import { notifyQueue, queueTransaction, type Sql } from "@/lib/queue/sql";
+import { assertLegalTransition } from "@/lib/queue/transitions";
+import { notifyQueue, queueTransaction, recordEvent, type Sql } from "@/lib/queue/sql";
 
 type CounterRow = {
   id: number;
@@ -86,6 +87,54 @@ export async function closeCounter(
     `;
     await notifyQueue(tx, { type: "COUNTER_CHANGED", counterId: input.counterId });
     return { id: input.counterId, status: "CLOSED" };
+  }, queueTransaction);
+}
+
+/**
+ * Admin menutup loket yang ditinggal petugasnya. Tiket yang masih dilayani ditutup sebagai DONE dengan
+ * auto_closed, sama seperti tutup hari, supaya tidak ikut rata-rata penanganan.
+ */
+export async function forceCloseCounter(
+  db: PrismaClient,
+  input: { counterId: number; adminId: number },
+): Promise<{ id: number; status: "CLOSED"; autoClosedTicket: string | null }> {
+  return db.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<CounterRow[]>`
+      SELECT id, status::text AS status, current_user_id, is_active
+      FROM counters
+      WHERE id = ${input.counterId}
+      FOR UPDATE
+    `;
+    if (!rows[0]) throw new QueueError("COUNTER_NOT_FOUND", "Counter does not exist.");
+    if (rows[0].status === "CLOSED") {
+      return { id: input.counterId, status: "CLOSED", autoClosedTicket: null };
+    }
+
+    assertLegalTransition("SERVING", "DONE");
+    const closed = await tx.$queryRaw<{ id: string; number: string; service_id: number }[]>`
+      UPDATE tickets
+      SET status = 'DONE', auto_closed = true, finished_at = now()
+      WHERE counter_id = ${input.counterId} AND status = 'SERVING'
+      RETURNING id::text AS id, number, service_id
+    `;
+    for (const ticket of closed) {
+      await recordEvent(tx, {
+        ticketId: BigInt(ticket.id),
+        type: "DONE",
+        notifyType: "TICKET_DONE",
+        counterId: input.counterId,
+        userId: input.adminId,
+        serviceId: ticket.service_id,
+      });
+    }
+
+    await tx.$executeRaw`
+      UPDATE counters
+      SET status = 'CLOSED', current_user_id = NULL
+      WHERE id = ${input.counterId}
+    `;
+    await notifyQueue(tx, { type: "COUNTER_CHANGED", counterId: input.counterId });
+    return { id: input.counterId, status: "CLOSED", autoClosedTicket: closed[0]?.number ?? null };
   }, queueTransaction);
 }
 

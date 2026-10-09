@@ -1,16 +1,24 @@
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { AdminError } from "@/lib/admin/errors";
+import { validationError } from "@/lib/admin/errors";
 import { notifyQueue } from "@/lib/queue/sql";
 
 const settingsBody = z.object({
-  branchName: z.string().trim().min(1).max(80),
-  runningText: z.string().trim().max(240),
+  branchName: z.string().trim().min(1, "Nama cabang wajib diisi.").max(80, "Nama cabang paling panjang 80 karakter."),
+  runningText: z.string().trim().max(240, "Teks berjalan paling panjang 240 karakter."),
   voiceEnabled: z.boolean(),
-  maxRecall: z.number().int().min(0).max(20),
-  targetServiceMinutes: z.number().int().positive().max(240),
-  ticketFooter: z.string().trim().max(240),
-  ticketWidthMm: z.union([z.literal(58), z.literal(80)]),
+  maxRecall: z
+    .number({ error: "Batas panggil ulang wajib diisi." })
+    .int("Batas panggil ulang harus bilangan bulat.")
+    .min(0, "Batas panggil ulang minimal 0.")
+    .max(20, "Batas panggil ulang paling besar 20."),
+  targetServiceMinutes: z
+    .number({ error: "Target lama penanganan wajib diisi." })
+    .int("Target lama penanganan harus bilangan bulat.")
+    .positive("Target lama penanganan minimal 1 menit.")
+    .max(240, "Target lama penanganan paling lama 240 menit."),
+  ticketFooter: z.string().trim().max(240, "Teks kaki tiket paling panjang 240 karakter."),
+  ticketWidthMm: z.union([z.literal(58), z.literal(80)], { error: "Lebar kertas harus 58 atau 80 mm." }),
 });
 
 export type AdminSettings = z.infer<typeof settingsBody>;
@@ -42,7 +50,7 @@ export async function readSettings(db: PrismaClient): Promise<AdminSettings> {
 
 export async function saveSettings(db: PrismaClient, body: unknown): Promise<AdminSettings> {
   const parsed = settingsBody.safeParse(body);
-  if (!parsed.success) throw new AdminError("VALIDATION", "Data tidak valid.");
+  if (!parsed.success) throw validationError(parsed.error);
   const entries: Array<{ key: string; value: string | number | boolean }> = [
     { key: "branch_name", value: parsed.data.branchName },
     { key: "running_text", value: parsed.data.runningText },

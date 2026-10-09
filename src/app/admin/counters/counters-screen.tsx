@@ -42,6 +42,7 @@ export function CountersScreen({
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<AdminCounter | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [closing, setClosing] = useState<{ counter: AdminCounter; ticket: string | null; officer: string | null } | null>(null);
   const [query, setQuery] = useState("");
   const [serviceFilter, setServiceFilter] = useState<number | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -179,6 +180,7 @@ export function CountersScreen({
               targetMinutes={state?.settings.targetServiceMinutes ?? 10}
               onEdit={setEditing}
               onToggle={(counter) => void toggle(counter)}
+              onForceClose={(counter, ticket, officer) => setClosing({ counter, ticket, officer })}
             />
           )}
 
@@ -202,6 +204,7 @@ export function CountersScreen({
                     targetMinutes={state?.settings.targetServiceMinutes ?? 10}
                     onEdit={setEditing}
                     onToggle={(counter) => void toggle(counter)}
+                    onForceClose={(counter, ticket, officer) => setClosing({ counter, ticket, officer })}
                   />
                 </div>
               ) : null}
@@ -221,13 +224,56 @@ export function CountersScreen({
       {editing ? (
         <EditCounterModal
           counter={editing}
-          services={activeServices}
+          services={services}
           onClose={() => setEditing(null)}
           onSaved={async (body) => {
             const message = await submitAdmin(`/api/admin/counters/${editing.id}`, "PATCH", body);
             if (!done(message, `${body.name} disimpan.`)) setEditing(null);
           }}
         />
+      ) : null}
+
+      {closing ? (
+        <Modal
+          title={`Tutup paksa ${closing.counter.name}?`}
+          description="Gunakan bila petugas meninggalkan loket tanpa menutupnya."
+          onClose={() => setClosing(null)}
+        >
+          <div className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-2 text-sm">
+              <li className="flex gap-2">
+                <Icon name="user" className="mt-0.5 size-4 text-ink-muted" />
+                {closing.officer ? `${closing.officer} dikeluarkan dari loket ini.` : "Loket dilepas dari petugasnya."}
+              </li>
+              <li className="flex gap-2">
+                <Icon name="ticket" className="mt-0.5 size-4 text-ink-muted" />
+                {closing.ticket
+                  ? `Nomor ${closing.ticket} yang sedang dilayani ditandai selesai otomatis dan tidak dihitung dalam rata-rata.`
+                  : "Tidak ada nomor yang sedang dilayani."}
+              </li>
+              <li className="flex gap-2">
+                <Icon name="tv" className="mt-0.5 size-4 text-ink-muted" />
+                Loket hilang dari TV sampai dibuka lagi.
+              </li>
+            </ul>
+            <div className="flex justify-end gap-2 border-t border-line pt-4">
+              <BrandButton variant="ghost" onClick={() => setClosing(null)}>
+                Batal
+              </BrandButton>
+              <BrandButton
+                variant="danger"
+                onClick={async () => {
+                  const target = closing.counter;
+                  const message = await submitAdmin(`/api/admin/counters/${target.id}/close`, "POST", {});
+                  if (!done(message, `${target.name} ditutup.`)) setClosing(null);
+                }}
+              >
+                <Icon name="lock" className="size-4" />
+                Tutup paksa
+              </BrandButton>
+            </div>
+          </div>
+        </Modal>
       ) : null}
 
       {bulkOpen ? (
@@ -252,12 +298,14 @@ function CounterGrid({
   targetMinutes,
   onEdit,
   onToggle,
+  onForceClose,
 }: {
   rows: { counter: AdminCounter; live: QueueCounterState | undefined; status: string }[];
   serviceById: Map<number, AdminService>;
   targetMinutes: number;
   onEdit: (counter: AdminCounter) => void;
   onToggle: (counter: AdminCounter) => void;
+  onForceClose: (counter: AdminCounter, ticket: string | null, officer: string | null) => void;
 }) {
   return (
     <ul className="grid gap-4 md:grid-cols-2">
@@ -271,6 +319,9 @@ function CounterGrid({
             targetMinutes={targetMinutes}
             onEdit={() => onEdit(counter)}
             onToggle={() => onToggle(counter)}
+            onForceClose={() =>
+              onForceClose(counter, live?.activeTicket?.number ?? null, live?.officerName ?? counter.officerName)
+            }
           />
         </li>
       ))}
@@ -312,6 +363,7 @@ function CounterCard({
   targetMinutes,
   onEdit,
   onToggle,
+  onForceClose,
 }: {
   counter: AdminCounter;
   live: QueueCounterState | undefined;
@@ -320,6 +372,7 @@ function CounterCard({
   targetMinutes: number;
   onEdit: () => void;
   onToggle: () => void;
+  onForceClose: () => void;
 }) {
   const busy = counter.isActive && (status === "OPEN" || status === "PAUSED");
   const officer = live?.officerName ?? counter.officerName;
@@ -390,17 +443,22 @@ function CounterCard({
           <Icon name="edit" className="size-4" />
           Ubah
         </BrandButton>
-        <BrandButton
-          size="sm"
-          variant={counter.isActive ? "danger" : "outline"}
-          onClick={onToggle}
-          disabled={busy}
-          title={busy ? "Petugas harus menutup loket ini dulu." : undefined}
-          ariaLabel={`${counter.isActive ? "Nonaktifkan" : "Aktifkan"} ${counter.name}`}
-        >
-          <Icon name="power" className="size-4" />
-          {counter.isActive ? "Nonaktifkan" : "Aktifkan"}
-        </BrandButton>
+        {busy ? (
+          <BrandButton size="sm" variant="danger" onClick={onForceClose} ariaLabel={`Tutup paksa ${counter.name}`}>
+            <Icon name="lock" className="size-4" />
+            Tutup paksa
+          </BrandButton>
+        ) : (
+          <BrandButton
+            size="sm"
+            variant={counter.isActive ? "danger" : "outline"}
+            onClick={onToggle}
+            ariaLabel={`${counter.isActive ? "Nonaktifkan" : "Aktifkan"} ${counter.name}`}
+          >
+            <Icon name="power" className="size-4" />
+            {counter.isActive ? "Nonaktifkan" : "Aktifkan"}
+          </BrandButton>
+        )}
       </div>
     </article>
   );
@@ -584,12 +642,12 @@ function EditCounterModal({
         <fieldset>
           <legend className="mb-2 text-sm font-bold">Layanan yang dilayani</legend>
           <div className="flex flex-wrap gap-2">
-            {services.map((service) => (
+            {services.filter((service) => service.isActive || counter.serviceIds.includes(service.id)).map((service) => (
               <ChipCheckbox
                 key={service.id}
                 name="serviceId"
                 value={service.id}
-                label={service.name}
+                label={service.isActive ? service.name : `${service.name} (nonaktif)`}
                 defaultChecked={counter.serviceIds.includes(service.id)}
                 leading={<PrefixTile prefix={service.prefix} className="size-6 rounded-md text-xs" />}
               />

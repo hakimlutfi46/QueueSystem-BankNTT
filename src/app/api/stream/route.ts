@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { auth } from "@/auth";
+import { currentUser } from "@/lib/auth/session";
 import { decideDevice, DISPLAY_COOKIE, KIOSK_COOKIE } from "@/lib/auth/device";
 import { getPrisma } from "@/lib/db";
 import { ensureDayClosed } from "@/lib/queue/day-close";
@@ -11,13 +11,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
   const jar = await cookies();
-  const session = await auth();
+  const user = await currentUser();
   const decision = decideDevice({
     pathname: "/api/stream",
     token: new URL(request.url).searchParams.get("token"),
     kioskCookie: jar.get(KIOSK_COOKIE)?.value,
     displayCookie: jar.get(DISPLAY_COOKIE)?.value,
-    hasSession: Boolean(session?.user),
+    hasSession: user != null,
   });
   if (decision.type !== "allow") {
     return Response.json(

@@ -1,19 +1,23 @@
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { AdminError } from "@/lib/admin/errors";
+import { AdminError, validationError } from "@/lib/admin/errors";
 import { notifyQueue } from "@/lib/queue/sql";
 
 const counterBody = z.object({
-  name: z.string().trim().min(1).max(80),
-  displayNumber: z.number().int().positive().max(999),
-  serviceIds: z.array(z.number().int().positive()).min(1),
+  name: z.string().trim().min(1, "Nama loket wajib diisi.").max(80, "Nama loket paling panjang 80 karakter."),
+  displayNumber: z
+    .number({ error: "Nomor tampil wajib diisi." })
+    .int("Nomor tampil harus bilangan bulat.")
+    .positive("Nomor tampil minimal 1.")
+    .max(999, "Nomor tampil paling besar 999."),
+  serviceIds: z.array(z.number().int().positive()).min(1, "Pilih minimal satu layanan."),
   isActive: z.boolean().optional(),
 });
 
 const MAX_BATCH = 20;
 
 const batchBody = z.object({
-  items: z.array(counterBody).min(1).max(MAX_BATCH),
+  items: z.array(counterBody).min(1, "Tambahkan minimal satu loket.").max(MAX_BATCH, `Paling banyak ${MAX_BATCH} loket sekaligus.`),
 });
 
 export type AdminCounter = {
@@ -72,7 +76,7 @@ export async function createCounter(db: PrismaClient, body: unknown): Promise<Ad
 /** Membuat beberapa loket dalam satu transaksi; gagal satu berarti tidak ada yang tersimpan. */
 export async function createCounters(db: PrismaClient, body: unknown): Promise<AdminCounter[]> {
   const parsed = batchBody.safeParse(body);
-  if (!parsed.success) throw new AdminError("VALIDATION", "Data tidak valid.");
+  if (!parsed.success) throw validationError(parsed.error);
   const names = parsed.data.items.map((item) => item.name.toLowerCase());
   if (new Set(names).size !== names.length) {
     throw new AdminError("NAME_TAKEN", "Nama loket tidak boleh sama.");
@@ -106,9 +110,8 @@ export async function createCounters(db: PrismaClient, body: unknown): Promise<A
 
 export async function updateCounter(db: PrismaClient, id: number, body: unknown): Promise<AdminCounter> {
   const parsed = counterBody.partial().safeParse(body);
-  if (!parsed.success || Object.keys(parsed.data).length === 0) {
-    throw new AdminError("VALIDATION", "Data tidak valid.");
-  }
+  if (!parsed.success) throw validationError(parsed.error);
+  if (Object.keys(parsed.data).length === 0) throw new AdminError("VALIDATION", "Tidak ada yang diubah.");
   return db.$transaction(async (tx) => {
     const existing = (await listCounters(tx as unknown as PrismaClient)).find((counter) => counter.id === id);
     if (!existing) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
@@ -116,7 +119,7 @@ export async function updateCounter(db: PrismaClient, id: number, body: unknown)
       throw new AdminError("COUNTER_BUSY", "Tutup loket terlebih dahulu.");
     }
     const serviceIds = parsed.data.serviceIds ? [...new Set(parsed.data.serviceIds)] : existing.serviceIds;
-    if (serviceIds.length === 0) throw new AdminError("VALIDATION", "Data tidak valid.");
+    if (serviceIds.length === 0) throw new AdminError("VALIDATION", "Pilih minimal satu layanan.");
     await assertServices(tx, serviceIds);
     if ((parsed.data.isActive ?? existing.isActive) && (parsed.data.name || parsed.data.isActive)) {
       await assertNameFree(tx, parsed.data.name ?? existing.name, id);

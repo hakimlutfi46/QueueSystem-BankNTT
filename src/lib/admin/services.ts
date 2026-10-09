@@ -1,16 +1,20 @@
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { AdminError } from "@/lib/admin/errors";
+import { AdminError, validationError } from "@/lib/admin/errors";
 import { errorText, notifyQueue } from "@/lib/queue/sql";
 
 const serviceBody = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1, "Nama layanan wajib diisi.").max(80, "Nama layanan paling panjang 80 karakter."),
   prefix: z
     .string()
     .trim()
-    .regex(/^[A-Za-z]{1,2}$/)
+    .regex(/^[A-Za-z]{1,2}$/, "Huruf awalan harus 1–2 huruf A–Z, tanpa angka atau spasi.")
     .transform((value) => value.toUpperCase()),
-  sortOrder: z.number().int().min(0).max(999),
+  sortOrder: z
+    .number({ error: "Urutan wajib diisi." })
+    .int("Urutan harus bilangan bulat.")
+    .min(0, "Urutan minimal 0.")
+    .max(999, "Urutan paling besar 999."),
   isActive: z.boolean().optional(),
 });
 
@@ -35,7 +39,7 @@ export async function listServices(db: PrismaClient): Promise<AdminService[]> {
 
 export async function createService(db: PrismaClient, body: unknown): Promise<AdminService> {
   const parsed = serviceBody.safeParse(body);
-  if (!parsed.success) throw new AdminError("VALIDATION", "Data tidak valid.");
+  if (!parsed.success) throw validationError(parsed.error);
   try {
     return await db.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
@@ -60,9 +64,8 @@ export async function createService(db: PrismaClient, body: unknown): Promise<Ad
 
 export async function updateService(db: PrismaClient, id: number, body: unknown): Promise<AdminService> {
   const parsed = serviceBody.partial().safeParse(body);
-  if (!parsed.success || Object.keys(parsed.data).length === 0) {
-    throw new AdminError("VALIDATION", "Data tidak valid.");
-  }
+  if (!parsed.success) throw validationError(parsed.error);
+  if (Object.keys(parsed.data).length === 0) throw new AdminError("VALIDATION", "Tidak ada yang diubah.");
   const current = await listServices(db);
   const existing = current.find((service) => service.id === id);
   if (!existing) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");

@@ -38,6 +38,14 @@ describe("mergeCounterDesk", () => {
     expect(merged.activeTicket).toBeNull();
   });
 
+  it("returns to the counter picker when an admin closes the counter", () => {
+    const live = state({ asOf: "later", waitingCount: 0, officerId: null, active: null, status: "CLOSED" });
+    const merged = mergeCounterDesk(desk, live, 7, "earlier");
+    expect(merged.mode).toBe("pick");
+    if (merged.mode !== "pick") return;
+    expect(merged.counters[0]).toMatchObject({ name: "CS 1", available: true });
+  });
+
   it("keeps the desk snapshot until a newer live state arrives", () => {
     const paused = { ...desk, counter: { ...desk.counter, status: "PAUSED" as const } };
     const live = state({

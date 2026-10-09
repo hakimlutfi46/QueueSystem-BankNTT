@@ -1,4 +1,6 @@
+import type { PrismaClient } from "@/generated/prisma/client";
 import { auth } from "@/auth";
+import { getPrisma } from "@/lib/db";
 
 export type SessionUser = {
   id: number;
@@ -6,15 +8,24 @@ export type SessionUser = {
   role: "ADMIN" | "STAFF";
 };
 
+/**
+ * Pengguna yang sedang masuk, dibaca ulang dari database. Sesi JWT hanya menyimpan id, jadi akun yang
+ * dinonaktifkan, diturunkan perannya, atau diganti namanya oleh admin langsung berlaku tanpa menunggu sesi habis.
+ */
 export async function currentUser(): Promise<SessionUser | null> {
   const session = await auth();
   const id = Number(session?.user?.id);
   if (!session?.user || !Number.isInteger(id) || id <= 0) return null;
-  return {
-    id,
-    name: session.user.name ?? "",
-    role: session.user.role === "ADMIN" ? "ADMIN" : "STAFF",
-  };
+  return loadSessionUser(getPrisma(), id);
+}
+
+export async function loadSessionUser(db: PrismaClient, id: number): Promise<SessionUser | null> {
+  const rows = await db.$queryRaw<{ name: string; role: string }[]>`
+    SELECT name, role::text AS role FROM users WHERE id = ${id} AND is_active LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return { id, name: row.name, role: row.role === "ADMIN" ? "ADMIN" : "STAFF" };
 }
 
 export async function currentOfficer(): Promise<{ id: number; name: string } | null> {

@@ -8,24 +8,7 @@ export function mergeCounterDesk(
   syncedAsOf: string | null,
 ): CounterDesk {
   if (!live) return desk;
-  if (desk.mode === "pick") {
-    return {
-      mode: "pick",
-      branchName: live.settings.branchName,
-      counters: live.counters.map((counter) => ({
-        id: counter.id,
-        name: counter.name,
-        displayNumber: counter.displayNumber,
-        status: counter.status,
-        officerId: counter.officerId,
-        officerName: counter.officerName,
-        available: counter.status === "CLOSED" || counter.officerId === officerId,
-        serviceNames: live.services
-          .filter((service) => counter.serviceIds.includes(service.id))
-          .map((service) => service.name),
-      })),
-    };
-  }
+  if (desk.mode === "pick") return pickFromLive(live, officerId);
   if (live.asOf === syncedAsOf) return desk;
 
   const held = live.counters.find((counter) => counter.id === desk.counter.id);
@@ -36,6 +19,8 @@ export function mergeCounterDesk(
         .reduce((total, service) => total + service.waitingCount, 0)
     : desk.waitingCount;
   const liveIsMine = held?.officerId === officerId && held.status !== "CLOSED";
+  // Admin menutup paksa loket ini atau menonaktifkannya: kembali ke layar pilih loket.
+  if (!held || !liveIsMine) return pickFromLive(live, officerId);
   const active = liveIsMine ? held.activeTicket : null;
 
   return {
@@ -67,5 +52,24 @@ export function mergeCounterDesk(
           ? null
           : desk.activeTicket,
     waitingCount,
+  };
+}
+
+function pickFromLive(live: QueueState, officerId: number): CounterDesk {
+  return {
+    mode: "pick",
+    branchName: live.settings.branchName,
+    counters: live.counters.map((counter) => ({
+      id: counter.id,
+      name: counter.name,
+      displayNumber: counter.displayNumber,
+      status: counter.status,
+      officerId: counter.officerId,
+      officerName: counter.officerName,
+      available: counter.status === "CLOSED" || counter.officerId === officerId,
+      serviceNames: live.services
+        .filter((service) => counter.serviceIds.includes(service.id))
+        .map((service) => service.name),
+    })),
   };
 }
