@@ -9,6 +9,7 @@ import { QueueNumber } from "@/components/brand/queue-number";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import { printTicket } from "@/lib/print/print-ticket";
+import { newRequestId } from "@/lib/request-id";
 import { useQueueState } from "@/lib/realtime/use-queue-state";
 import { useNow } from "@/lib/use-now";
 
@@ -56,7 +57,7 @@ export function KioskScreen({ timeZone }: { timeZone: string }) {
       const response = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serviceId, requestId: crypto.randomUUID() }),
+        body: JSON.stringify({ serviceId, requestId: newRequestId() }),
       });
       if (!response.ok) throw new Error("Ticket was not issued.");
       const payload = (await response.json()) as {
