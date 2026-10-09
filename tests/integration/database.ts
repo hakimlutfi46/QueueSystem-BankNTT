@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import { Client, Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { DB_SESSION_OPTIONS } from "@/lib/db";
 
 export function testDatabaseUrl(): string {
   if (process.env.TEST_DATABASE_URL) {
@@ -44,7 +45,7 @@ export async function ensureTestDatabase(): Promise<string> {
 }
 
 export function createTestPrisma(databaseUrl: string): { prisma: PrismaClient; pool: Pool } {
-  const pool = new Pool({ connectionString: databaseUrl, max: 30 });
+  const pool = new Pool({ connectionString: databaseUrl, max: 30, options: DB_SESSION_OPTIONS });
   const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   return { prisma, pool };
 }
