@@ -118,7 +118,6 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
 
   const lastCall = state.lastCall;
   const blinking = lastCall != null && highlight === lastCall.id;
-  const lastService = lastCall ? state.services.find((service) => service.id === lastCall.serviceId) : undefined;
   const previousCalls = state.recentCalls.filter((call) => call.ticketId !== lastCall?.ticketId).slice(0, 4);
   const counters = counterPages[counterPage] ?? [];
 
@@ -184,7 +183,6 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
                   <p className="mt-3 max-w-full truncate rounded-[var(--radius-card)] border-4 border-brand-white px-10 py-2 text-[56px] font-bold leading-tight">
                     {lastCall.counterName ?? "Loket"}
                   </p>
-                  {lastService ? <p className="mt-3 max-w-full truncate text-2xl opacity-80">{lastService.name}</p> : null}
                 </>
               ) : (
                 <>
