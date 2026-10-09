@@ -5,7 +5,9 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import { AdminError } from "@/lib/admin/errors";
 import { createCounter, createCounters, updateCounter } from "@/lib/admin/counters";
 import { createService } from "@/lib/admin/services";
-import { readSettings, saveSettings } from "@/lib/admin/settings";
+import { readSettings, refreshTimezone, saveSettings } from "@/lib/admin/settings";
+import { appTimezone, setTimezoneOverride } from "@/lib/env";
+import { serviceDate } from "@/lib/queue/sql";
 import { loadDaySummary } from "@/lib/admin/summary";
 import { createTestPrisma, ensureTestDatabase } from "./database";
 
@@ -122,5 +124,35 @@ describe("admin records", () => {
     });
     expect(saved.branchName).toBe("Cabang Kupang");
     await expect(readSettings(prisma)).resolves.toMatchObject({ voiceEnabled: false, ticketWidthMm: 58 });
+  });
+
+  it("switches the branch time zone from Admin and uses it for the queue date", async () => {
+    const base = {
+      branchName: "Cabang Jakarta",
+      runningText: "",
+      voiceEnabled: true,
+      maxRecall: 3,
+      targetServiceMinutes: 10,
+      ticketFooter: "",
+      ticketWidthMm: 80,
+    };
+    try {
+      await expect(saveSettings(prisma, { ...base, timeZone: "Asia/Jakarta" })).resolves.toMatchObject({
+        timeZone: "Asia/Jakarta",
+      });
+      expect(appTimezone()).toBe("Asia/Jakarta");
+      // 23.30 WIB masih tanggal 8, padahal di WITA sudah tanggal 9.
+      await expect(serviceDate(prisma, new Date("2026-10-08T16:30:00Z"))).resolves.toBe("2026-10-08");
+
+      setTimezoneOverride(null);
+      await expect(refreshTimezone(prisma)).resolves.toBe("Asia/Jakarta");
+      expect(appTimezone()).toBe("Asia/Jakarta");
+
+      await expect(saveSettings(prisma, { ...base, timeZone: "UTC" })).rejects.toMatchObject({
+        message: "Zona waktu harus WIB, WITA, atau WIT.",
+      });
+    } finally {
+      setTimezoneOverride(null);
+    }
   });
 });

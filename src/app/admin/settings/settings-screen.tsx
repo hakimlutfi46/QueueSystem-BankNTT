@@ -10,6 +10,7 @@ import { Field, Switch, inputClass } from "@/components/ui/field";
 import { Icon } from "@/components/ui/icon";
 import { Alert, PageHeader, Panel } from "@/components/ui/panel";
 import type { AdminSettings } from "@/lib/admin/settings";
+import { INDONESIA_TIME_ZONES } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 export function SettingsScreen({ settings }: { settings: AdminSettings }) {
@@ -32,6 +33,7 @@ export function SettingsScreen({ settings }: { settings: AdminSettings }) {
       targetServiceMinutes: Number(formData.get("targetServiceMinutes") ?? 0),
       ticketFooter: String(formData.get("ticketFooter") ?? ""),
       ticketWidthMm: Number(formData.get("ticketWidthMm") ?? 80),
+      timeZone: String(formData.get("timeZone") ?? settings.timeZone),
     });
     setPending(false);
     setError(message);
@@ -61,6 +63,29 @@ export function SettingsScreen({ settings }: { settings: AdminSettings }) {
                 className={inputClass}
               />
             </Field>
+          </Panel>
+
+          <Panel title="Zona waktu" description="Dipakai untuk jam di kiosk dan TV, waktu di tiket, pergantian nomor harian, dan laporan.">
+            <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Zona waktu">
+              {INDONESIA_TIME_ZONES.map((zone) => (
+                <label key={zone.id} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="timeZone"
+                    value={zone.id}
+                    defaultChecked={settings.timeZone === zone.id}
+                    className="peer sr-only"
+                  />
+                  <span className="flex flex-col rounded-xl border border-line p-4 transition-colors hover:border-brand-blue peer-checked:border-brand-navy peer-checked:bg-navy-soft peer-focus-visible:ring-4 peer-focus-visible:ring-sky-soft">
+                    <span className="text-xl font-bold text-brand-navy">{zone.label}</span>
+                    <span className="text-sm text-ink-muted">{zone.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-ink-muted">
+              Mengganti zona waktu di tengah hari bisa menggeser tanggal antrian. Lakukan saat cabang belum buka.
+            </p>
           </Panel>
 
           <Panel title="Layar TV dan suara">

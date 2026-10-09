@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { DEFAULT_BRANDING } from "@/lib/branding";
+import { envTimezone, INDONESIA_TIME_ZONES, isIndonesiaTimeZone, setTimezoneOverride } from "@/lib/env";
 import { validationError } from "@/lib/admin/errors";
 import { notifyQueue } from "@/lib/queue/sql";
 
@@ -20,9 +21,12 @@ const settingsBody = z.object({
     .max(240, "Target lama penanganan paling lama 240 menit."),
   ticketFooter: z.string().trim().max(240, "Teks kaki tiket paling panjang 240 karakter."),
   ticketWidthMm: z.union([z.literal(58), z.literal(80)], { error: "Lebar kertas harus 58 atau 80 mm." }),
+  timeZone: z.enum(INDONESIA_TIME_ZONES.map((zone) => zone.id) as [string, ...string[]], {
+    error: "Zona waktu harus WIB, WITA, atau WIT.",
+  }).optional(),
 });
 
-export type AdminSettings = z.infer<typeof settingsBody>;
+export type AdminSettings = Omit<z.infer<typeof settingsBody>, "timeZone"> & { timeZone: string };
 
 const DEFAULTS: AdminSettings = {
   branchName: DEFAULT_BRANDING.orgName,
@@ -32,6 +36,7 @@ const DEFAULTS: AdminSettings = {
   targetServiceMinutes: 10,
   ticketFooter: "",
   ticketWidthMm: 80,
+  timeZone: "Asia/Makassar",
 };
 
 export async function readSettings(db: PrismaClient): Promise<AdminSettings> {
@@ -46,7 +51,21 @@ export async function readSettings(db: PrismaClient): Promise<AdminSettings> {
     targetServiceMinutes: numberValue(values.get("target_service_minutes")) ?? DEFAULTS.targetServiceMinutes,
     ticketFooter: stringValue(values.get("ticket_footer"), DEFAULTS.ticketFooter),
     ticketWidthMm: width === 58 || width === 80 ? width : DEFAULTS.ticketWidthMm,
+    timeZone: syncTimezone(values.get("time_zone")),
   };
+}
+
+/** Baca ulang zona waktu pilihan Admin ke cache server. Dipanggil saat server menyala dan tiap menit. */
+export async function refreshTimezone(db: PrismaClient): Promise<string> {
+  const row = await db.setting.findUnique({ where: { key: "time_zone" } });
+  return syncTimezone(row?.value);
+}
+
+function syncTimezone(stored: unknown): string {
+  setTimezoneOverride(isIndonesiaTimeZone(stored) ? stored : null);
+  if (isIndonesiaTimeZone(stored)) return stored;
+  const fromEnv = envTimezone();
+  return isIndonesiaTimeZone(fromEnv) ? fromEnv : DEFAULTS.timeZone;
 }
 
 export async function saveSettings(db: PrismaClient, body: unknown): Promise<AdminSettings> {
@@ -60,6 +79,7 @@ export async function saveSettings(db: PrismaClient, body: unknown): Promise<Adm
     { key: "target_service_minutes", value: parsed.data.targetServiceMinutes },
     { key: "ticket_footer", value: parsed.data.ticketFooter },
     { key: "ticket_width_mm", value: parsed.data.ticketWidthMm },
+    ...(parsed.data.timeZone ? [{ key: "time_zone", value: parsed.data.timeZone }] : []),
   ];
   await db.$transaction(async (tx) => {
     for (const entry of entries) {
@@ -71,7 +91,8 @@ export async function saveSettings(db: PrismaClient, body: unknown): Promise<Adm
     }
     await notifyQueue(tx, { type: "CONFIG_CHANGED" });
   });
-  return parsed.data;
+  if (parsed.data.timeZone) setTimezoneOverride(parsed.data.timeZone);
+  return readSettings(db);
 }
 
 function stringValue(value: unknown, fallback: string): string {

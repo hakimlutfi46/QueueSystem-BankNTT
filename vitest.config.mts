@@ -10,6 +10,8 @@ export default defineConfig({
     sequence: { concurrent: false },
     // next-auth imports "next/server" without an extension, which Node's ESM resolver rejects.
     server: { deps: { inline: ["next-auth"] } },
+    // Uji menghitung tanggal dan jam dengan WITA, apa pun isi .env di mesin pengembang.
+    env: { APP_TIMEZONE: "Asia/Makassar" },
   },
   resolve: {
     alias: {
