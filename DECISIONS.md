@@ -1,5 +1,9 @@
 # Keputusan
 
+## 2026-10-09 — TV: nomor panggilan di tengah, tanpa kolom antrean
+
+Atas permintaan pengguna, kolom antrean per layanan dihapus dari TV karena loket sudah menampilkan nomor yang sedang dilayani. Nomor yang dipanggil kini berada di tengah layar dengan empat panggilan sebelumnya di bawahnya; loket dibagi ke kolom kiri dan kanan (enam per sisi, berganti halaman setelah dua belas). Dengan urutan nama, loket CS berada di kiri dan Teller di kanan. `nextNumber` per layanan ikut dihapus dari state karena tidak dipakai lagi. Di kiosk, ukuran huruf tombol paling besar 32 px dan jumlah menunggu hanya tampil bila ada antrean.
+
 ## 2026-10-09 — Sesi database selalu UTC
 
 Adapter `@prisma/adapter-pg` membuang offset zona waktu saat membaca `timestamptz` dari `$queryRaw`. Pada server PostgreSQL ber-TimeZone `Asia/Jakarta`, `15:31+07` terbaca sebagai `15:31Z`, sehingga waktu tiket, timer loket, dan status perangkat maju tujuh jam. Semua koneksi aplikasi dan uji integrasi kini membuka sesi dengan `-c TimeZone=UTC` (`DB_SESSION_OPTIONS` di `src/lib/db.ts`), jadi offset selalu nol. Tanggal dan jam cabang tetap dihitung dengan `AT TIME ZONE` dan `APP_TIMEZONE` atau pilihan Admin, tidak bergantung pada zona sesi.
