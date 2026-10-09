@@ -66,6 +66,17 @@ Pada tayangan pertama, tekan **Aktifkan suara** supaya nomor yang dipanggil diba
 
 Petugas membuka `http://192.168.1.10:3000/counter`, masuk, lalu memilih loket. Tombol utama memanggil nomor berikutnya. Nomor yang sama tidak bisa diambil dua loket.
 
+## Data contoh
+
+Untuk mencoba aplikasi di laptop, isi database dengan data contoh:
+
+```bash
+npm run db:seed
+npm run db:seed:demo
+```
+
+Perintah kedua menambah layanan Kredit (`C`) dan Pembukaan Rekening (`D`), loket CS 3, Teller 3, dan Kredit 1, enam petugas dan satu akun `supervisor` (admin), serta riwayat tiket tujuh hari kerja terakhir untuk laporan. Kata sandi semua akun tambahan sama dengan `SEED_STAFF_PASSWORD`. Jangan jalankan perintah ini di server cabang.
+
 ## Pengujian
 
 Cara menjalankan lint, uji unit dan integrasi, uji end-to-end, dan daftar periksa tampilan ada di [TESTING.md](TESTING.md).
