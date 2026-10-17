@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatPairCode, generatePairCode, normalizePairCode, PAIR_CODE_ALPHABET } from "@/lib/auth/devices";
-import { createPairRateLimit } from "@/lib/auth/pair-rate-limit";
+import { clientAddress, createRateLimit, longestWait, waitText } from "@/lib/auth/rate-limit";
 import { kioskApp, readPrinterStatus } from "@/lib/print/kiosk-app";
 
 describe("pairing codes", () => {
@@ -23,7 +23,7 @@ describe("pairing codes", () => {
   });
 
   it("blocks an address after too many wrong codes until the window passes", () => {
-    const limit = createPairRateLimit(3, 60_000);
+    const limit = createRateLimit(3, 60_000);
     const start = 1_000_000;
     for (let index = 0; index < 3; index += 1) {
       expect(limit.blockedFor("10.0.0.5", start)).toBe(0);
@@ -35,6 +35,20 @@ describe("pairing codes", () => {
     limit.fail("10.0.0.6", start);
     limit.reset("10.0.0.6");
     expect(limit.blockedFor("10.0.0.6", start)).toBe(0);
+  });
+
+  it("waits for the strictest of several limits and reads the sender address", () => {
+    const strict = createRateLimit(1, 120_000);
+    const loose = createRateLimit(5, 60_000);
+    strict.fail("a", 0);
+    loose.fail("a", 0);
+    expect(longestWait([[strict, "a"], [loose, "a"]], 0)).toBe(120);
+    expect(longestWait([[loose, "a"]], 0)).toBe(0);
+    expect(waitText(45)).toBe("45 detik");
+    expect(waitText(61)).toBe("2 menit");
+    expect(clientAddress(new Headers({ "x-forwarded-for": "10.0.0.9, 172.16.0.1" }))).toBe("10.0.0.9");
+    expect(clientAddress(new Headers({ "x-real-ip": "10.0.0.8" }))).toBe("10.0.0.8");
+    expect(clientAddress(new Headers())).toBe("unknown");
   });
 });
 
