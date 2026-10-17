@@ -8,9 +8,8 @@ import { FullscreenButton } from "@/components/ui/fullscreen";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import {
-  COUNTERS_PER_PAGE,
+  counterColumns,
   heroNumberSize,
-  paginate,
   STAGE_HEIGHT,
   STAGE_WIDTH,
   stageFit,
@@ -103,7 +102,7 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
   const allCounters = [...(state?.counters ?? [])].sort((left, right) =>
     left.name.localeCompare(right.name, "id", { numeric: true }),
   );
-  const counterPages = paginate(allCounters, COUNTERS_PER_PAGE);
+  const counterPages = counterColumns(allCounters);
   const counterPage = useRotatingPage(counterPages.length);
 
   if (!state) {
@@ -120,7 +119,8 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
   const lastCall = state.lastCall;
   const blinking = lastCall != null && highlight === lastCall.id;
   const previousCalls = state.recentCalls.filter((call) => call.ticketId !== lastCall?.ticketId).slice(0, 4);
-  const counters = counterPages[counterPage] ?? [];
+  const columns = counterPages[counterPage] ?? { left: [], right: [], rows: 4 };
+  const hasCounters = columns.left.length + columns.right.length > 0;
 
   return (
     <Stage>
@@ -219,20 +219,26 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
             <SectionTitle pages={counterPages.length} page={counterPage}>
               Loket
             </SectionTitle>
-            {counters.length === 0 ? (
+            {!hasCounters ? (
               <p className="text-2xl opacity-80">Belum ada loket.</p>
             ) : (
-              <div
-                className="grid min-h-0 flex-1 grid-flow-col grid-cols-2 gap-3"
-                // Isi per kolom: dengan urutan nama, CS di kolom kiri dan Teller di kolom kanan.
-                style={{ gridTemplateRows: `repeat(${Math.min(6, Math.max(4, Math.ceil(counters.length / 2)))}, minmax(0, 1fr))` }}
-              >
-                {counters.map((counter) => (
-                  <CounterCard
-                    key={counter.id}
-                    counter={counter}
-                    latest={lastCall?.counterId === counter.id && counter.activeTicket != null}
-                  />
+              // Satu kelompok layanan per kolom: CS di kiri, Teller di kanan, dengan tinggi kartu yang sama.
+              <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+                {[columns.left, columns.right].map((column, index) => (
+                  <div
+                    key={index}
+                    className="grid min-h-0 gap-3"
+                    data-testid={index === 0 ? "counters-left" : "counters-right"}
+                    style={{ gridTemplateRows: `repeat(${columns.rows}, minmax(0, 1fr))` }}
+                  >
+                    {column.map((counter) => (
+                      <CounterCard
+                        key={counter.id}
+                        counter={counter}
+                        latest={lastCall?.counterId === counter.id && counter.activeTicket != null}
+                      />
+                    ))}
+                  </div>
                 ))}
               </div>
             )}

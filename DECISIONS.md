@@ -24,7 +24,7 @@ PLAN hanya meminta konfirmasi untuk Tidak hadir dan Tutup loket. Atas permintaan
 
 ## 2026-10-09 — TV: dua panel, tanpa kolom antrean
 
-Atas permintaan pengguna, kolom antrean per layanan dihapus dari TV karena loket sudah menampilkan nomor yang sedang dilayani. TV dibagi dua: nomor yang dipanggil dan empat panggilan sebelumnya di kiri, semua loket di kanan dalam dua kolom yang diisi per kolom (dua belas per halaman). Dengan urutan nama, loket CS berada di kolom kiri dan Teller di kolom kanan. Susunan tiga kolom dengan loket di kedua sisi sempat dicoba lalu ditolak pengguna. `nextNumber` per layanan ikut dihapus dari state karena tidak dipakai lagi. Di kiosk, ukuran huruf tombol paling besar 32 px dan jumlah menunggu hanya tampil bila ada antrean.
+Atas permintaan pengguna, kolom antrean per layanan dihapus dari TV karena loket sudah menampilkan nomor yang sedang dilayani. TV dibagi dua: nomor yang dipanggil dan empat panggilan sebelumnya di kiri, semua loket di kanan dalam dua kolom yang diisi per kolom (dua belas per halaman). Loket dikelompokkan menurut layanan yang dilayaninya: kelompok CS di kolom kiri dan Teller di kolom kanan, tanpa memecah satu kelompok ke dua kolom (sebelumnya kolom diisi berurutan dengan minimal empat baris, sehingga dengan tiga loket CS, Teller 1 ikut di kolom kiri). Bila pembagian per kelompok butuh halaman lebih banyak, loket dibagi rata separuh-separuh. Susunan tiga kolom dengan loket di kedua sisi sempat dicoba lalu ditolak pengguna. `nextNumber` per layanan ikut dihapus dari state karena tidak dipakai lagi. Di kiosk, ukuran huruf tombol paling besar 32 px dan jumlah menunggu hanya tampil bila ada antrean.
 
 ## 2026-10-09 — Sesi database selalu UTC
 
