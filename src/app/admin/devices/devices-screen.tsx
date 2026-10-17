@@ -31,10 +31,13 @@ export function DevicesScreen({
   devices,
   envFallback,
   kioskApp: initialKioskApp,
+  serverHosts,
 }: {
   devices: AdminDevice[];
   envFallback: { kiosk: boolean; display: boolean };
   kioskApp: KioskAppOverview;
+  /** IP jaringan server, diisi bila Admin dibuka lewat localhost. */
+  serverHosts: string[];
 }) {
   const router = useRouter();
   const { confirm, dialog } = useConfirm();
@@ -254,6 +257,7 @@ export function DevicesScreen({
       {issued ? (
         <IssuedModal
           issued={issued}
+          serverHosts={serverHosts}
           onClose={() => setIssued(null)}
           onPairCode={issued.device.kind === "kiosk" ? () => void issueCode(issued.device) : undefined}
         />
@@ -261,6 +265,7 @@ export function DevicesScreen({
       {pairCode ? (
         <PairCodeModal
           pairCode={pairCode}
+          serverHosts={serverHosts}
           installer={installer}
           onRenew={() => void issueCode(pairCode.device)}
           onClose={() => setPairCode(null)}
@@ -400,14 +405,18 @@ function DeviceRow({
 /** Tautan pemasangan, ditampilkan sekali. Alamat server bisa diganti, misalnya dari localhost ke IP cabang. */
 function IssuedModal({
   issued,
+  serverHosts,
   onClose,
   onPairCode,
 }: {
   issued: IssuedDevice;
+  serverHosts: string[];
   onClose: () => void;
   onPairCode?: () => void;
 }) {
-  const [origin, setOrigin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
+  const [origin, setOrigin] = useState(() =>
+    serverHosts[0] ? `http://${serverHosts[0]}` : typeof window === "undefined" ? "" : window.location.origin,
+  );
   const [copied, setCopied] = useState<"link" | "command" | null>(null);
   const [manual, setManual] = useState<"link" | "command" | null>(null);
   const linkRef = useRef<HTMLElement>(null);
@@ -440,9 +449,17 @@ function IssuedModal({
           <Icon name="lock" className="mt-0.5 size-4" />
           Simpan atau buka tautan ini sekarang. Setelah dialog ditutup, token tidak bisa dilihat lagi.
         </p>
-        <Field label="Alamat server" hint="Ganti dengan IP server cabang bila perangkat dibuka dari komputer lain, misalnya http://192.168.1.10:3000">
+        <Field
+          label="Alamat server"
+          hint={
+            serverHosts.length > 0
+              ? "Diisi otomatis dengan IP server di jaringan, karena halaman ini dibuka lewat localhost yang tidak bisa dijangkau perangkat lain."
+              : "Alamat yang dibuka perangkat. Ganti bila perangkat memakai IP atau nama server lain."
+          }
+        >
           <input value={origin} onChange={(event) => setOrigin(event.target.value)} className={cn(inputClass, "font-mono text-sm")} />
         </Field>
+        <HostChoices hosts={serverHosts} current={origin.replace(/^https?:\/\//, "")} onPick={(host) => setOrigin(`http://${host}`)} />
         <div>
           <p className="mb-1.5 text-sm font-bold">Tautan</p>
           <div className="flex gap-2">
@@ -502,17 +519,19 @@ function IssuedModal({
 /** Kode pendek untuk aplikasi kiosk Windows, ditampilkan besar supaya mudah dibaca dan diketik di PC kiosk. */
 function PairCodeModal({
   pairCode,
+  serverHosts,
   installer,
   onRenew,
   onClose,
 }: {
   pairCode: PairCode;
+  serverHosts: string[];
   installer: InstallerInfo;
   onRenew: () => void;
   onClose: () => void;
 }) {
   const now = useNow();
-  const [origin, setOrigin] = useState(() => (typeof window === "undefined" ? "" : window.location.host));
+  const [origin, setOrigin] = useState(() => serverHosts[0] ?? (typeof window === "undefined" ? "" : window.location.host));
   const left = now === 0 ? null : Math.max(0, Math.floor((Date.parse(pairCode.expiresAt) - now) / 1000));
   const expired = left === 0;
 
@@ -528,7 +547,12 @@ function PairCodeModal({
               aria-label="Alamat server"
               className="mt-1 w-full bg-transparent font-mono text-2xl font-bold text-brand-navy outline-none"
             />
-            <p className="mt-1 text-xs text-ink-muted">Ganti dengan IP server cabang bila halaman ini dibuka lewat localhost.</p>
+            <p className="mt-1 text-xs text-ink-muted">
+              {serverHosts.length > 0
+                ? "IP server di jaringan, diisi otomatis. Kiosk harus berada di jaringan yang sama."
+                : "Alamat yang diketik di PC kiosk. Bisa diganti bila perlu."}
+            </p>
+            <HostChoices hosts={serverHosts} current={origin} onPick={setOrigin} />
           </div>
           <div className={cn("rounded-xl px-4 py-4", expired ? "bg-danger-soft" : "bg-navy-soft")}>
             <p className="text-sm font-bold text-ink-muted">Kode pemasangan</p>
@@ -575,6 +599,30 @@ function PairCodeModal({
 function formatCountdown(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/** Pilihan IP bila server punya lebih dari satu jaringan (misalnya kabel dan Wi-Fi). */
+function HostChoices({ hosts, current, onPick }: { hosts: string[]; current: string; onPick: (host: string) => void }) {
+  if (hosts.length < 2) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="text-ink-muted">IP lain server ini:</span>
+      {hosts.map((host) => (
+        <button
+          key={host}
+          type="button"
+          onClick={() => onPick(host)}
+          aria-pressed={current === host}
+          className={cn(
+            "rounded-lg border px-2 py-1 font-mono",
+            current === host ? "border-brand-navy bg-navy-soft font-bold text-brand-navy" : "border-line hover:border-brand-blue",
+          )}
+        >
+          {host}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function CopyButton({ state, onClick }: { state: "idle" | "copied"; onClick: () => void }) {
