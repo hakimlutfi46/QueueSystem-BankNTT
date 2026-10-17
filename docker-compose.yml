@@ -14,6 +14,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    # Menyala lagi sendiri setelah server dimatikan dan dihidupkan.
+    restart: unless-stopped
 
   # Selesai sekali. Migrasi ulang: docker compose run --rm migrate
   migrate:
@@ -48,6 +50,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
 
   # Cadangan harian ke folder ./backups di server, disimpan BACKUP_KEEP_DAYS hari (bawaan 30).
   # Pulihkan: lihat README bagian Backup database.

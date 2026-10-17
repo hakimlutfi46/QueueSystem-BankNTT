@@ -146,6 +146,26 @@ Loket yang **nonaktif** (diatur Admin) berbeda dengan **tutup**: loket nonaktif 
 4. Bila nasabah tidak datang: **Panggil ulang** (dibatasi sesuai pengaturan), lalu **Tidak hadir**.
 5. **Istirahat** bila rehat; **Tutup loket** saat selesai bertugas, lalu keluar.
 
+### Mematikan dan menyalakan perangkat setiap hari
+
+Kiosk dan TV boleh dimatikan setelah tutup dan dinyalakan lagi besok **tanpa pengaturan ulang**. Pengaturan aplikasi kiosk (`config.json`) dan izin perangkat di browser (cookie, berlaku 400 hari) tersimpan permanen.
+
+**Saat tutup:**
+1. Petugas menekan **Tutup loket**, lalu keluar. Loket yang tidak ditutup tetap tampil buka atas nama petugas itu sampai dibuka atau ditutup paksa admin.
+2. Matikan PC kiosk dan PC TV seperti biasa (tombol Windows → Power → Shut down, atau tekan tombol power sebentar). Aplikasi kiosk mengizinkan Windows mati.
+3. Server sebaiknya **tetap menyala**, supaya backup malam berjalan. Bila server ikut dimatikan, jadwalkan backup di jam kerja.
+
+**Besok pagi:** nyalakan server dulu, lalu kiosk dan TV. Urutannya tidak wajib: perangkat yang menyala lebih dulu menunggu dan tersambung sendiri ("Menyambung ke server…", dicoba tiap 5 detik). Nomor sudah kembali ke A001/B001.
+
+**Disiapkan sekali** supaya cukup menekan tombol power:
+
+| Perangkat | Yang disiapkan |
+| --- | --- |
+| Server | **IP tetap** (reservasi DHCP di router, atau IP statis), supaya kiosk dan TV menemukan alamat yang sama setiap hari. Aplikasi menyala sendiri: Docker Desktop "Start when you sign in" (layanan `db`, `app`, dan `backup` memakai `restart: unless-stopped`), atau `npm run start` lewat Task Scheduler/pm2/systemd saat komputer menyala. Matikan mode tidur. Opsional: BIOS "Power on after AC loss". |
+| PC kiosk (aplikasi Windows) | Aplikasi sudah menyala sendiri saat Windows login. Aktifkan **auto-login Windows** (`netplwiz`) supaya tidak perlu mengetik sandi Windows. |
+| PC TV (Chrome) | Buat shortcut perintah Chrome dari Admin → Perangkat (dengan `--kiosk --autoplay-policy=no-user-gesture-required`) di folder **Startup** (`Win + R` → `shell:startup`), plus auto-login Windows. Jangan pakai mode Incognito dan jangan hapus cookie, karena izin perangkat tersimpan di sana. |
+| Smart TV (browser bawaan) | Jadikan alamat `/display` sebagai halaman awal. Suara biasanya perlu satu ketukan setelah TV menyala. |
+
 ### Tutup hari
 
 Berjalan sendiri, dicek tiap menit oleh server. Saat tanggal cabang berganti, tiket yang masih menunggu menjadi `EXPIRED`, dan tiket yang masih terbuka di loket ditandai selesai otomatis (tidak dihitung dalam rata-rata laporan). Nomor esok hari mulai lagi dari 001.
@@ -202,7 +222,7 @@ Kiosk dan TV **tidak login**. Setiap perangkat didaftarkan di **Admin → Perang
    - TV: `google-chrome --kiosk --autoplay-policy=no-user-gesture-required --app="…/display?token=…"`
 4. Status perangkat berubah menjadi **Tersambung**.
 
-Tautan hanya tampil sekali. Bila hilang, tekan **Tautan baru** (tautan lama langsung mati). **Cabut** mematikan izin perangkat yang hilang atau dipindah.
+Tautan hanya tampil sekali. Bila hilang, tekan **Tautan baru** (tautan lama langsung mati). **Cabut** mematikan izin perangkat yang hilang atau dipindah. Perangkat yang sudah dicabut bisa **Aktifkan lagi**, atau **Hapus** untuk membuangnya dari daftar (tiket dan laporan tidak terpengaruh).
 
 | Status di Admin | Arti |
 | --- | --- |
@@ -518,7 +538,8 @@ Cara lengkap dan daftar periksa manual: [TESTING.md](../TESTING.md).
 | Selalu dibawa ke "Ganti kata sandi" | Sandi masih bawaan/lemah/sementara. Ganti dengan sandi minimal 8 karakter yang tidak mudah ditebak |
 | "Terlalu banyak percobaan yang salah" | Tunggu sesuai waktu di pesan, atau restart server |
 | Kiosk/TV: "Perangkat belum diizinkan" | Token dicabut atau belum dipasang. Admin → Perangkat → **Tautan baru** / **Kode aplikasi** |
-| Kiosk/TV: "Menyambung ulang…" terus | Server mati atau IP berubah. Cek server dan alamat di perangkat |
+| Kiosk/TV: "Menyambung ulang…" terus | Server mati atau IP berubah. Cek server dan alamat di perangkat; beri server IP tetap |
+| Setelah server dinyalakan ulang aplikasi tidak bisa dibuka | Docker: pastikan Docker Desktop menyala saat login (layanan memakai `restart: unless-stopped`). Tanpa Docker: jalankan `npm run start` otomatis lewat Task Scheduler/pm2 |
 | TV tidak bersuara | Ketuk layar sekali, atau jalankan Chrome dengan `--autoplay-policy=no-user-gesture-required`; cek **Suara panggilan** di Pengaturan |
 | Tiket tidak tercetak (browser) | Printer thermal harus printer default, Chrome dengan `--kiosk-printing`, `TICKET_OUTPUT` bukan `pdf` |
 | Kiosk Windows: "Mohon hubungi petugas — Printer…" | Printer offline/kertas habis/tidak ditemukan. Perbaiki printer; kiosk pulih sendiri dalam 10 detik |
