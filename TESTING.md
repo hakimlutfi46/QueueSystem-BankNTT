@@ -5,8 +5,8 @@ Ada tiga lapis pengujian. Jalankan berurutan: yang cepat dulu, end-to-end terakh
 | Lapis | Perintah | Database | Lama |
 | --- | --- | --- | --- |
 | Lint dan typecheck | `npm run lint`, `npm run typecheck` | Tidak perlu | < 1 menit |
-| Unit dan integrasi (Vitest) | `npm test` | `queue_test`, dibuat otomatis | ± 10 detik |
-| End-to-end (Playwright) | `npm run test:e2e` | `queue_e2e`, disiapkan sendiri | 1–2 menit |
+| Unit dan integrasi (Vitest), ± 88 uji | `npm test` | `queue_test`, dibuat otomatis | ± 15 detik |
+| End-to-end (Playwright), 12 uji | `npm run test:e2e` | `queue_e2e`, disiapkan sendiri | 1–2 menit |
 
 Selain itu ada uji manual tampilan di bagian akhir. PLAN.md mewajibkannya untuk setiap layar.
 
@@ -67,6 +67,13 @@ Uji berjalan berurutan, tidak paralel, karena semua kasus berbagi satu database.
 | Warna merek: aturan kontras PLAN.md dan CSS penimpa hanya berisi hex yang sah | `tests/unit/branding-colors.test.ts` |
 | End-to-end dan loket dinamis di TV | `tests/e2e/journey.spec.ts`, `tests/e2e/admin.spec.ts` |
 | Daftarkan, buka, dan cabut perangkat | `tests/e2e/devices.spec.ts` |
+| Layanan dihubungkan ke loket; loket yang tidak terhubung tidak bisa memanggil; dua admin menyimpan bersamaan | `tests/integration/service-counters.test.ts` |
+| Waktu dari database terbaca benar walau PostgreSQL ber-TimeZone selain UTC (jam tiket, timer loket) | `tests/integration/timestamps.test.ts` |
+| Zona waktu dari Admin dipakai untuk tanggal antrian | `tests/integration/admin.test.ts`, `tests/unit/env.test.ts` |
+| Tata letak TV (kanvas, halaman loket) dan kiosk (kolom tombol, mode gulir) | `tests/unit/display.test.ts`, `tests/unit/kiosk-layout.test.ts` |
+| Tiket PDF dan pilihan printer atau PDF | `tests/unit/ticket-pdf.test.ts` |
+| Nomor permintaan kiosk di HTTP biasa (tanpa `crypto.randomUUID`) | `tests/unit/request-id.test.ts` |
+| Aliran realtime langsung terbuka (tidak menunggu heartbeat) | `tests/unit/realtime.test.ts` |
 
 ## 3. End-to-end
 
@@ -128,10 +135,11 @@ npx playwright show-report                      # buka laporan uji terakhir
 | Berkas | Yang diuji |
 | --- | --- |
 | `journey.spec.ts` | Kiosk, loket, dan TV dalam tiga jendela; nomor tampil di TV dalam 2 detik dan masuk laporan harian |
-| `kiosk.spec.ts` | Satu sentuhan menghasilkan satu tiket dan satu cetakan; permintaan gagal tidak mencetak |
+| `kiosk.spec.ts` | Satu sentuhan menghasilkan satu tiket dan satu cetakan; tiket hanya memuat logo, tanpa nama lembaga dan slogan; permintaan gagal tidak mencetak |
 | `counter.spec.ts` | Dua petugas di dua loket mendapat nomor berbeda; sandi salah ditolak |
 | `display.spec.ts` | Panggilan tampil di TV; dua panggilan berdekatan dibacakan berurutan |
 | `admin.spec.ts` | Loket baru dari Admin muncul di layar petugas dan TV tanpa muat ulang |
+| `branding.spec.ts` | Nama lembaga dan slogan dari Admin tampil di beranda dan judul halaman |
 | `devices.spec.ts` | Kiosk didaftarkan di Admin → Perangkat, tautannya dibuka, lalu dicabut sampai layar menolak perangkat |
 | `reports.spec.ts` | Laporan harian, rekap rentang, dan unduhan Excel |
 | `home.spec.ts`, `styleguide.spec.ts` | Beranda dan halaman panduan tampilan |
@@ -158,9 +166,20 @@ Lalu ulangi langkah "Siapkan database `queue_e2e`".
 | Uji di layar TV atau loket habis waktu | Pastikan tidak ada loket yang tertinggal terbuka dari percobaan manual; ulangi dari database bersih. |
 | Loket "CS Khusus" muncul di database kerja | Uji e2e pernah dijalankan saat `npm run dev` tersambung ke database kerja. Nonaktifkan dari Admin → Loket. |
 
-## 4. Uji manual tampilan
+## 4. Uji manual di localhost
 
-Supaya dasbor, laporan, dan grafik langsung terisi, jalankan dulu `npm run db:seed:demo` (lihat bagian Data contoh di README). Lalu jalankan `npm run dev`, masuk sebagai admin, buka **Admin → Perangkat**, daftarkan satu kiosk dan satu TV, lalu salin tautan dari dialog yang muncul. Buka di jendela terpisah dengan ukuran target:
+Siapkan data bersih seperti di README bagian "Menjalankan di laptop":
+
+```bash
+npx prisma migrate reset --force
+npm run db:seed
+SEED_DEMO_HISTORY_DAYS=0 npm run db:seed:demo
+npm run dev
+```
+
+Hasilnya dua layanan, Customer Service (A001…) di CS 1–5 dan Teller (B001…) di Teller 1–5, sepuluh petugas, dan nol tiket. Untuk menguji dasbor dan laporan dengan angka, jalankan `npm run db:seed:demo` tanpa `SEED_DEMO_HISTORY_DAYS=0`; riwayat tujuh hari ikut terisi.
+
+Masuk sebagai admin, buka **Admin → Perangkat**, daftarkan satu kiosk dan satu TV, ganti **Alamat server** dengan IP laptop bila kiosk atau TV ada di perangkat lain, lalu buka tautannya. Buka setiap layar di jendela terpisah, petugas di jendela Incognito:
 
 | Layar | Ukuran target | Alamat |
 | --- | --- | --- |
@@ -169,64 +188,70 @@ Supaya dasbor, laporan, dan grafik langsung terisi, jalankan dulu `npm run db:se
 | Loket | 1366 × 768 | `/counter` |
 | Admin | 1440 × 900 dan 390 lebar (HP) | `/admin` |
 
-Di Chrome, ukuran layar diatur dari DevTools → Toggle device toolbar.
+Di Chrome, ukuran layar diatur dari DevTools → Toggle device toolbar. TV dan kiosk tetap rapi di ukuran lain; ukuran di atas adalah perangkat sebenarnya.
 
 ### Daftar periksa
 
-**Alur antrian**
+**Kiosk dan tiket**
 
-- [ ] Kiosk: sentuh satu layanan. Nomor besar tampil bersama "n antrian di depan Anda", lalu layar kembali ke awal setelah 4 detik.
-- [ ] Loket: masuk sebagai `petugas.cs`, buka CS 1, tekan **Panggil berikutnya** atau `Spasi`. Nomor tampil di loket.
-- [ ] TV: tekan **Aktifkan suara** sekali. Nomor yang dipanggil berkedip, lonceng berbunyi, lalu kalimat panggilan dibacakan. Kartu loket yang memanggil diberi garis oranye.
-- [ ] Loket: **Panggil ulang** (`R`) sampai batas di Pengaturan. Setelah batas, tombol mati dan muncul "batas panggil ulang tercapai".
-- [ ] Loket: timer berubah oranye setelah melewati target lama penanganan.
+- [ ] Kiosk menampilkan dua tombol, Customer Service dan Teller, tanpa huruf awalan. Tidak ada tulisan yang terpotong; jumlah menunggu hanya muncul bila ada antrean.
+- [ ] Sentuh Customer Service: nomor A001 tampil bersama "n antrian di depan Anda", lalu layar kembali ke awal setelah 4 detik. Teller memberi B001.
+- [ ] Dengan `TICKET_OUTPUT=printer`, tiket tercetak ke printer default. Tanpa `--kiosk-printing`, Chrome menampilkan dialog cetak; dengan flag itu, tiket tercetak langsung.
+- [ ] Isi tiket: logo, NOMOR ANTRIAN, nomor, layanan, tanggal dan jam, jumlah di depan, teks kaki. Jamnya sama dengan jam di laptop dan TV.
+- [ ] Sentuh dua kali cepat: hanya satu nomor dan satu cetakan.
 
-**Loket dinamis**
+**Loket**
 
-- [ ] Admin → Loket → **Tambah beberapa loket**: pilih Teller, jumlah 2. Pratinjau menampilkan nomor lanjutan, misalnya Teller 3 dan Teller 4.
-- [ ] Setelah disimpan, kedua loket muncul di layar pilih loket petugas tanpa muat ulang.
-- [ ] Tambah loket dengan nama yang sudah dipakai loket aktif. Penyimpanan ditolak dengan pesan "sudah ada".
-- [ ] Buka loket baru dari layar petugas. Status di Admin → Loket berubah menjadi Buka, dan loket muncul di TV.
-- [ ] Loket yang sedang buka menampilkan **Tutup paksa**, bukan Nonaktifkan. Tutup paksa saat petugas sedang melayani: layar petugas kembali ke Pilih loket, dan nomornya tampil "Selesai (tutup otomatis)" di laporan harian.
+- [ ] Masuk sebagai `petugas.cs`, buka CS 1, tekan **Panggil berikutnya** atau `Spasi`. Nomor A tampil, dan timer berjalan dari 00:00.
+- [ ] Di CS 1, tiket Teller (B) tidak pernah terpanggil. Bila hanya ada tiket B, CS 1 menampilkan "Belum ada antrian".
+- [ ] **Panggil ulang** (`R`) sampai batas di Pengaturan. Setelah batas, tombol mati dan muncul "batas panggil ulang tercapai".
+- [ ] Timer berubah oranye setelah melewati target lama penanganan.
+- [ ] **Tidak hadir** dan **Tutup loket** meminta konfirmasi. **Keluar** juga meminta konfirmasi dan memperingatkan bila loket masih buka.
+
+**TV**
+
+- [ ] Dibuka dengan perintah Chrome dari Admin → Perangkat, suara langsung menyala tanpa tombol. Di browser biasa, tombol **Aktifkan suara** muncul.
+- [ ] Panggil nomor dari loket: dalam 2 detik nomor tampil besar di kiri, berkedip, lonceng berbunyi, lalu kalimat panggilan dibacakan. Kartu loket yang memanggil diberi bingkai oranye.
+- [ ] **Panggil ulang** dibacakan lagi, berkali-kali. Dua panggilan berdekatan dibacakan berurutan.
+- [ ] Panel kanan menampilkan semua loket: CS 1–5 di kolom kiri, Teller 1–5 di kolom kanan, dengan status Buka, Istirahat, atau Tutup.
+- [ ] Empat panggilan sebelumnya tampil di bawah nomor yang sedang dipanggil.
+
+**Layanan dan loket**
+
+- [ ] Admin → Layanan → **Atur loket** pada Customer Service: pilih CS 1–5 saja, simpan. Admin → Loket menampilkan hubungan yang sama.
+- [ ] Coba melepas satu-satunya layanan dari sebuah loket: ditolak dengan nama loketnya.
+- [ ] Admin → Loket → **Tambah beberapa loket**: pilih Teller, jumlah 2. Pratinjau menampilkan Teller 6 dan Teller 7. Setelah disimpan, keduanya muncul di layar pilih loket dan di TV tanpa muat ulang.
+- [ ] Tambah loket dengan nama yang sudah dipakai loket aktif: ditolak dengan pesan "sudah ada".
+- [ ] **Nonaktifkan** loket atau layanan meminta konfirmasi. Loket yang sedang buka menampilkan **Tutup paksa**; menutup paksa saat petugas melayani mengembalikan layar petugas ke Pilih loket, dan nomornya tercatat "Selesai (tutup otomatis)" di laporan.
 
 **Petugas**
 
+- [ ] Menyimpan petugas yang dinonaktifkan, diganti perannya, atau diganti sandinya meminta konfirmasi.
 - [ ] Nonaktifkan petugas yang sedang memegang loket: ditolak dengan nama loketnya.
-- [ ] Nonaktifkan petugas yang sedang masuk tapi tidak memegang loket, lalu muat ulang layarnya: petugas langsung diarahkan ke halaman masuk.
-- [ ] Isi nama pengguna dengan spasi atau kata sandi kurang dari 6 karakter: pesan galat menyebut kolom yang salah.
+- [ ] Nonaktifkan petugas yang sedang masuk tanpa loket, lalu muat ulang layarnya: petugas diarahkan ke halaman masuk.
+- [ ] Nama pengguna berspasi atau kata sandi kurang dari 6 karakter: pesan galat menyebut kolom yang salah.
 
 **Perangkat**
 
-- [ ] Admin → Perangkat: daftarkan kiosk "Kiosk Lobi" dan TV "TV Ruang Tunggu". Dialog menampilkan tautan dan perintah Chrome; ganti **Alamat server** dan keduanya ikut berubah.
-- [ ] Tutup dialog. Tautan tidak bisa dilihat lagi; daftar hanya menampilkan empat karakter terakhir token.
-- [ ] Buka tautan kiosk dan TV. Dalam 30 detik, tanpa muat ulang, status keduanya di Admin → Perangkat berubah dari Belum dipasang menjadi Tersambung.
-- [ ] **Tautan baru** pada kiosk, lalu buka tautan lama di jendela privat: halaman menampilkan "Perangkat belum diizinkan". Tautan baru bisa dibuka.
-- [ ] **Cabut** TV yang sedang tampil: layar TV menampilkan "Perangkat belum diizinkan", dan perangkat pindah ke daftar Dicabut. **Aktifkan lagi** memberi tautan baru.
+- [ ] Tautan hanya tampil sekali; setelah dialog ditutup, daftar hanya menampilkan empat karakter terakhir token.
+- [ ] Dalam 30 detik setelah tautan dibuka, status berubah dari Belum dipasang menjadi Tersambung.
+- [ ] **Tautan baru** meminta konfirmasi; setelahnya tautan lama menampilkan "Perangkat belum diizinkan".
+- [ ] **Cabut** TV yang sedang tampil: layar TV menampilkan "Perangkat belum diizinkan". **Aktifkan lagi** memberi tautan baru.
+- [ ] Tombol **Salin** menyalin tautan juga saat Admin dibuka lewat `http://192.168.x.x`.
 
-**Identitas lembaga**
+**Pengaturan dan identitas**
 
-- [ ] Admin → Identitas & tampilan: ganti nama lembaga dan slogan, lalu **Simpan identitas**. Kiosk dan TV yang terbuka ikut berubah tanpa muat ulang.
-- [ ] Kosongkan slogan dan simpan: slogan hilang dari kiosk, TV, dan tiket.
-- [ ] Unggah logo PNG atau SVG. Logo baru tampil di kiosk, TV, dan layar petugas. Berkas lebih dari 512 KB ditolak.
-- [ ] **Pakai logo bawaan** mengembalikan logo Bank NTT.
-- [ ] Ganti warna Utama dengan warna pucat, misalnya `#cfe8ff`. Bagian Keterbacaan menandai pasangan yang gagal dengan rasio dan batas minimalnya, tapi penyimpanan tetap bisa.
-- [ ] Ganti beberapa warna dan simpan. Pratinjau, kiosk, dan TV memakai warna baru tanpa muat ulang.
-- [ ] **Kembali ke warna bawaan**, lalu simpan. Warna Bank NTT kembali.
+- [ ] Pengaturan → **Zona waktu**: ganti WIB ke WITA meminta konfirmasi; setelah disimpan, jam di kiosk dan TV maju satu jam.
+- [ ] Ubah teks berjalan dan nama cabang: TV dan kiosk ikut berubah setelah disimpan.
+- [ ] Identitas & tampilan: ganti nama lembaga, slogan, logo, dan warna. Kiosk dan TV ikut berubah tanpa muat ulang. **Pakai logo bawaan** meminta konfirmasi.
+- [ ] Warna Utama yang pucat, misalnya `#cfe8ff`, ditandai di bagian Keterbacaan, tapi penyimpanan tetap bisa.
 
-**Admin dan laporan**
+**Dasbor dan laporan**
 
-- [ ] Dasbor: angka berubah sendiri saat tiket diambil, tanpa muat ulang.
-- [ ] Layanan: tambah layanan baru, misalnya Kredit dengan huruf `C`. Tombolnya langsung muncul di kiosk.
-- [ ] Pengaturan: ubah teks berjalan dan nama cabang. TV dan kiosk ikut berubah setelah disimpan.
-- [ ] Laporan harian: klik **Ulang** pada satu tiket. Halaman cetak terbuka dengan tanda "CETAK ULANG".
-- [ ] Laporan harian: **Unduh Excel** dan **Unduh CSV** terbuka dengan benar.
-
-**Tampilan** (bandingkan dengan bagian Design system di PLAN.md)
-
-- [ ] Tidak ada yang terpotong atau perlu digulir di kiosk dan TV pada ukuran target.
-- [ ] Oranye hanya dipakai sebagai aksen: nomor terbaru di TV, garis diagonal, dan peringatan target.
-- [ ] Nomor di TV terbaca dari jarak 5–10 meter.
-- [ ] Admin tetap rapi di lebar HP: menu pindah ke atas, kartu tersusun satu kolom.
+- [ ] Dasbor: angka dan "Lama ditangani" berubah sendiri saat tiket diambil dan dipanggil.
+- [ ] Laporan harian: tiket uji tampil dengan jam ambil, jam dipanggil, dan durasi yang benar.
+- [ ] Klik **Ulang** pada satu tiket: halaman cetak terbuka dengan tanda "CETAK ULANG".
+- [ ] **Unduh Excel** dan **Unduh CSV** terbuka dengan benar.
 
 ## Sebelum commit
 

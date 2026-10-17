@@ -2,14 +2,66 @@
 
 Satu aplikasi untuk kiosk tiket, loket petugas, layar TV, dan admin cabang. Nomor antrian disimpan di PostgreSQL. Kiosk dan TV tidak memakai login; setiap perangkat didaftarkan dari Admin dan dibuka sekali dengan tautannya sendiri.
 
-## Yang perlu disiapkan
+## Menjalankan di laptop (localhost)
+
+Untuk mencoba atau mengembangkan aplikasi tanpa Docker.
+
+**Yang perlu terpasang:** Node.js 20.9 atau lebih baru, dan PostgreSQL 16 atau lebih baru yang menyala di laptop.
+
+**Sekali saja:**
+
+```bash
+npm install
+cp .env.example .env
+createdb -h 127.0.0.1 queue_dev
+```
+
+Lalu ubah `.env`:
+
+- `DATABASE_URL`: arahkan ke database tadi, misalnya `postgresql://USER@127.0.0.1:5432/queue_dev` (ganti `USER` dengan pengguna PostgreSQL Anda).
+- `AUTH_SECRET`: string acak, misalnya hasil `openssl rand -base64 32`.
+- `APP_TIMEZONE`: `Asia/Jakarta` bila laptop memakai WIB. Bisa diganti lagi dari Admin → Pengaturan.
+- `TICKET_OUTPUT=printer` bila kiosk sudah tersambung ke printer thermal. Bila kosong, `npm run dev` mengunduh tiket sebagai PDF.
+
+**Isi database dan nyalakan:**
+
+```bash
+npm run db:deploy                          # buat tabel
+npm run db:seed                            # data awal: admin, layanan, pengaturan
+SEED_DEMO_HISTORY_DAYS=0 npm run db:seed:demo   # 5 loket CS, 5 loket Teller, 10 petugas, tanpa riwayat
+npm run dev
+```
+
+Buka `http://localhost:3000`. Dari kiosk, TV, atau HP di jaringan yang sama, pakai IP laptop, misalnya `http://192.168.1.97:3000`. IP laptop ada di pengaturan Wi-Fi.
+
+| Halaman | Alamat | Masuk dengan |
+| --- | --- | --- |
+| Admin | `/admin` | `admin`, kata sandi dari `SEED_ADMIN_PASSWORD` |
+| Loket petugas | `/counter` | `petugas.cs` … `petugas.cs5`, `petugas.teller` … `petugas.teller5`, kata sandi dari `SEED_STAFF_PASSWORD` |
+| Kiosk dan TV | tautan dari Admin → Perangkat | tidak perlu masuk |
+
+Satu browser hanya bisa memegang satu akun. Untuk mencoba admin dan beberapa petugas di satu laptop, pakai jendela Incognito atau browser lain.
+
+**Mulai lagi dari data kosong:**
+
+```bash
+npx prisma migrate reset --force
+npm run db:seed
+SEED_DEMO_HISTORY_DAYS=0 npm run db:seed:demo
+```
+
+Semua tiket, perangkat terdaftar, dan pengaturan ikut terhapus. Daftarkan ulang kiosk dan TV di Admin → Perangkat, lalu restart `npm run dev`.
+
+**Bila halaman dev dimuat ulang terus-menerus** dan log berisi "Compiled in 0ms" berulang, cache dev di folder `.next` rusak. Matikan `npm run dev`, hapus folder `.next`, lalu nyalakan lagi.
+
+## Server cabang: yang perlu disiapkan
 
 - Komputer server di jaringan cabang, dengan [Docker](https://docs.docker.com/get-docker/) dan Docker Compose.
 - PC kiosk dengan Chrome, layar sentuh, dan printer thermal 80 mm sebagai printer default.
 - PC atau mini PC untuk TV, dengan Chrome.
 - Alamat IP server yang bisa dijangkau kiosk dan TV, misalnya `192.168.1.10`.
 
-## Server
+## Server cabang: memasang dengan Docker
 
 Dari folder proyek:
 
@@ -87,11 +139,17 @@ Perintah untuk TV dari dialog Perangkat:
 google-chrome --kiosk --autoplay-policy=no-user-gesture-required --app="http://192.168.1.10:3000/display?token=TOKEN"
 ```
 
-Pada tayangan pertama, tekan **Aktifkan suara** supaya nomor yang dipanggil dibacakan. Dua panggilan yang berdekatan dibacakan berurutan.
+Layar TV dibagi dua: nomor yang sedang dipanggil dan empat panggilan sebelumnya di kiri, semua loket beserta statusnya (Buka, Istirahat, Tutup) di kanan.
+
+Suara menyala sendiri bila Chrome dijalankan dengan perintah di atas, karena `--autoplay-policy=no-user-gesture-required` mengizinkan suara tanpa sentuhan. Bila TV dibuka di browser biasa, tombol **Aktifkan suara** muncul; tekan sekali. Setiap panggilan dan panggil ulang dibacakan, dan dua panggilan berdekatan dibacakan berurutan.
 
 ## Loket petugas
 
-Petugas membuka `http://192.168.1.10:3000/counter`, masuk, lalu memilih loket. Tombol utama memanggil nomor berikutnya. Nomor yang sama tidak bisa diambil dua loket.
+Petugas membuka `http://192.168.1.10:3000/counter`, masuk, lalu memilih loket. Tombol utama (atau `Spasi`) memanggil nomor berikutnya, dan timer berjalan sejak nomor dipanggil. Nomor yang sama tidak bisa diambil dua loket.
+
+Loket hanya memanggil tiket dari layanan yang terhubung dengannya. Hubungannya diatur dari Admin → Loket (per loket) atau Admin → Layanan → **Atur loket** (per layanan). Di data contoh, Customer Service (A001…) hanya dipanggil CS 1–5 dan Teller (B001…) hanya Teller 1–5.
+
+Aksi yang sulit dibatalkan meminta konfirmasi lebih dulu: keluar dari akun, menonaktifkan loket atau layanan, membuat tautan perangkat baru, mengubah peran atau menonaktifkan petugas, menghapus logo, dan mengganti zona waktu.
 
 ## Identitas lembaga
 
