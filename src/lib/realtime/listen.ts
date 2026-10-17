@@ -6,7 +6,14 @@ export type ListenerStatus = "connecting" | "listening" | "disconnected";
 
 const globalForRealtime = globalThis as typeof globalThis & {
   queueListener?: QueueListener;
+  queueListenerVersion?: number;
 };
+
+/**
+ * Naikkan bila cara pendengar meneruskan sinyal berubah. Pendengar dari versi lama yang masih hidup
+ * di proses `npm run dev` diganti otomatis, jadi perbaikan berlaku tanpa memulai ulang server.
+ */
+const LISTENER_VERSION = 2;
 
 export class QueueListener {
   private stopped = false;
@@ -105,15 +112,18 @@ export class QueueListener {
 }
 
 export function ensureQueueListener(): void {
-  if (globalForRealtime.queueListener) return;
+  const existing = globalForRealtime.queueListener;
+  if (existing && globalForRealtime.queueListenerVersion === LISTENER_VERSION) return;
+  if (existing) void existing.stop();
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
   }
   const listener = new QueueListener({
     connectionString,
-    onEvent: publish,
+    onEvent: (event) => publish(event),
   });
   globalForRealtime.queueListener = listener;
+  globalForRealtime.queueListenerVersion = LISTENER_VERSION;
   void listener.start();
 }
