@@ -1,0 +1,9 @@
+/* Same contract as the server's ticket page. The app reads the width (80 mm). */
+@page { size: 80mm auto; margin: 0; }
+html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+body { width: 80mm; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+.ticket { width: 72mm; padding: 3mm 4mm; text-align: center; }
+.title { font-size: 18px; font-weight: 700; }
+.sub { font-size: 11px; margin: 2px 0; }
+.big { font-size: 44px; font-weight: 700; margin: 6px 0; }
+.line { border-top: 1px dashed #000; margin: 6px 0; }

@@ -1,0 +1,65 @@
+{
+  "name": "kiosk-antrian",
+  "productName": "BANK NTT Ticket",
+  "version": "1.0.0",
+  "description": "Aplikasi kiosk tiket antrian untuk Windows (layar penuh terkunci + cetak thermal senyap).",
+  "author": "Kiosk Antrian",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "check": "node scripts/check.mjs",
+    "mock-server": "node scripts/mock-server.mjs",
+    "dist:win": "node scripts/build-and-copy.mjs",
+    "build-and-copy": "node scripts/build-and-copy.mjs"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "id.kiosk-antrian.app",
+    "productName": "BANK NTT Ticket",
+    "artifactName": "BANK-NTT-Ticket-Setup.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "toolsets": {
+      "nsis": "1.2.1"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BANK NTT Ticket",
+      "deleteAppDataOnUninstall": false
+    },
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true
+    }
+  }
+}

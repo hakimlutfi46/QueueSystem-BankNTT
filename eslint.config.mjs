@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "src/generated/**",
+    // Aplikasi kiosk Windows (Electron) punya dependensi dan gaya kodenya sendiri.
+    "apps/**",
+    "downloads/**",
   ]),
 ]);
 

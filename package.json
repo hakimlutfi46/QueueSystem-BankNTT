@@ -16,7 +16,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:seed:demo": "tsx prisma/seed-demo.ts"
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "kiosk:build": "node apps/kiosk-desktop/scripts/build-and-copy.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

@@ -49,3 +49,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# kiosk desktop (Electron): dependensi, hasil build, dan installer .exe yang disajikan server
+/apps/kiosk-desktop/node_modules/
+/apps/kiosk-desktop/dist/
+/downloads/

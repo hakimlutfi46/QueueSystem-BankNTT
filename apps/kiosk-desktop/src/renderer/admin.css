@@ -1,0 +1,11 @@
+body { background: #fff; border: 3px solid var(--brand); }
+main { padding: 22px 26px; }
+h1 { margin: 0 0 4px; font-size: 26px; color: var(--brand); }
+.muted { margin: 0 0 14px; color: var(--muted); font-size: 15px; min-height: 18px; }
+.field { margin-bottom: 12px; }
+.field input { text-align: center; letter-spacing: 10px; font-size: 28px; }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.pad button { min-height: 50px; font-size: 22px; font-weight: 600; border-radius: 10px; border: 2px solid var(--line); background: var(--brand-soft); color: var(--ink); }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.actions .btn { min-height: 54px; font-size: 18px; padding: 0 10px; }
+.actions #cancel { grid-column: 1 / -1; }

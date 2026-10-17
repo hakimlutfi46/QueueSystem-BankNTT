@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   // misalnya http://192.168.1.10:3000 dari HP, kiosk, atau TV. Server produksi tidak memakai daftar ini.
   allowedDevOrigins: ["127.0.0.1", "192.168.*.*", "10.*.*.*", "172.*.*.*", "*.local"],
   output: "standalone",
+  // Installer kiosk Windows (~100 MB) dan sumber aplikasinya dibaca saat berjalan, bukan bagian bundle server.
+  outputFileTracingExcludes: {
+    "/*": ["./downloads/**/*", "./apps/**/*"],
+  },
   experimental: {
     // Saluran debug React di `npm run dev` melempar "stream is closing or closed" dan
     // "enqueueModel is not a function" di browser (terutama Safari) saat halaman dialihkan, misalnya
