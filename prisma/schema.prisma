@@ -61,6 +61,8 @@ model User {
   passwordHash String   @map("password_hash")
   role         UserRole @default(STAFF)
   isActive     Boolean  @default(true) @map("is_active")
+  /// Kata sandi bawaan, lemah, atau sementara dari admin: wajib diganti sebelum membuka loket atau admin.
+  mustChangePassword Boolean @default(false) @map("must_change_password")
 
   currentCounters Counter[]     @relation("CounterCurrentUser")
   servedTickets   Ticket[]      @relation("TicketServedBy")

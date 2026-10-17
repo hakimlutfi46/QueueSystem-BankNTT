@@ -28,22 +28,37 @@ export type AdminUser = {
   name: string;
   role: "ADMIN" | "STAFF";
   isActive: boolean;
+  /** Masih memakai sandi sementara, bawaan, atau lemah. */
+  mustChangePassword: boolean;
 };
 
 export async function listUsers(db: PrismaClient): Promise<AdminUser[]> {
   const rows = await db.$queryRaw<
-    { id: number; username: string; name: string; role: string; is_active: boolean }[]
+    { id: number; username: string; name: string; role: string; is_active: boolean; must_change_password: boolean }[]
   >`
-    SELECT id, username, name, role::text AS role, is_active
+    SELECT id, username, name, role::text AS role, is_active, must_change_password
     FROM users
     ORDER BY username
   `;
   return rows.flatMap((row) => {
     if (row.role !== "ADMIN" && row.role !== "STAFF") return [];
-    return [{ id: row.id, username: row.username, name: row.name, role: row.role, isActive: row.is_active }];
+    return [
+      {
+        id: row.id,
+        username: row.username,
+        name: row.name,
+        role: row.role,
+        isActive: row.is_active,
+        mustChangePassword: row.must_change_password,
+      },
+    ];
   });
 }
 
+/**
+ * Akun baru dari admin memakai sandi sementara: pemiliknya wajib menggantinya saat pertama masuk.
+ * Begitu juga sandi yang direset admin untuk akun orang lain.
+ */
 export async function createUser(db: PrismaClient, body: unknown): Promise<AdminUser> {
   const parsed = userBody.safeParse(body);
   if (!parsed.success) throw validationError(parsed.error);
@@ -52,13 +67,14 @@ export async function createUser(db: PrismaClient, body: unknown): Promise<Admin
   try {
     return await db.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<{ id: number }[]>`
-        INSERT INTO users (username, name, password_hash, role, is_active)
+        INSERT INTO users (username, name, password_hash, role, is_active, must_change_password)
         VALUES (
           ${parsed.data.username},
           ${parsed.data.name},
           ${hash},
           ${parsed.data.role}::user_role,
-          ${parsed.data.isActive ?? true}
+          ${parsed.data.isActive ?? true},
+          true
         )
         RETURNING id
       `;
@@ -117,7 +133,8 @@ export async function updateUser(
             name = ${parsed.data.name ?? existing.name},
             role = ${nextRole}::user_role,
             is_active = ${nextActive},
-            password_hash = ${hash}
+            password_hash = ${hash},
+            must_change_password = ${actorId !== id}
           WHERE id = ${id}
         `;
       } else {

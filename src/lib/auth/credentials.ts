@@ -1,5 +1,6 @@
 import * as argon2 from "argon2";
 import type { PrismaClient } from "@/generated/prisma/client";
+import { isWeakPassword, weakPasswordsAllowed } from "@/lib/auth/password-policy";
 import { getPrisma } from "@/lib/db";
 
 export type AuthenticatedUser = {
@@ -32,6 +33,11 @@ export async function authenticate(
     if (!matches) return null;
   } catch {
     return null;
+  }
+
+  // Sandi bawaan atau lemah tetap diterima sekali, lalu akun wajib menggantinya sebelum bekerja.
+  if (!weakPasswordsAllowed() && isWeakPassword(password, name)) {
+    await db.$executeRaw`UPDATE users SET must_change_password = true WHERE id = ${user.id}`;
   }
 
   return { id: String(user.id), name: user.name, role: user.role };

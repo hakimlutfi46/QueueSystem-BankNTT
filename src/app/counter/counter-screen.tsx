@@ -102,10 +102,15 @@ export function CounterScreen({
               />
               {live.connected ? "Langsung" : "Menyambung…"}
             </span>
-            <span className="flex items-center gap-2 text-sm font-bold">
+            <a
+              href="/account/password?next=%2Fcounter"
+              className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-bold hover:bg-brand-white/10"
+              title="Ganti kata sandi"
+            >
               <Icon name="user" className="size-4" />
               {officerName}
-            </span>
+              <Icon name="lock" className="size-3.5 opacity-70" />
+            </a>
             <LogoutButton
               className="inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-card)] border border-line bg-brand-white px-3 text-sm font-bold text-brand-navy hover:border-brand-blue hover:bg-navy-soft"
               warning={

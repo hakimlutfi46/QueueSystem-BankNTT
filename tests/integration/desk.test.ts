@@ -104,6 +104,11 @@ describe("counter desk", () => {
       role: "STAFF",
     });
     await expect(authenticate("petugas.cs", "salah", prisma)).resolves.toBeNull();
+    // "change-me" adalah sandi bawaan: masuk diterima, tapi akun wajib mengganti sandinya.
+    const flagged = await prisma.$queryRaw<{ must_change_password: boolean }[]>`
+      SELECT must_change_password FROM users WHERE username = 'petugas.cs'
+    `;
+    expect(flagged[0]?.must_change_password).toBe(true);
 
     await prisma.$executeRaw`UPDATE users SET is_active = false WHERE username = 'petugas.cs'`;
     await expect(authenticate("petugas.cs", "change-me", prisma)).resolves.toBeNull();

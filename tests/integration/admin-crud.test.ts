@@ -77,7 +77,13 @@ describe("admin CRUD", () => {
   it("drops a deactivated or demoted account from the session right away", async () => {
     const admin = await createUser(prisma, { username: "kepala", name: "Kepala", password: "rahasia", role: "ADMIN" });
     const staff = await createUser(prisma, { username: "sari", name: "Sari", password: "rahasia", role: "STAFF" });
-    await expect(loadSessionUser(prisma, staff.id)).resolves.toEqual({ id: staff.id, name: "Sari", role: "STAFF" });
+    // Sandi dari admin bersifat sementara: akun baru wajib menggantinya.
+    await expect(loadSessionUser(prisma, staff.id)).resolves.toEqual({
+      id: staff.id,
+      name: "Sari",
+      role: "STAFF",
+      mustChangePassword: true,
+    });
 
     await updateUser(prisma, staff.id, admin.id, { name: "Sari Dewi" });
     await expect(loadSessionUser(prisma, staff.id)).resolves.toMatchObject({ name: "Sari Dewi" });

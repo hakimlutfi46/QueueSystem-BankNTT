@@ -3,7 +3,7 @@ import { adminErrorResponse } from "@/lib/admin/errors";
 
 export async function guardAdmin(): Promise<Response | { id: number }> {
   const user = await currentUser();
-  if (!user || user.role !== "ADMIN") {
+  if (!user || user.role !== "ADMIN" || user.mustChangePassword) {
     return adminDenied(user) as Response;
   }
   return { id: user.id };

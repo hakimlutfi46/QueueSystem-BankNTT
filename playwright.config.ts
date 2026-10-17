@@ -32,6 +32,8 @@ export default defineConfig({
     env: {
       ...serverEnv,
       TICKET_OUTPUT: process.env.TICKET_OUTPUT ?? "printer",
+      // Uji masuk dengan sandi seeder "change-me", yang di server sungguhan wajib diganti dulu.
+      AUTH_ALLOW_WEAK_PASSWORDS: "true",
       // Build produksi untuk E2E_PORT ada di .next-e2e, terpisah dari cache npm run dev.
       ...(separatePort ? { NEXT_DIST_DIR: process.env.NEXT_DIST_DIR ?? ".next-e2e" } : {}),
     },

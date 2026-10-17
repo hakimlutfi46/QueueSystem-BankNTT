@@ -6,7 +6,16 @@ export type SessionUser = {
   id: number;
   name: string;
   role: "ADMIN" | "STAFF";
+  /** Sandi bawaan, lemah, atau sementara: hanya halaman ganti sandi yang boleh dibuka. */
+  mustChangePassword: boolean;
 };
+
+export const CHANGE_PASSWORD_PATH = "/account/password";
+
+/** Alamat halaman ganti sandi, dengan tujuan setelahnya. */
+export function changePasswordUrl(next: string): string {
+  return `${CHANGE_PASSWORD_PATH}?next=${encodeURIComponent(next)}`;
+}
 
 /**
  * Pengguna yang sedang masuk, dibaca ulang dari database. Sesi JWT hanya menyimpan id, jadi akun yang
@@ -20,17 +29,23 @@ export async function currentUser(): Promise<SessionUser | null> {
 }
 
 export async function loadSessionUser(db: PrismaClient, id: number): Promise<SessionUser | null> {
-  const rows = await db.$queryRaw<{ name: string; role: string }[]>`
-    SELECT name, role::text AS role FROM users WHERE id = ${id} AND is_active LIMIT 1
+  const rows = await db.$queryRaw<{ name: string; role: string; must_change_password: boolean }[]>`
+    SELECT name, role::text AS role, must_change_password FROM users WHERE id = ${id} AND is_active LIMIT 1
   `;
   const row = rows[0];
   if (!row) return null;
-  return { id, name: row.name, role: row.role === "ADMIN" ? "ADMIN" : "STAFF" };
+  return {
+    id,
+    name: row.name,
+    role: row.role === "ADMIN" ? "ADMIN" : "STAFF",
+    mustChangePassword: row.must_change_password,
+  };
 }
 
+/** Petugas yang boleh bekerja di loket. Akun yang wajib mengganti sandi belum boleh. */
 export async function currentOfficer(): Promise<{ id: number; name: string } | null> {
   const user = await currentUser();
-  if (!user) return null;
+  if (!user || user.mustChangePassword) return null;
   return { id: user.id, name: user.name };
 }
 
@@ -39,6 +54,12 @@ export function adminDenied(user: SessionUser | null): Response | null {
     return Response.json(
       { error: { code: "UNAUTHENTICATED", message: "Silakan masuk." } },
       { status: 401 },
+    );
+  }
+  if (user.mustChangePassword) {
+    return Response.json(
+      { error: { code: "PASSWORD_CHANGE_REQUIRED", message: "Ganti kata sandi dulu sebelum melanjutkan." } },
+      { status: 403 },
     );
   }
   if (user.role !== "ADMIN") {

@@ -88,6 +88,14 @@ export function AdminNav({ name, branchName }: { name: string; branchName: strin
               <p className="truncate font-bold">{name}</p>
               <p className="text-xs opacity-80">Admin</p>
             </div>
+            <Link
+              href="/account/password?next=%2Fadmin"
+              className="rounded-lg p-2 hover:bg-brand-blue"
+              aria-label="Ganti kata sandi"
+              title="Ganti kata sandi"
+            >
+              <Icon name="lock" />
+            </Link>
             <LogoutButton className="rounded-lg p-2 hover:bg-brand-blue">
               <Icon name="logout" />
             </LogoutButton>
@@ -101,6 +109,9 @@ export function AdminNav({ name, branchName }: { name: string; branchName: strin
             <BrandLogo variant="color" className="h-7" />
           </div>
           <p className="min-w-0 flex-1 truncate font-bold">{branchName}</p>
+          <Link href="/account/password?next=%2Fadmin" className="rounded-lg p-2 hover:bg-brand-blue" aria-label="Ganti kata sandi">
+            <Icon name="lock" />
+          </Link>
           <LogoutButton className="rounded-lg p-2 hover:bg-brand-blue">
             <Icon name="logout" />
           </LogoutButton>

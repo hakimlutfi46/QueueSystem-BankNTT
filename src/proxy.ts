@@ -70,6 +70,7 @@ function cookieName(kind: DeviceKind): string {
 
 export const config = {
   matcher: [
+    "/account/:path*",
     "/counter/:path*",
     "/api/counters/:path*",
     "/admin",

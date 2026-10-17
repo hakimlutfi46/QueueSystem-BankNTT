@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AdminNav } from "@/app/admin/admin-nav";
 import { readSettings } from "@/lib/admin/settings";
-import { currentUser } from "@/lib/auth/session";
+import { changePasswordUrl, currentUser } from "@/lib/auth/session";
 import { getPrisma } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -13,6 +13,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   if (!user) redirect("/login?callbackUrl=/admin");
   // Petugas yang membuka halaman admin diarahkan ke halaman masuk, yang menjelaskan cara berganti ke akun admin.
   if (user.role !== "ADMIN") redirect("/login?callbackUrl=/admin");
+  if (user.mustChangePassword) redirect(changePasswordUrl("/admin"));
   const settings = await readSettings(getPrisma());
 
   return (

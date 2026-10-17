@@ -133,7 +133,10 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
                         <Badge tone={user.role === "ADMIN" ? "navy" : "sky"}>{user.role === "ADMIN" ? "Admin" : "Petugas"}</Badge>
                       </td>
                       <td className="px-3 py-3">
-                        {user.isActive ? <Badge tone="success" dot>Aktif</Badge> : <Badge tone="muted" dot>Nonaktif</Badge>}
+                        <div className="flex flex-wrap gap-1">
+                          {user.isActive ? <Badge tone="success" dot>Aktif</Badge> : <Badge tone="muted" dot>Nonaktif</Badge>}
+                          {user.isActive && user.mustChangePassword ? <Badge tone="orange">Wajib ganti sandi</Badge> : null}
+                        </div>
                       </td>
                       <td className="px-3 py-3">
                         {desk ? (
@@ -175,7 +178,7 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
               <Field label="Nama pengguna" hint="3–40 karakter: huruf, angka, titik, garis bawah, atau strip">
                 <input name="username" required pattern="[A-Za-z0-9._\-]{3,40}" autoComplete="off" className={inputClass} />
               </Field>
-              <Field label="Kata sandi" hint="Minimal 6 karakter">
+              <Field label="Kata sandi sementara" hint="Minimal 6 karakter. Petugas wajib menggantinya saat pertama masuk.">
                 <input name="password" type="password" required minLength={6} autoComplete="new-password" className={inputClass} />
               </Field>
               <Field label="Peran">
@@ -211,7 +214,7 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
                     : "Akun ini tidak bisa membuka halaman Admin lagi.",
                 );
               }
-              if (password) warnings.push("Kata sandi lama tidak berlaku lagi.");
+              if (password) warnings.push("Kata sandi lama tidak berlaku lagi, dan pemilik akun wajib mengganti sandi baru ini saat masuk.");
               if (warnings.length > 0) {
                 const ok = await confirm({
                   title: `Simpan perubahan ${editing.name}?`,
@@ -246,7 +249,7 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
                 <input name="username" required pattern="[A-Za-z0-9._\-]{3,40}" defaultValue={editing.username} className={inputClass} />
               </Field>
             </div>
-            <Field label="Kata sandi baru" hint="Kosongkan bila tidak diubah">
+            <Field label="Kata sandi baru" hint="Kosongkan bila tidak diubah. Sandi dari admin bersifat sementara: pemilik akun wajib menggantinya saat masuk.">
               <input name="password" type="password" minLength={6} autoComplete="new-password" className={inputClass} />
             </Field>
             <Field label="Peran">
