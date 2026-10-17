@@ -54,3 +54,6 @@ next-env.d.ts
 /apps/kiosk-desktop/node_modules/
 /apps/kiosk-desktop/dist/
 /downloads/
+
+# cadangan database (npm run db:backup)
+/backups/
