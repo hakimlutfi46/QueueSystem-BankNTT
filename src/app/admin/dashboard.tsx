@@ -9,7 +9,7 @@ import { EmptyState, PageHeader, Panel, StatCard } from "@/components/ui/panel";
 import type { DaySummary } from "@/lib/admin/summary";
 import { cn } from "@/lib/cn";
 import { formatDuration } from "@/lib/format-duration";
-import { subscribeQueueEvents, useQueueState } from "@/lib/realtime/use-queue-state";
+import { useQueueState } from "@/lib/realtime/use-queue-state";
 import { secondsSince, useNow } from "@/lib/use-now";
 
 export function Dashboard({ initial }: { initial: DaySummary }) {
@@ -17,15 +17,22 @@ export function Dashboard({ initial }: { initial: DaySummary }) {
   const [summary, setSummary] = useState(initial);
   const now = useNow();
 
+  // Angka hari ini diambil ulang setiap keadaan antrian diperbarui: lewat sinyal realtime, atau lewat
+  // pengambilan berkala tiap 5 detik saat sambungan realtime putus. Dengan begitu kartu angka tidak
+  // berhenti selama sambungan menyambung ulang.
+  const asOf = state?.asOf;
   useEffect(() => {
-    return subscribeQueueEvents(() => {
-      void fetch("/api/admin/summary", { cache: "no-store" })
-        .then(async (response) => {
-          if (response.ok) setSummary((await response.json()) as DaySummary);
-        })
-        .catch(() => undefined);
-    });
-  }, []);
+    if (!asOf) return;
+    let cancelled = false;
+    void fetch("/api/admin/summary", { cache: "no-store" })
+      .then(async (response) => {
+        if (response.ok && !cancelled) setSummary((await response.json()) as DaySummary);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [asOf]);
 
   const target = state?.settings.targetServiceMinutes ?? 10;
   const counters = state?.counters ?? [];
