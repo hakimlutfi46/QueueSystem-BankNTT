@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await currentUser();
   if (!user) redirect("/login?callbackUrl=/admin");
-  if (user.role !== "ADMIN") redirect("/counter");
+  // Petugas yang membuka halaman admin diarahkan ke halaman masuk, yang menjelaskan cara berganti ke akun admin.
+  if (user.role !== "ADMIN") redirect("/login?callbackUrl=/admin");
   const settings = await readSettings(getPrisma());
 
   return (

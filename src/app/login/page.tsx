@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { BrandLogo, BrandTagline } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { Icon, type IconName } from "@/components/ui/icon";
+import { logout } from "@/app/counter/actions";
 import { LoginForm } from "@/app/login/login-form";
+import { BrandButton } from "@/components/brand/brand-button";
 import { readSettings } from "@/lib/admin/settings";
 import { currentUser } from "@/lib/auth/session";
 import { getPrisma } from "@/lib/db";
@@ -26,10 +28,10 @@ export default async function LoginPage({
   // Tanpa tujuan, admin diarahkan ke panel admin dan petugas ke layar loket setelah masuk.
   const callbackUrl =
     params.callbackUrl?.startsWith("/") && !params.callbackUrl.startsWith("//") ? params.callbackUrl : "";
-  if (user) {
-    const home = user.role === "ADMIN" ? "/admin" : "/counter";
-    redirect(!callbackUrl || (user.role !== "ADMIN" && callbackUrl.startsWith("/admin")) ? home : callbackUrl);
-  }
+  // Sudah masuk dan tujuannya bisa dibuka akun ini: langsung ke sana. Bila /login dibuka langsung, atau
+  // petugas membuka halaman admin, tampilkan siapa yang sedang masuk supaya bisa berganti akun.
+  const blockedAdmin = user != null && user.role !== "ADMIN" && callbackUrl.startsWith("/admin");
+  if (user && callbackUrl && !blockedAdmin) redirect(callbackUrl);
   const { branchName } = await readSettings(getPrisma());
   const forAdmin = callbackUrl.startsWith("/admin");
   const forCounter = callbackUrl.startsWith("/counter");
@@ -86,7 +88,11 @@ export default async function LoginPage({
                   ? "Masuk dengan akun petugas, lalu pilih loket tempat Anda bertugas."
                   : "Akun admin masuk ke panel admin, akun petugas langsung ke layar loket."}
             </p>
-            <LoginForm callbackUrl={callbackUrl} />
+            {user ? (
+              <SignedInCard name={user.name} admin={user.role === "ADMIN"} blockedAdmin={blockedAdmin} />
+            ) : (
+              <LoginForm callbackUrl={callbackUrl} />
+            )}
             <p className="mt-8 text-center text-xs text-ink-muted">
               Lupa kata sandi? Minta admin cabang menggantinya dari menu Petugas.
             </p>
@@ -94,5 +100,31 @@ export default async function LoginPage({
         </div>
       </section>
     </main>
+  );
+}
+
+/** Akun yang sedang masuk, dengan pilihan lanjut ke halamannya atau keluar untuk berganti akun. */
+function SignedInCard({ name, admin, blockedAdmin }: { name: string; admin: boolean; blockedAdmin: boolean }) {
+  return (
+    <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-brand-white p-5 shadow-card">
+      <p className="text-ink">
+        Anda sudah masuk sebagai <strong>{name}</strong> ({admin ? "admin" : "petugas"}).
+      </p>
+      {blockedAdmin ? (
+        <p className="rounded-xl bg-orange-soft px-4 py-3 text-sm font-bold text-ink">
+          Halaman admin hanya untuk akun admin. Keluar dulu, lalu masuk dengan akun admin.
+        </p>
+      ) : null}
+      <BrandButton href={admin ? "/admin" : "/counter"} size="lg" variant={blockedAdmin ? "outline" : "primary"}>
+        {admin ? "Lanjut ke panel admin" : "Lanjut ke layar loket"}
+        <Icon name="arrowRight" />
+      </BrandButton>
+      <form action={logout}>
+        <BrandButton type="submit" variant={blockedAdmin ? "primary" : "outline"} className="w-full">
+          <Icon name="logout" />
+          Keluar dan masuk dengan akun lain
+        </BrandButton>
+      </form>
+    </div>
   );
 }
