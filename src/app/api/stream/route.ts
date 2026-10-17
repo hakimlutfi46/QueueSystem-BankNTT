@@ -5,6 +5,7 @@ import { deviceMatcher } from "@/lib/auth/devices";
 import { getPrisma } from "@/lib/db";
 import { ensureDayClosed } from "@/lib/queue/day-close";
 import { ensureQueueListener } from "@/lib/realtime/listen";
+import { keepDevicePresence, type DeviceCredential } from "@/lib/realtime/presence";
 import { createQueueEventStream } from "@/lib/realtime/stream";
 
 export const runtime = "nodejs";
@@ -31,7 +32,24 @@ export async function GET(request: Request): Promise<Response> {
   await ensureDayClosed(getPrisma()).catch((error: unknown) => {
     console.error(error);
   });
-  const stream = createQueueEventStream({ signal: request.signal });
+  // Tanpa sesi login berarti kiosk atau TV: jaga catatan terakhir aktifnya selama sambungan terbuka,
+  // dan putus sambungan bila perangkat dicabut.
+  const closed = new AbortController();
+  request.signal.addEventListener("abort", () => closed.abort(), { once: true });
+  if (!user) {
+    const credentials: DeviceCredential[] = [];
+    const kiosk = jar.get(KIOSK_COOKIE)?.value;
+    const display = jar.get(DISPLAY_COOKIE)?.value;
+    if (kiosk) credentials.push({ kind: "kiosk", token: kiosk });
+    if (display) credentials.push({ kind: "display", token: display });
+    keepDevicePresence({
+      credentials,
+      verify: deviceMatcher(getPrisma()),
+      onRevoked: () => closed.abort(),
+      signal: closed.signal,
+    });
+  }
+  const stream = createQueueEventStream({ signal: closed.signal });
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
