@@ -58,6 +58,46 @@ test("a failed request does not print a ticket", async ({ page }) => {
   expect(await printCount(page)).toBe(0);
 });
 
+test("inside the Windows app the ticket goes to the app's printer, not the browser dialog", async ({ page }) => {
+  await page.addInitScript(() => {
+    const calls: string[] = [];
+    (window as Window & { __appPrints?: string[] }).__appPrints = calls;
+    (window as Window & { kioskApp?: unknown }).kioskApp = {
+      version: "test",
+      printerStatus: async () => ({ ready: true, printer: "POS-80", message: null }),
+      printTicket: async (id: string) => {
+        calls.push(id);
+        return { ok: true, message: null };
+      },
+    };
+  });
+  const before = await ticketCount();
+  await page.goto(kioskEntry());
+  await page.getByRole("button", { name: /Customer Service/ }).click();
+  await expect(page.getByText("Silakan ambil tiket yang tercetak")).toBeVisible();
+  const ticketId = await page.locator("[data-ticket-id]").getAttribute("data-ticket-id");
+  await expect.poll(() => page.evaluate(() => (window as Window & { __appPrints?: string[] }).__appPrints)).toEqual([ticketId]);
+  expect(await printCount(page)).toBe(0);
+  expect(await ticketCount()).toBe(before + 1);
+});
+
+test("inside the Windows app no number is issued while the printer is not ready", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as Window & { kioskApp?: unknown }).kioskApp = {
+      version: "test",
+      printerStatus: async () => ({ ready: false, printer: "POS-80", message: "Kertas habis." }),
+      printTicket: async () => ({ ok: true, message: null }),
+    };
+  });
+  const before = await ticketCount();
+  await page.goto(kioskEntry());
+  const problem = page.getByTestId("kiosk-printer-problem");
+  await expect(problem.getByText("Mohon hubungi petugas")).toBeVisible();
+  await expect(problem.getByText("Kertas habis.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Customer Service/ })).toHaveCount(0);
+  expect(await ticketCount()).toBe(before);
+});
+
 async function ticketCount(): Promise<number> {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set");

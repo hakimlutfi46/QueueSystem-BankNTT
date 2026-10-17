@@ -12,12 +12,15 @@ import { cn } from "@/lib/cn";
 import { kioskGrid, MIN_BUTTON_HEIGHT } from "@/lib/kiosk/layout";
 import { useFitText } from "@/lib/use-fit-text";
 import type { TicketOutput } from "@/lib/print/output";
+import { kioskApp, readPrinterStatus } from "@/lib/print/kiosk-app";
 import { downloadTicketPdf, printTicket } from "@/lib/print/print-ticket";
 import { newRequestId } from "@/lib/request-id";
 import { useQueueState } from "@/lib/realtime/use-queue-state";
 import { useNow } from "@/lib/use-now";
 
 const CONFIRMATION_MS = 4_000;
+/** Seberapa sering aplikasi kiosk Windows ditanya status printernya. */
+const PRINTER_POLL_MS = 10_000;
 
 type IssuedTicketView = {
   id: string;
@@ -34,6 +37,25 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
   const [busy, setBusy] = useState<number | null>(null);
   const [issued, setIssued] = useState<IssuedTicketView | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  // Hanya di aplikasi kiosk Windows: pesan bila printer tidak siap, atau bila tiket terakhir gagal dicetak.
+  const [printerProblem, setPrinterProblem] = useState<string | null>(null);
+  const [printFailed, setPrintFailed] = useState<string | null>(null);
+
+  useEffect(() => {
+    const app = kioskApp();
+    if (!app) return;
+    let stopped = false;
+    const check = async () => {
+      const status = await readPrinterStatus(app);
+      if (!stopped) setPrinterProblem(status.ready ? null : (status.message ?? "Printer belum siap."));
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), PRINTER_POLL_MS);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!issued) return;
@@ -50,6 +72,18 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
     pending.current = true;
     setBusy(serviceId);
     setUnavailable(false);
+    setPrintFailed(null);
+    const app = kioskApp();
+    if (app) {
+      // Jangan buat nomor bila printer tidak siap: nasabah tidak akan menerima tiketnya.
+      const status = await readPrinterStatus(app);
+      if (!status.ready) {
+        pending.current = false;
+        setBusy(null);
+        setPrinterProblem(status.message ?? "Printer belum siap.");
+        return;
+      }
+    }
     try {
       const response = await fetch("/api/tickets", {
         method: "POST",
@@ -68,7 +102,14 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
         aheadCount: payload.aheadCount,
       };
       setIssued(view);
-      if (output === "pdf") {
+      if (app) {
+        void app
+          .printTicket(view.id)
+          .then((result) => {
+            if (!result.ok) setPrintFailed(result.message ?? "Tiket gagal dicetak.");
+          })
+          .catch(() => setPrintFailed("Tiket gagal dicetak."));
+      } else if (output === "pdf") {
         downloadTicketPdf(view);
       } else {
         void printTicket({ id: view.id }).catch(() => undefined);
@@ -113,10 +154,16 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
                 <p className="text-3xl font-bold text-ink">
                   <span className="text-brand-navy tabular-nums">{issued.aheadCount}</span> antrian di depan Anda
                 </p>
-                <p className="mt-4 flex items-center justify-center gap-2 text-xl text-ink-muted">
-                  <Icon name={output === "pdf" ? "download" : "printer"} className="size-6" />
-                  {output === "pdf" ? "Tiket diunduh sebagai PDF (mode uji tanpa printer)" : "Silakan ambil tiket yang tercetak"}
-                </p>
+                {printFailed ? (
+                  <p role="alert" className="mt-4 rounded-xl bg-danger-soft px-4 py-3 text-xl font-bold text-danger">
+                    Tiket gagal dicetak. Mohon hubungi petugas dan sebutkan nomor di atas.
+                  </p>
+                ) : (
+                  <p className="mt-4 flex items-center justify-center gap-2 text-xl text-ink-muted">
+                    <Icon name={output === "pdf" && !kioskApp() ? "download" : "printer"} className="size-6" />
+                    {output === "pdf" && !kioskApp() ? "Tiket diunduh sebagai PDF (mode uji tanpa printer)" : "Silakan ambil tiket yang tercetak"}
+                  </p>
+                )}
               </div>
               <div className="h-2 bg-surface" aria-hidden="true">
                 <div
@@ -141,7 +188,17 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
           </section>
         ) : null}
 
-        {!issued && !unavailable && !state ? (
+        {!issued && !unavailable && printerProblem ? (
+          <section className="flex flex-1 flex-col items-center justify-center gap-6 text-center" data-testid="kiosk-printer-problem">
+            <span className="flex size-24 items-center justify-center rounded-full bg-orange-soft text-ink">
+              <Icon name="printer" className="size-12" />
+            </span>
+            <p className="text-[40px] font-bold text-brand-navy">Mohon hubungi petugas</p>
+            <p className="max-w-xl text-2xl text-ink-muted">{printerProblem} Nomor antrian belum bisa diambil.</p>
+          </section>
+        ) : null}
+
+        {!issued && !unavailable && !printerProblem && !state ? (
           <div className="m-auto flex flex-col items-center gap-4 text-center">
             {error ? (
               <p className="text-[40px] font-bold text-brand-navy">Mohon hubungi petugas</p>
@@ -154,7 +211,7 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
           </div>
         ) : null}
 
-        {!issued && !unavailable && state ? (
+        {!issued && !unavailable && !printerProblem && state ? (
           <>
             <div className="mb-[clamp(12px,3vh,32px)] shrink-0 text-center">
               <h1 className="text-[clamp(28px,5vh,48px)] font-bold leading-tight text-brand-navy">Silakan pilih layanan</h1>
