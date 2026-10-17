@@ -5,8 +5,8 @@ Ada tiga lapis pengujian. Jalankan berurutan: yang cepat dulu, end-to-end terakh
 | Lapis | Perintah | Database | Lama |
 | --- | --- | --- | --- |
 | Lint dan typecheck | `npm run lint`, `npm run typecheck` | Tidak perlu | < 1 menit |
-| Unit dan integrasi (Vitest), ± 88 uji | `npm test` | `queue_test`, dibuat otomatis | ± 15 detik |
-| End-to-end (Playwright), 12 uji | `npm run test:e2e` | `queue_e2e`, disiapkan sendiri | 1–2 menit |
+| Unit dan integrasi (Vitest), ± 98 uji | `npm test` | `queue_test`, dibuat otomatis | ± 15 detik |
+| End-to-end (Playwright), 15 uji | `npm run test:e2e` | `queue_e2e`, disiapkan sendiri | 1–2 menit |
 
 Selain itu ada uji manual tampilan di bagian akhir. PLAN.md mewajibkannya untuk setiap layar.
 
@@ -63,6 +63,8 @@ Uji berjalan berurutan, tidak paralel, karena semua kasus berbagi satu database.
 | CRUD Admin: pesan galat, akun nonaktif, tutup paksa loket | `tests/integration/admin-crud.test.ts` |
 | Tidak ada warna hex di luar `tokens.css` | `tests/unit/tokens.test.ts` |
 | Perangkat terdaftar: token hanya disimpan hash-nya, tautan baru mematikan tautan lama, cabut menolak perangkat, token cadangan `.env` tetap diterima | `tests/integration/devices.test.ts`, `tests/unit/device.test.ts` |
+| Kode pemasangan aplikasi kiosk Windows: sekali pakai, kedaluwarsa, hanya kode terbaru, batas percobaan; kiosk memakai printer aplikasi dan tidak membuat nomor saat printer tidak siap | `tests/integration/devices.test.ts`, `tests/unit/pairing.test.ts`, `tests/e2e/devices.spec.ts`, `tests/e2e/kiosk.spec.ts` |
+| Nama dan ikon aplikasi kiosk Windows: bawaan BANK NTT Ticket, nama aman untuk berkas Windows, ikon harus PNG persegi minimal 256 px | `tests/integration/kiosk-app.test.ts` |
 | Identitas lembaga: bawaan Bank NTT, simpan nama lain, unggah dan hapus logo | `tests/integration/branding.test.ts` |
 | Warna merek: aturan kontras PLAN.md dan CSS penimpa hanya berisi hex yang sah | `tests/unit/branding-colors.test.ts` |
 | End-to-end dan loket dinamis di TV | `tests/e2e/journey.spec.ts`, `tests/e2e/admin.spec.ts` |

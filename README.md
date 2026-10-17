@@ -133,6 +133,27 @@ Nasabah memilih layanan. Satu sentuhan menghasilkan satu nomor dan satu cetakan.
 
 Belum punya printer? Isi `TICKET_OUTPUT=pdf` di `.env`: setiap tiket diunduh sebagai PDF seukuran kertas thermal, dan tombol **Ulang** di laporan harian membuka PDF-nya. Bila kosong, `npm run dev` memakai PDF dan build produksi langsung mencetak ke printer. Isi `TICKET_OUTPUT=printer` untuk memaksa cetak ke printer.
 
+## Kiosk dengan aplikasi Windows (disarankan)
+
+PC kiosk yang memakai Windows bisa memakai aplikasi **BANK NTT Ticket** sebagai pengganti Chrome. Aplikasi ini membuka kiosk layar penuh yang terkunci (Alt+F4, F11, Esc, dan pindah ke situs lain diblokir), menyala otomatis saat Windows login, dan mencetak tiket langsung ke printer thermal pilihan tanpa dialog. Bila printer mati, offline, atau kertas habis, kiosk menampilkan "Mohon hubungi petugas" dan tidak membuat nomor. TV tetap memakai tautan.
+
+1. **Buat installer sekali di server cabang** (sekitar 100 MB, tidak masuk git). Di **Admin → Perangkat → Aplikasi kiosk Windows**, tekan **Build installer**, atau dari terminal:
+
+   ```bash
+   npm run kiosk:build
+   ```
+
+   Hasilnya `downloads/BANK-NTT-Ticket-Setup.exe`. Server menyajikannya dari **Unduh installer (.exe)** di halaman yang sama, jadi bisa diunduh dari PC kiosk lewat jaringan lokal tanpa internet. Bila berkasnya disimpan di tempat lain, isi `KIOSK_INSTALLER_PATH` di `.env`.
+
+   Nama aplikasi bawaannya **BANK NTT Ticket** dengan ikon simbol logo Bank NTT. Keduanya bisa diganti lewat tombol **Ubah** di panel itu (unggah gambar apa saja, dibuat persegi otomatis), lalu **Simpan & build ulang**. Build memakan sekitar setengah sampai tiga menit; build pertama perlu internet untuk mengunduh Electron. Tombol build hanya ada bila server berjalan dari folder proyek lengkap (`npm run start`); image Docker tidak memuat `apps/kiosk-desktop`, jadi di sana build dilakukan di komputer lain lalu isi `downloads/` disalin ke server.
+2. Di PC kiosk, unduh dan jalankan installer. Installer belum ditandatangani, jadi Windows SmartScreen bisa menampilkan "Windows protected your PC": klik **More info → Run anyway**.
+3. Di Admin → Perangkat, daftarkan kiosk lalu tekan **Kode aplikasi**. Dialog menampilkan alamat server dan kode 6 karakter, misalnya `4K7-Q2M`, yang berlaku 30 menit dan sekali pakai.
+4. Di aplikasi, isi alamat server (misalnya `10.70.10.67:3000`) dan kode itu, pilih printer thermal, tekan **Cetak uji**, lalu buat PIN admin. Kiosk langsung terbuka dan status di Admin berubah menjadi Tersambung.
+
+Untuk keluar atau mengubah pengaturan, tekan **Ctrl + Shift + Alt + K** di kiosk dan masukkan PIN admin. Tombol Windows dan Ctrl+Alt+Del tidak bisa diblokir aplikasi apa pun; untuk penguncian penuh pakai akun Windows khusus dengan auto-login dan Shell Launcher. Langkahnya ada di [`apps/kiosk-desktop/README.md`](apps/kiosk-desktop/README.md).
+
+Tautan lama kiosk tetap berlaku sampai kode dipakai. Setelah itu hanya aplikasi yang dipasangkan yang bisa membuka kiosk itu. Kode yang salah dibatasi 10 kali per 10 menit per alamat IP.
+
 ## TV
 
 Perintah untuk TV dari dialog Perangkat:

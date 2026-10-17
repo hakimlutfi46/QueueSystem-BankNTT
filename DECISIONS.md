@@ -1,5 +1,15 @@
 # Keputusan
 
+## 2026-10-17 — Aplikasi kiosk Windows dengan kode pemasangan
+
+PC kiosk memakai Windows, sedangkan TV beragam sistemnya, jadi hanya kiosk yang mendapat installer. Aplikasinya Electron (`apps/kiosk-desktop`), dibungkus NSIS menjadi installer `.exe`. Electron dipilih karena bisa mencetak senyap ke printer bernama dan membaca status printer, dua hal yang tidak bisa dilakukan halaman web biasa. Halaman `/kiosk` mendeteksi `window.kioskApp` dari preload dan memakai printer aplikasi; di browser biasa perilakunya tetap seperti sebelumnya.
+
+Atas pilihan pengguna, satu installer generik dipakai semua kiosk dan dipasangkan dengan kode pendek dari Admin → Perangkat (6 karakter tanpa 0/O/1/I, berlaku 30 menit, sekali pakai, hanya hash-nya yang disimpan), bukan installer per perangkat yang membawa token. Kode ditukar dengan token baru lewat `POST /api/devices/pair`; tautan lama berhenti berlaku saat itu, dan mencabut perangkat juga menghapus kodenya. Percobaan kode yang salah dibatasi di memori proses, karena satu cabang hanya punya satu server.
+
+Installer dibuat sekali dengan `npm run kiosk:build` lalu disajikan server dari `downloads/` (hanya untuk admin), supaya tetap bisa diunduh di jaringan cabang tanpa internet. Berkas sekitar 100 MB itu tidak masuk git dan dikecualikan dari bundle standalone. Installer belum ditandatangani, jadi SmartScreen bisa memperingatkan saat pertama dijalankan.
+
+Nama aplikasi bawaan "BANK NTT Ticket" dengan ikon simbol logo Bank NTT (tanpa tulisan, supaya terbaca di ukuran taskbar). Atas permintaan pengguna, admin bisa mengganti nama dan ikon lalu membuat ulang installer dari Admin tanpa developer: server menjalankan skrip build yang sama sebagai proses terpisah dan menyimpan hasilnya di `downloads/`. Ikon diubah menjadi PNG persegi 512 px di browser, jadi server tidak butuh pustaka gambar. electron-builder menanam ikon dan nama ke `.exe` dengan resedit (JavaScript murni), jadi build berjalan di Mac, Linux, dan Windows tanpa wine; hanya penandatanganan kode yang dilewati. Pengaturan aplikasi disimpan di folder tetap `%APPDATA%\kiosk-antrian`, bukan folder bernama sesuai nama aplikasi, supaya pairing, printer, dan PIN tidak hilang bila nama diganti.
+
 ## 2026-10-09 — Konfirmasi untuk aksi sensitif
 
 PLAN hanya meminta konfirmasi untuk Tidak hadir dan Tutup loket. Atas permintaan pengguna, aksi lain yang sulit dibatalkan atau berdampak ke layar lain kini juga meminta konfirmasi lewat satu komponen bersama (`src/components/ui/confirm.tsx`): keluar dari akun (dengan peringatan bila loket masih buka), menonaktifkan atau mengaktifkan loket dan layanan, membuat tautan perangkat baru, menyimpan petugas yang dinonaktifkan, diganti perannya, atau diganti sandinya, menghapus logo unggahan, dan mengganti zona waktu. Tombol utama layar loket (Panggil berikutnya) sengaja tetap tanpa konfirmasi supaya pelayanan tidak melambat.
