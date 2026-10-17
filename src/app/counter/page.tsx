@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CounterPage() {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?callbackUrl=%2Fcounter");
 
   const desk = await loadCounterDesk(getPrisma(), user.id);
   return (
