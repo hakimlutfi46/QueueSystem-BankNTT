@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestAdmin, submitAdmin } from "@/app/admin/submit";
 import { BrandButton } from "@/components/brand/brand-button";
@@ -10,9 +10,11 @@ import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
 import type { DeviceKind } from "@/lib/auth/device";
-import type { AdminDevice, IssuedDevice } from "@/lib/auth/devices";
+import type { AdminDevice, IssuedDevice, PairCode } from "@/lib/auth/devices";
 import { cn } from "@/lib/cn";
 import { copyText, selectContents } from "@/lib/copy-text";
+import type { KioskAppOverview } from "@/lib/kiosk/overview";
+import { formatSize, INSTALLER_URL, KioskAppPanel } from "@/app/admin/devices/kiosk-app-panel";
 import { useNow } from "@/lib/use-now";
 
 const KINDS: { kind: DeviceKind; label: string; icon: "touch" | "tv"; path: string; hint: string }[] = [
@@ -20,21 +22,31 @@ const KINDS: { kind: DeviceKind; label: string; icon: "touch" | "tv"; path: stri
   { kind: "display", label: "Layar TV", icon: "tv", path: "/display", hint: "TV ruang tunggu yang menampilkan dan membacakan panggilan." },
 ];
 
+type InstallerInfo = KioskAppOverview["installer"];
+
 /** Dianggap tersambung bila perangkat meminta data dalam 3 menit terakhir. */
 const ONLINE_MS = 3 * 60 * 1000;
 
 export function DevicesScreen({
   devices,
   envFallback,
+  kioskApp: initialKioskApp,
 }: {
   devices: AdminDevice[];
   envFallback: { kiosk: boolean; display: boolean };
+  kioskApp: KioskAppOverview;
 }) {
   const router = useRouter();
   const { confirm, dialog } = useConfirm();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [issued, setIssued] = useState<IssuedDevice | null>(null);
+  const [pairCode, setPairCode] = useState<PairCode | null>(null);
+  // Jawaban API terbaru menggantikan data awal halaman, misalnya selama build berjalan.
+  const [liveKioskApp, setLiveKioskApp] = useState<KioskAppOverview | null>(null);
+  const kioskApp = liveKioskApp ?? initialKioskApp;
+  const installer = kioskApp.installer;
+  const onKioskAppChange = useCallback((next: KioskAppOverview) => setLiveKioskApp(next), []);
   const [renaming, setRenaming] = useState<AdminDevice | null>(null);
   const [revoking, setRevoking] = useState<AdminDevice | null>(null);
   const [kind, setKind] = useState<DeviceKind>("kiosk");
@@ -88,6 +100,16 @@ export function DevicesScreen({
     }
   }
 
+  async function issueCode(device: AdminDevice) {
+    const result = await requestAdmin<PairCode>(`/api/admin/devices/${device.id}/pair-code`, "POST", {});
+    setError(result.error);
+    if (!result.error && result.data) {
+      setNotice(null);
+      setIssued(null);
+      setPairCode(result.data);
+    }
+  }
+
   const active = devices.filter((device) => !device.revokedAt);
   const revoked = devices.filter((device) => device.revokedAt);
 
@@ -109,7 +131,22 @@ export function DevicesScreen({
                 key={item.kind}
                 title={item.label}
                 description={item.hint}
-                actions={<Badge tone="navy">{list.length} terdaftar</Badge>}
+                actions={
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.kind === "kiosk" ? (
+                      <BrandButton
+                        size="sm"
+                        variant="outline"
+                        href={installer ? INSTALLER_URL : "#kiosk-app"}
+                        title={installer ? `${installer.fileName} · ${formatSize(installer.size)}` : "Installer belum dibuat"}
+                      >
+                        <Icon name="download" className="size-4" />
+                        Unduh installer (.exe)
+                      </BrandButton>
+                    ) : null}
+                    <Badge tone="navy">{list.length} terdaftar</Badge>
+                  </div>
+                }
                 bodyClassName="p-0"
               >
                 {list.length === 0 ? (
@@ -134,6 +171,7 @@ export function DevicesScreen({
                         onRename={() => setRenaming(device)}
                         onRotate={() => void rotate(device)}
                         onRevoke={() => setRevoking(device)}
+                        onPairCode={device.kind === "kiosk" ? () => void issueCode(device) : undefined}
                       />
                     ))}
                   </ul>
@@ -153,6 +191,7 @@ export function DevicesScreen({
                     onRename={() => setRenaming(device)}
                     onRotate={() => void rotate(device)}
                     onRevoke={() => undefined}
+                    onPairCode={device.kind === "kiosk" ? () => void issueCode(device) : undefined}
                   />
                 ))}
               </ul>
@@ -202,6 +241,9 @@ export function DevicesScreen({
               </BrandButton>
             </form>
           </Panel>
+          <div id="kiosk-app" className="scroll-mt-6">
+            <KioskAppPanel app={kioskApp} onChange={onKioskAppChange} />
+          </div>
           <p className="px-1 text-xs text-ink-muted">
             Token dibuat acak oleh server dan hanya ditampilkan sekali. Yang disimpan hanya sidik token, jadi tautan
             yang hilang tidak bisa dilihat lagi. Buat tautan baru bila perlu memasang ulang.
@@ -209,7 +251,21 @@ export function DevicesScreen({
         </div>
       </div>
 
-      {issued ? <IssuedModal issued={issued} onClose={() => setIssued(null)} /> : null}
+      {issued ? (
+        <IssuedModal
+          issued={issued}
+          onClose={() => setIssued(null)}
+          onPairCode={issued.device.kind === "kiosk" ? () => void issueCode(issued.device) : undefined}
+        />
+      ) : null}
+      {pairCode ? (
+        <PairCodeModal
+          pairCode={pairCode}
+          installer={installer}
+          onRenew={() => void issueCode(pairCode.device)}
+          onClose={() => setPairCode(null)}
+        />
+      ) : null}
 
       {renaming ? (
         <Modal title="Ganti nama perangkat" onClose={() => setRenaming(null)}>
@@ -269,12 +325,14 @@ function DeviceRow({
   onRename,
   onRotate,
   onRevoke,
+  onPairCode,
 }: {
   device: AdminDevice;
   icon: "touch" | "tv";
   onRename: () => void;
   onRotate: () => void;
   onRevoke: () => void;
+  onPairCode?: () => void;
 }) {
   const now = useNow();
   const seen = device.lastSeenAt ? Date.parse(device.lastSeenAt) : null;
@@ -318,6 +376,12 @@ function DeviceRow({
           <Icon name="edit" className="size-4" />
           Ganti nama
         </BrandButton>
+        {onPairCode ? (
+          <BrandButton size="sm" variant="outline" onClick={onPairCode} ariaLabel={`Kode aplikasi Windows untuk ${device.name}`}>
+            <Icon name="lock" className="size-4" />
+            Kode aplikasi
+          </BrandButton>
+        ) : null}
         <BrandButton size="sm" variant="outline" onClick={onRotate} ariaLabel={`Buat tautan baru untuk ${device.name}`}>
           <Icon name="repeat" className="size-4" />
           {device.revokedAt ? "Aktifkan lagi" : "Tautan baru"}
@@ -334,7 +398,15 @@ function DeviceRow({
 }
 
 /** Tautan pemasangan, ditampilkan sekali. Alamat server bisa diganti, misalnya dari localhost ke IP cabang. */
-function IssuedModal({ issued, onClose }: { issued: IssuedDevice; onClose: () => void }) {
+function IssuedModal({
+  issued,
+  onClose,
+  onPairCode,
+}: {
+  issued: IssuedDevice;
+  onClose: () => void;
+  onPairCode?: () => void;
+}) {
   const [origin, setOrigin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
   const [copied, setCopied] = useState<"link" | "command" | null>(null);
   const [manual, setManual] = useState<"link" | "command" | null>(null);
@@ -404,6 +476,18 @@ function IssuedModal({ issued, onClose }: { issued: IssuedDevice; onClose: () =>
           )}
           <li>Status di halaman ini berubah menjadi Tersambung.</li>
         </ol>
+        {onPairCode ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-4 py-3">
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-bold">Memakai aplikasi kiosk Windows?</span>{" "}
+              <span className="text-ink-muted">Pasangkan dengan kode pendek, tanpa menyalin tautan.</span>
+            </p>
+            <BrandButton size="sm" variant="outline" onClick={onPairCode}>
+              <Icon name="lock" className="size-4" />
+              Buat kode aplikasi
+            </BrandButton>
+          </div>
+        ) : null}
         <div className="flex justify-end gap-2 border-t border-line pt-4">
           <BrandButton href={link} variant="ghost" ariaLabel="Buka tautan di tab ini">
             Buka di sini
@@ -413,6 +497,84 @@ function IssuedModal({ issued, onClose }: { issued: IssuedDevice; onClose: () =>
       </div>
     </Modal>
   );
+}
+
+/** Kode pendek untuk aplikasi kiosk Windows, ditampilkan besar supaya mudah dibaca dan diketik di PC kiosk. */
+function PairCodeModal({
+  pairCode,
+  installer,
+  onRenew,
+  onClose,
+}: {
+  pairCode: PairCode;
+  installer: InstallerInfo;
+  onRenew: () => void;
+  onClose: () => void;
+}) {
+  const now = useNow();
+  const [origin, setOrigin] = useState(() => (typeof window === "undefined" ? "" : window.location.host));
+  const left = now === 0 ? null : Math.max(0, Math.floor((Date.parse(pairCode.expiresAt) - now) / 1000));
+  const expired = left === 0;
+
+  return (
+    <Modal wide title={`Kode aplikasi ${pairCode.device.name}`} onClose={onClose}>
+      <div className="flex flex-col gap-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl bg-surface px-4 py-4">
+            <p className="text-sm font-bold text-ink-muted">Alamat server</p>
+            <input
+              value={origin}
+              onChange={(event) => setOrigin(event.target.value)}
+              aria-label="Alamat server"
+              className="mt-1 w-full bg-transparent font-mono text-2xl font-bold text-brand-navy outline-none"
+            />
+            <p className="mt-1 text-xs text-ink-muted">Ganti dengan IP server cabang bila halaman ini dibuka lewat localhost.</p>
+          </div>
+          <div className={cn("rounded-xl px-4 py-4", expired ? "bg-danger-soft" : "bg-navy-soft")}>
+            <p className="text-sm font-bold text-ink-muted">Kode pemasangan</p>
+            <p
+              className={cn("mt-1 font-mono text-4xl font-bold tracking-[0.2em]", expired ? "text-danger line-through" : "text-brand-navy")}
+              data-testid="pair-code"
+            >
+              {pairCode.code}
+            </p>
+            <p className={cn("mt-1 text-xs font-bold", expired ? "text-danger" : "text-ink-muted")} aria-live="polite">
+              {left == null ? "\u00a0" : expired ? "Kedaluwarsa. Buat kode baru." : `Berlaku ${formatCountdown(left)} lagi · sekali pakai`}
+            </p>
+          </div>
+        </div>
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
+          <li>
+            Pasang <span className="font-bold text-ink">{installer?.fileName ?? "installer aplikasi kiosk"}</span> di PC kiosk
+            {installer ? null : " (installer belum dibuat di server ini)"}.
+          </li>
+          <li>Isi alamat server dan kode di atas, pilih printer thermal, lalu buat PIN admin.</li>
+          <li>Kiosk terbuka layar penuh dan terkunci. Status di halaman ini berubah menjadi Tersambung.</li>
+        </ol>
+        <p className="text-xs text-ink-muted">
+          Tautan lama perangkat ini tetap berlaku sampai kode dipakai. Setelah itu hanya aplikasi yang dipasangkan yang bisa membuka kiosk.
+        </p>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
+          {installer ? (
+            <BrandButton variant="ghost" href={INSTALLER_URL}>
+              <Icon name="download" className="size-4" />
+              Unduh installer
+            </BrandButton>
+          ) : null}
+          <BrandButton variant="outline" onClick={onRenew}>
+            <Icon name="repeat" className="size-4" />
+            Kode baru
+          </BrandButton>
+          <BrandButton onClick={onClose}>Selesai</BrandButton>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function formatCountdown(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 function CopyButton({ state, onClick }: { state: "idle" | "copied"; onClick: () => void }) {

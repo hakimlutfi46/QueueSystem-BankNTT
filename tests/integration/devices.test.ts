@@ -5,7 +5,9 @@ import {
   createDevice,
   deviceMatcher,
   hashDeviceToken,
+  issuePairCode,
   listDevices,
+  redeemPairCode,
   renameDevice,
   revokeDevice,
   rotateDevice,
@@ -87,5 +89,41 @@ describe("devices", () => {
     await expect(matches("kiosk", "cadangan-kiosk")).resolves.toBe(true);
     process.env.KIOSK_TOKEN = "";
     await expect(matches("kiosk", "cadangan-kiosk")).resolves.toBe(false);
+  });
+
+  it("pairs the Windows kiosk app with a one-time short code that replaces the old link", async () => {
+    const { device, token: linkToken } = await createDevice(prisma, { kind: "kiosk", name: "Kiosk Lobi" });
+    const issued = await issuePairCode(prisma, device.id);
+    expect(issued.code).toMatch(/^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$/);
+    expect(Date.parse(issued.expiresAt) - Date.now()).toBeGreaterThan(29 * 60_000);
+
+    // Membuat kode belum mengganti token: kiosk yang terpasang lewat tautan tetap jalan.
+    await expect(verifyDeviceToken(prisma, "kiosk", linkToken)).resolves.toBe(true);
+    const stored = await prisma.$queryRaw<{ pair_code_hash: string }[]>`SELECT pair_code_hash FROM devices`;
+    expect(stored[0]?.pair_code_hash).not.toContain(issued.code.replace("-", ""));
+
+    const paired = await redeemPairCode(prisma, issued.code.toLowerCase().replace("-", " "));
+    expect(paired).toMatchObject({ kind: "kiosk", name: "Kiosk Lobi" });
+    await expect(verifyDeviceToken(prisma, "kiosk", paired.token)).resolves.toBe(true);
+    await expect(verifyDeviceToken(prisma, "kiosk", linkToken)).resolves.toBe(false);
+
+    await expect(redeemPairCode(prisma, issued.code)).rejects.toMatchObject({ code: "PAIR_CODE_INVALID" });
+    await expect(redeemPairCode(prisma, "ABC")).rejects.toMatchObject({ code: "VALIDATION" });
+  });
+
+  it("rejects an expired code, keeps only the newest code, and drops codes when the device is revoked", async () => {
+    const { device } = await createDevice(prisma, { kind: "kiosk", name: "Kiosk Lobi" });
+    const first = await issuePairCode(prisma, device.id);
+    const second = await issuePairCode(prisma, device.id);
+    await expect(redeemPairCode(prisma, first.code)).rejects.toMatchObject({ code: "PAIR_CODE_INVALID" });
+
+    await prisma.$executeRaw`UPDATE devices SET pair_code_expires_at = now() - interval '1 minute'`;
+    await expect(redeemPairCode(prisma, second.code)).rejects.toMatchObject({ code: "PAIR_CODE_EXPIRED" });
+
+    const third = await issuePairCode(prisma, device.id);
+    await revokeDevice(prisma, device.id);
+    await expect(redeemPairCode(prisma, third.code)).rejects.toMatchObject({ code: "PAIR_CODE_INVALID" });
+
+    await expect(issuePairCode(prisma, 9999)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

@@ -21,6 +21,12 @@ const clientErrors: Record<string, { status: number; message: string | null }> =
   CANNOT_CHANGE_SELF: { status: 409, message: "Anda tidak dapat menonaktifkan akun sendiri." },
   USER_ON_DUTY: { status: 409, message: null },
   COUNTER_LAST_SERVICE: { status: 409, message: null },
+  PAIR_CODE_INVALID: { status: 404, message: null },
+  PAIR_CODE_EXPIRED: { status: 410, message: null },
+  PAIR_CODE_FAILED: { status: 500, message: null },
+  BUILD_RUNNING: { status: 409, message: null },
+  BUILD_UNAVAILABLE: { status: 409, message: null },
+  RATE_LIMITED: { status: 429, message: null },
 };
 
 export function adminErrorResponse(error: unknown): Response | null {
