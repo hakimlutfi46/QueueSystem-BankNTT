@@ -1,6 +1,7 @@
 /**
  * Data contoh untuk mencoba aplikasi di laptop, meniru cabang yang hanya punya loket Teller dan
- * Customer Service: 8 layanan, 5 loket CS, 5 loket Teller, 10 petugas, dan satu supervisor, plus riwayat
+ * Customer Service: 2 layanan (Customer Service A001…, Teller B001…), 5 loket CS, 5 loket Teller, 10 petugas,
+ * dan satu supervisor, plus riwayat
  * tiket tujuh hari kerja terakhir supaya dasbor, laporan, dan grafik langsung terisi.
  *
  * Layanan, loket, dan akun contoh lama yang tidak ada di daftar ini dinonaktifkan, tidak dihapus,
@@ -27,20 +28,14 @@ function historyDays(value: string | undefined): number {
   return days;
 }
 
-/** Layanan teller singkat (2–6 menit), layanan CS lebih lama (6–20 menit). Urutan kiosk: paling ramai dulu. */
+/** Dua layanan saja: Customer Service (nomor A001…) dan Teller (nomor B001…). */
 const SERVICES = [
-  { prefix: "B", name: "Setor Tunai", sortOrder: 1, perDay: [90, 130], handle: [2, 5] },
-  { prefix: "E", name: "Tarik Tunai", sortOrder: 2, perDay: [70, 100], handle: [2, 4] },
-  { prefix: "F", name: "Transfer & Pembayaran", sortOrder: 3, perDay: [45, 70], handle: [3, 6] },
-  { prefix: "D", name: "Pembukaan Rekening", sortOrder: 4, perDay: [10, 18], handle: [4, 6] },
-  { prefix: "A", name: "Pengaduan Layanan", sortOrder: 5, perDay: [8, 14], handle: [10, 20] },
-  { prefix: "G", name: "Kartu ATM & Mobile Banking", sortOrder: 6, perDay: [30, 45], handle: [6, 12] },
-  { prefix: "C", name: "Informasi Produk & Kredit", sortOrder: 7, perDay: [20, 32], handle: [8, 18] },
-  { prefix: "H", name: "Perubahan Data Nasabah", sortOrder: 8, perDay: [12, 20], handle: [6, 14] },
+  { prefix: "A", name: "Customer Service", sortOrder: 1, perDay: [60, 90], handle: [6, 15] },
+  { prefix: "B", name: "Teller", sortOrder: 2, perDay: [180, 260], handle: [2, 5] },
 ] as const;
 
-const CS_SERVICES = ["A", "C", "G", "H"] as const;
-const TELLER_SERVICES = ["B", "D", "E", "F"] as const;
+const CS_SERVICES = ["A"] as const;
+const TELLER_SERVICES = ["B"] as const;
 
 /** Lima loket CS dan lima loket Teller. */
 const COUNTERS = [

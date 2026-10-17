@@ -14,7 +14,7 @@ Adapter `@prisma/adapter-pg` membuang offset zona waktu saat membaca `timestampt
 
 ## 2026-10-09 — Tombol kiosk menyesuaikan jumlah layanan
 
-PLAN menetapkan tombol layanan setinggi minimal 160 px dengan nama, huruf awalan, dan jumlah menunggu. Dengan delapan layanan bank, tombol setinggi itu meluber dari layar dan menutupi judul. Kiosk sekarang menghitung jumlah kolom dan baris dari ruang yang tersedia (`src/lib/kiosk/layout.ts`), sehingga semua tombol sama besar dan muat tanpa digulir; bila tombol akan lebih pendek dari 96 px, kiosk beralih ke daftar yang bisa digulir. Ukuran huruf tiap tombol dikecilkan otomatis sampai nama dan jumlah menunggu muat utuh, jadi tulisan tidak pernah terpotong. Atas permintaan pengguna, huruf awalan tidak ditampilkan di tombol; nomor tiket tetap memakainya.
+PLAN menetapkan tombol layanan setinggi minimal 160 px dengan nama, huruf awalan, dan jumlah menunggu. Dengan banyak layanan (sempat delapan layanan bank), tombol setinggi itu meluber dari layar dan menutupi judul. Kiosk sekarang menghitung jumlah kolom dan baris dari ruang yang tersedia (`src/lib/kiosk/layout.ts`), sehingga semua tombol sama besar dan muat tanpa digulir; bila tombol akan lebih pendek dari 96 px, kiosk beralih ke daftar yang bisa digulir. Ukuran huruf tiap tombol dikecilkan otomatis sampai nama dan jumlah menunggu muat utuh, jadi tulisan tidak pernah terpotong. Atas permintaan pengguna, huruf awalan tidak ditampilkan di tombol; nomor tiket tetap memakainya.
 
 ## 2026-10-09 — Layanan dihubungkan ke loket dari dua arah
 
@@ -84,7 +84,7 @@ Petugas yang masih memegang loket tidak bisa dinonaktifkan. Admin diminta menutu
 
 ## 2026-10-09 — Data contoh terpisah dari seed
 
-`prisma/seed.ts` tetap berisi data awal yang aman untuk cabang, dan itu yang dijalankan Docker. Data contoh untuk mencoba aplikasi ada di `prisma/seed-demo.ts` (`npm run db:seed:demo`): delapan layanan bank, lima loket CS dan lima loket Teller, sepuluh petugas, dan riwayat tiket tujuh hari kerja terakhir. Hasilnya tetap sama setiap kali dijalankan, dan tanggal yang sudah punya tiket dilewati, jadi tidak pernah menimpa data sungguhan.
+`prisma/seed.ts` tetap berisi data awal yang aman untuk cabang, dan itu yang dijalankan Docker. Data contoh untuk mencoba aplikasi ada di `prisma/seed-demo.ts` (`npm run db:seed:demo`): dua layanan (Customer Service dan Teller), lima loket CS dan lima loket Teller, sepuluh petugas, dan riwayat tiket tujuh hari kerja terakhir. Hasilnya tetap sama setiap kali dijalankan, dan tanggal yang sudah punya tiket dilewati, jadi tidak pernah menimpa data sungguhan.
 
 ## 2026-10-08 — Loket dinamis per cabang
 
