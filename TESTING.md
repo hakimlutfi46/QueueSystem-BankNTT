@@ -62,7 +62,7 @@ Uji berjalan berurutan, tidak paralel, karena semua kasus berbagi satu database.
 | Loket dinamis: tambah beberapa loket, nama unik | `tests/integration/admin.test.ts`, `tests/unit/counter-names.test.ts` |
 | CRUD Admin: pesan galat, akun nonaktif, tutup paksa loket | `tests/integration/admin-crud.test.ts` |
 | Tidak ada warna hex di luar `tokens.css` | `tests/unit/tokens.test.ts` |
-| Perangkat terdaftar: token hanya disimpan hash-nya, tautan baru mematikan tautan lama, cabut menolak perangkat, token cadangan `.env` tetap diterima | `tests/integration/devices.test.ts`, `tests/unit/device.test.ts` |
+| Perangkat terdaftar: token hanya disimpan hash-nya, tautan baru mematikan tautan lama, cabut menolak perangkat, hanya perangkat yang dicabut yang bisa dihapus, token cadangan `.env` tetap diterima | `tests/integration/devices.test.ts`, `tests/unit/device.test.ts` |
 | Kode pemasangan aplikasi kiosk Windows: sekali pakai, kedaluwarsa, hanya kode terbaru, batas percobaan; kiosk memakai printer aplikasi dan tidak membuat nomor saat printer tidak siap | `tests/integration/devices.test.ts`, `tests/unit/pairing.test.ts`, `tests/e2e/devices.spec.ts`, `tests/e2e/kiosk.spec.ts` |
 | Sandi bawaan, lemah, atau dari admin wajib diganti sebelum membuka loket atau admin; sandi baru minimal 8 karakter dan tidak mudah ditebak; masuk dikunci setelah 5 sandi salah | `tests/unit/password-policy.test.ts`, `tests/integration/passwords.test.ts`, `tests/integration/desk.test.ts`, `tests/e2e/password.spec.ts` |
 | Nama dan ikon aplikasi kiosk Windows: bawaan BANK NTT Ticket, nama aman untuk berkas Windows, ikon harus PNG persegi minimal 256 px | `tests/integration/kiosk-app.test.ts` |

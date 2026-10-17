@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
   createDevice,
+  deleteDevice,
   deviceMatcher,
   hashDeviceToken,
   issuePairCode,
@@ -125,5 +126,17 @@ describe("devices", () => {
     await expect(redeemPairCode(prisma, third.code)).rejects.toMatchObject({ code: "PAIR_CODE_INVALID" });
 
     await expect(issuePairCode(prisma, 9999)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("deletes a device only after it has been revoked", async () => {
+    const { device, token } = await createDevice(prisma, { kind: "display", name: "TV Lama" });
+    await expect(deleteDevice(prisma, device.id)).rejects.toMatchObject({ code: "DEVICE_ACTIVE" });
+    await expect(verifyDeviceToken(prisma, "display", token)).resolves.toBe(true);
+
+    await revokeDevice(prisma, device.id);
+    await expect(deleteDevice(prisma, device.id)).resolves.toEqual({ id: device.id, name: "TV Lama" });
+    await expect(listDevices(prisma)).resolves.toEqual([]);
+    await expect(verifyDeviceToken(prisma, "display", token)).resolves.toBe(false);
+    await expect(deleteDevice(prisma, device.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

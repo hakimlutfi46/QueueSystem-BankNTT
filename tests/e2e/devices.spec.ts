@@ -43,6 +43,12 @@ test("a registered kiosk opens with its link and loses access once revoked", asy
   await kiosk.goto("/kiosk");
   await expect(kiosk.getByRole("heading", { name: "Perangkat belum diizinkan" })).toBeVisible();
 
+  // Perangkat yang sudah dicabut bisa dihapus dari daftar.
+  await admin.getByRole("button", { name: `Hapus ${name}`, exact: true }).click();
+  await admin.getByRole("dialog", { name: `Hapus ${name}?` }).getByRole("button", { name: "Hapus perangkat" }).click();
+  await expect(admin.getByText(`${name} dihapus.`)).toBeVisible();
+  await expect(admin.getByTestId(/^device-/).filter({ hasText: name })).toHaveCount(0);
+
   await adminContext.close();
   await kioskContext.close();
   await tvContext.close();

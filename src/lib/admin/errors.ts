@@ -25,6 +25,7 @@ const clientErrors: Record<string, { status: number; message: string | null }> =
   PAIR_CODE_EXPIRED: { status: 410, message: null },
   PAIR_CODE_FAILED: { status: 500, message: null },
   BUILD_RUNNING: { status: 409, message: null },
+  DEVICE_ACTIVE: { status: 409, message: null },
   BUILD_UNAVAILABLE: { status: 409, message: null },
   RATE_LIMITED: { status: 429, message: null },
 };

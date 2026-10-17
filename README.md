@@ -116,6 +116,7 @@ Status perangkat di halaman Perangkat:
 
 - **Tautan baru** membuat token baru. Tautan lama langsung tidak berlaku, jadi perangkat harus dibuka ulang dengan tautan baru. Pada perangkat yang dicabut, tombol ini bernama **Aktifkan lagi**.
 - **Cabut** mencabut izin. Layar yang masih terbuka menampilkan "Perangkat belum diizinkan" pada permintaan berikutnya. Pakai ini bila perangkat hilang, dipindah, atau tautannya tersebar.
+- **Hapus** muncul pada perangkat yang sudah dicabut, untuk membuangnya dari daftar. Perangkat yang masih aktif harus dicabut dulu.
 
 `KIOSK_TOKEN` dan `DISPLAY_TOKEN` di `.env` tidak wajib. Bila diisi, keduanya tetap diterima sebagai token cadangan di samping perangkat terdaftar, dengan tautan `/kiosk?token=KIOSK_TOKEN` dan `/display?token=DISPLAY_TOKEN`. Token cadangan tidak bisa dicabut dari Admin. Kosongkan keduanya di server cabang bila semua perangkat sudah didaftarkan dari Admin.
 

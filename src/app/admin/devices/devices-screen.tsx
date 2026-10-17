@@ -113,6 +113,19 @@ export function DevicesScreen({
     }
   }
 
+  async function remove(device: AdminDevice) {
+    const ok = await confirm({
+      title: `Hapus ${device.name}?`,
+      message: "Perangkat ini hilang dari daftar dan tidak bisa diaktifkan lagi. Tiket dan laporan tidak terpengaruh. Untuk memasang perangkat itu lagi, daftarkan sebagai perangkat baru.",
+      confirmLabel: "Hapus perangkat",
+      tone: "danger",
+      icon: "close",
+    });
+    if (!ok) return;
+    const message = await submitAdmin(`/api/admin/devices/${device.id}`, "DELETE", {});
+    done(message, `${device.name} dihapus.`);
+  }
+
   const active = devices.filter((device) => !device.revokedAt);
   const revoked = devices.filter((device) => device.revokedAt);
 
@@ -184,7 +197,11 @@ export function DevicesScreen({
           })}
 
           {revoked.length > 0 ? (
-            <Panel title="Dicabut" description="Perangkat ini tidak bisa membuka kiosk atau TV. Buat tautan baru untuk mengaktifkannya lagi." bodyClassName="p-0">
+            <Panel
+              title="Dicabut"
+              description="Perangkat ini tidak bisa membuka kiosk atau TV. Aktifkan lagi dengan tautan atau kode baru, atau hapus dari daftar."
+              bodyClassName="p-0"
+            >
               <ul className="divide-y divide-line">
                 {revoked.map((device) => (
                   <DeviceRow
@@ -194,6 +211,7 @@ export function DevicesScreen({
                     onRename={() => setRenaming(device)}
                     onRotate={() => void rotate(device)}
                     onRevoke={() => undefined}
+                    onDelete={() => void remove(device)}
                     onPairCode={device.kind === "kiosk" ? () => void issueCode(device) : undefined}
                   />
                 ))}
@@ -331,6 +349,7 @@ function DeviceRow({
   onRotate,
   onRevoke,
   onPairCode,
+  onDelete,
 }: {
   device: AdminDevice;
   icon: "touch" | "tv";
@@ -338,6 +357,7 @@ function DeviceRow({
   onRotate: () => void;
   onRevoke: () => void;
   onPairCode?: () => void;
+  onDelete?: () => void;
 }) {
   const now = useNow();
   const seen = device.lastSeenAt ? Date.parse(device.lastSeenAt) : null;
@@ -391,6 +411,12 @@ function DeviceRow({
           <Icon name="repeat" className="size-4" />
           {device.revokedAt ? "Aktifkan lagi" : "Tautan baru"}
         </BrandButton>
+        {device.revokedAt && onDelete ? (
+          <BrandButton size="sm" variant="danger" onClick={onDelete} ariaLabel={`Hapus ${device.name}`}>
+            <Icon name="close" className="size-4" />
+            Hapus
+          </BrandButton>
+        ) : null}
         {device.revokedAt ? null : (
           <BrandButton size="sm" variant="danger" onClick={onRevoke} ariaLabel={`Cabut ${device.name}`}>
             <Icon name="power" className="size-4" />

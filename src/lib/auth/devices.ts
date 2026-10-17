@@ -214,6 +214,22 @@ export async function redeemPairCode(db: PrismaClient, input: unknown): Promise<
   });
 }
 
+/**
+ * Hapus perangkat dari daftar. Hanya perangkat yang sudah dicabut, supaya kiosk atau TV yang masih dipakai
+ * tidak hilang karena salah klik. Tidak ada tabel lain yang merujuk perangkat, jadi tiket dan laporan utuh.
+ */
+export async function deleteDevice(db: PrismaClient, id: number): Promise<{ id: number; name: string }> {
+  const rows = await db.$queryRaw<{ id: number; name: string }[]>`
+    DELETE FROM devices WHERE id = ${id} AND revoked_at IS NOT NULL
+    RETURNING id, name
+  `;
+  const row = rows[0];
+  if (row) return row;
+  const exists = await db.$queryRaw<{ id: number }[]>`SELECT id FROM devices WHERE id = ${id}`;
+  if (exists.length > 0) throw new AdminError("DEVICE_ACTIVE", "Cabut perangkat ini dulu sebelum menghapusnya.");
+  throw new AdminError("NOT_FOUND", "Perangkat tidak ditemukan.");
+}
+
 /** Benar bila token milik perangkat aktif berjenis sama. Sekaligus mencatat waktu terakhir aktif. */
 export async function verifyDeviceToken(db: PrismaClient, kind: DeviceKind, token: string): Promise<boolean> {
   if (!token || token.length > 200) return false;
