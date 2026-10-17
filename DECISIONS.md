@@ -1,5 +1,13 @@
 # Keputusan
 
+## 2026-10-17 — Wajib ganti sandi, batas percobaan masuk, dan backup harian
+
+Akun yang masuk dengan sandi bawaan seeder, sandi umum, sandi yang memuat nama pengguna, atau sandi kurang dari 8 karakter ditandai `must_change_password`, begitu juga akun baru dan sandi yang direset admin untuk akun orang lain. Sandi lemah dideteksi saat masuk karena server hanya menyimpan hash; menandai saat seed tidak menangkap sandi lemah yang diisi admin lewat `.env`. Selama tanda itu ada, `currentOfficer` dan penjaga API admin menolak akun, dan halaman loket serta admin mengalihkan ke `/account/password`. Uji end-to-end masuk dengan sandi seeder `change-me`, jadi Playwright menyalakan server dengan `AUTH_ALLOW_WEAK_PASSWORDS=true`.
+
+Batas percobaan masuk disimpan di memori proses, sama seperti kode pemasangan kiosk: 5 salah per IP dan akun, 20 per akun dari IP mana pun, 50 per IP. Header `x-forwarded-for` bisa dipalsukan bila server dibuka langsung, jadi batas per akun tanpa IP tetap ada; angkanya cukup longgar supaya orang luar sulit mengunci akun petugas terlalu lama.
+
+`npm run db:backup` memakai `pg_dump` format custom, memeriksa hasilnya dengan `pg_restore --list` sebelum dianggap sah, dan hanya menghapus cadangan bernama pola miliknya sendiri. Penjadwalan diserahkan ke cron atau Task Scheduler karena server cabang bisa Linux atau Windows; Docker Compose mendapat layanan `backup` sendiri.
+
 ## 2026-10-17 — Aplikasi kiosk Windows dengan kode pemasangan
 
 PC kiosk memakai Windows, sedangkan TV beragam sistemnya, jadi hanya kiosk yang mendapat installer. Aplikasinya Electron (`apps/kiosk-desktop`), dibungkus NSIS menjadi installer `.exe`. Electron dipilih karena bisa mencetak senyap ke printer bernama dan membaca status printer, dua hal yang tidak bisa dilakukan halaman web biasa. Halaman `/kiosk` mendeteksi `window.kioskApp` dari preload dan memakai printer aplikasi; di browser biasa perilakunya tetap seperti sebelumnya.

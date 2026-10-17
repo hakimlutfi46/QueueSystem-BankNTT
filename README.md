@@ -2,6 +2,8 @@
 
 Satu aplikasi untuk kiosk tiket, loket petugas, layar TV, dan admin cabang. Nomor antrian disimpan di PostgreSQL. Kiosk dan TV tidak memakai login; setiap perangkat didaftarkan dari Admin dan dibuka sekali dengan tautannya sendiri.
 
+**Baru mengenal proyek ini?** Mulai dari [docs/PANDUAN.md](docs/PANDUAN.md): gambaran lengkap, alur sehari-hari, menu admin, kiosk dan TV, aplikasi kiosk Windows, keamanan, backup, daftar perintah, peta kode, dan pemecahan masalah dalam satu dokumen.
+
 ## Menjalankan di laptop (localhost)
 
 Untuk mencoba atau mengembangkan aplikasi tanpa Docker.
@@ -72,7 +74,7 @@ cp .env.example .env
 Isi `.env` sebelum dinyalakan:
 
 - `AUTH_SECRET`: string acak yang panjang.
-- `SEED_ADMIN_PASSWORD` dan `SEED_STAFF_PASSWORD`: kata sandi awal. Bila kosong saat `npm run db:seed`, dipakai `Password123`. Ganti lagi dari halaman Admin setelah masuk.
+- `SEED_ADMIN_PASSWORD` dan `SEED_STAFF_PASSWORD`: kata sandi awal. Bila kosong saat `npm run db:seed`, dipakai `Password123`. Akun yang masuk dengan sandi bawaan atau lemah langsung diminta menggantinya (lihat **Kata sandi dan keamanan masuk**).
 - `APP_TIMEZONE`: `Asia/Makassar` untuk WITA, `Asia/Jakarta` untuk WIB, `Asia/Jayapura` untuk WIT. Setelah masuk, zona waktu juga bisa diganti dari Admin → Pengaturan.
 - `SEED_ORG_NAME` (opsional): nama lembaga bila bukan Bank NTT.
 
@@ -173,6 +175,40 @@ Petugas membuka `http://192.168.1.10:3000/counter`, masuk, lalu memilih loket. T
 Loket hanya memanggil tiket dari layanan yang terhubung dengannya. Hubungannya diatur dari Admin → Loket (per loket) atau Admin → Layanan → **Atur loket** (per layanan). Di data contoh, Customer Service (A001…) hanya dipanggil CS 1–5 dan Teller (B001…) hanya Teller 1–5.
 
 Aksi yang sulit dibatalkan meminta konfirmasi lebih dulu: keluar dari akun, menonaktifkan loket atau layanan, membuat tautan perangkat baru, mengubah peran atau menonaktifkan petugas, menghapus logo, dan mengganti zona waktu.
+
+## Kata sandi dan keamanan masuk
+
+- **Wajib ganti sandi.** Akun yang masuk dengan sandi bawaan (`Password123`, `change-me`), sandi umum, sandi yang memuat nama pengguna, atau sandi kurang dari 8 karakter langsung dibawa ke halaman **Ganti kata sandi**. Begitu juga akun baru dan sandi yang direset admin: sandi dari admin bersifat sementara. Sampai sandi diganti, loket, panel admin, dan API-nya tidak bisa dibuka. Di Admin → Petugas, akun seperti ini bertanda **Wajib ganti sandi**.
+- **Ganti sandi sendiri** kapan saja lewat ikon gembok di samping nama (panel admin dan layar loket), atau `/account/password`. Sandi baru minimal 8 karakter, berbeda dari yang lama, dan tidak mudah ditebak.
+- **Batas percobaan.** Setelah 5 sandi salah untuk satu akun dari satu komputer, masuk ditolak 15 menit. Satu akun juga dikunci setelah 20 sandi salah dari komputer mana pun, dan satu komputer setelah 50 sandi salah untuk akun mana pun. Penghitungnya disimpan di memori server, jadi memulai ulang server membuka kunci.
+
+`AUTH_ALLOW_WEAK_PASSWORDS=true` mematikan kewajiban ganti sandi lemah. Isian ini hanya dipakai uji end-to-end; jangan diisi di server cabang.
+
+## Backup database
+
+Cadangkan database tiap hari. Tanpa cadangan, kerusakan disk server menghapus seluruh riwayat antrian dan laporan.
+
+```bash
+npm run db:backup
+```
+
+Perintah ini membuat `backups/queue-YYYYMMDD-HHMMSS.dump` dengan `pg_dump`, memeriksa berkasnya bisa dibaca, lalu menghapus cadangan yang lebih tua dari 30 hari. Folder dan masa simpan bisa diatur dengan `BACKUP_DIR` dan `BACKUP_KEEP_DAYS` di `.env`. Butuh PostgreSQL client tools (`pg_dump`, `pg_restore`) di server, dengan versi yang sama atau lebih baru dari server database.
+
+Jadwalkan tiap malam:
+
+- **Linux/Mac (cron)**: `crontab -e`, lalu tambahkan `30 22 * * * cd /opt/antrian && npm run db:backup >> backups/backup.log 2>&1`.
+- **Windows (Task Scheduler)**: Create Basic Task → Daily 22.30 → Start a program: `cmd.exe` dengan argumen `/c cd /d C:\antrian && npm run db:backup >> backups\backup.log 2>&1`.
+- **Docker**: layanan `backup` di `docker-compose.yml` sudah mencadangkan tiap 24 jam ke folder `./backups` di server.
+
+Salin folder `backups` secara berkala ke tempat lain (flashdisk, NAS, atau server kantor pusat). Cadangan yang hanya ada di disk server ikut hilang bila disk itu rusak.
+
+**Memulihkan** (menimpa isi database; hentikan aplikasi dulu):
+
+```bash
+pg_restore --clean --if-exists --no-owner --dbname="postgresql://USER:SANDI@127.0.0.1:5432/queue" backups/queue-20261017-223000.dump
+```
+
+Dengan Docker: `docker compose stop app`, lalu `docker compose exec -T db pg_restore --clean --if-exists --no-owner -U queue -d queue < backups/queue-20261017-223000.dump`, lalu `docker compose start app`. Coba pemulihan sesekali ke database terpisah supaya yakin cadangannya bisa dipakai.
 
 ## Identitas lembaga
 
