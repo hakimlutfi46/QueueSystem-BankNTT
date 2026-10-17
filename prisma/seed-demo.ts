@@ -15,7 +15,17 @@ import argon2 from "argon2";
 import { getPrisma } from "../src/lib/db";
 import { appTimezone } from "../src/lib/env";
 
-const HISTORY_DAYS = 7;
+/** Hari kerja riwayat tiket contoh. SEED_DEMO_HISTORY_DAYS=0 memasang layanan, loket, dan petugas tanpa riwayat. */
+const HISTORY_DAYS = historyDays(process.env.SEED_DEMO_HISTORY_DAYS);
+
+function historyDays(value: string | undefined): number {
+  if (value === undefined || value.trim() === "") return 7;
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 0 || days > 60) {
+    throw new Error("SEED_DEMO_HISTORY_DAYS harus bilangan bulat 0 sampai 60.");
+  }
+  return days;
+}
 
 /** Layanan teller singkat (2–6 menit), layanan CS lebih lama (6–20 menit). Urutan kiosk: paling ramai dulu. */
 const SERVICES = [
