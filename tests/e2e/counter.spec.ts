@@ -50,12 +50,19 @@ test("two officers call different numbers", async ({ browser }) => {
   await second.close();
 });
 
-test("a wrong password stays on the login page", async ({ page }) => {
+test("a wrong password stays on the login page, keeps the username, and the next try signs in", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Nama pengguna").fill("petugas.cs");
   await page.getByLabel("Kata sandi").fill("bukan-sandi");
   await page.getByRole("button", { name: "Masuk" }).click();
   await expect(page.getByText("Nama pengguna atau kata sandi salah.")).toBeVisible();
+  // React mengosongkan form setelah aksi; nama pengguna harus tetap terisi supaya percobaan kedua terkirim.
+  await expect(page.getByLabel("Nama pengguna")).toHaveValue("petugas.cs");
+  await page.waitForTimeout(500);
+  await page.getByLabel("Kata sandi").fill("change-me");
+  await page.getByRole("button", { name: "Masuk" }).click();
+  // Petugas bisa langsung ke meja loket bila masih memegang loket dari uji sebelumnya; yang penting sudah masuk.
+  await expect(page).toHaveURL(/\/counter$/);
 });
 
 async function login(page: Page, username: string) {

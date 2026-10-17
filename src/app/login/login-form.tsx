@@ -10,6 +10,9 @@ import { cn } from "@/lib/cn";
 export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
   const [state, action, pending] = useActionState(loginAction, null);
   const [visible, setVisible] = useState(false);
+  // React 19 mengosongkan isian form setelah aksi selesai. Nama pengguna dikendalikan state supaya tetap
+  // terisi setelah kata sandi salah; tanpa ini percobaan kedua tidak terkirim karena kolomnya wajib.
+  const [username, setUsername] = useState("");
 
   return (
     <form action={action} className="flex w-full flex-col gap-5">
@@ -20,6 +23,8 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
           <Icon name="user" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-muted" />
           <input
             name="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
             autoCapitalize="none"
             required
