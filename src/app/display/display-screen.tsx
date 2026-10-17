@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { BrandButton } from "@/components/brand/brand-button";
 import { BrandLogo, BrandTagline } from "@/components/brand/brand-logo";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
+import { FullscreenButton } from "@/components/ui/fullscreen";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import {
@@ -146,6 +147,7 @@ export function DisplayScreen({ timeZone }: { timeZone: string }) {
               Aktifkan suara
             </BrandButton>
           ) : null}
+          <FullscreenButton className="shrink-0" />
           <div className="shrink-0 text-right">
             <DisplayClock timeZone={timeZone} />
             {!connected ? (

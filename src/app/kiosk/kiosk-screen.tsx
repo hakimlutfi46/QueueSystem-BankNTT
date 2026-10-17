@@ -6,6 +6,7 @@ import { BrandHeader } from "@/components/brand/brand-header";
 import { useBranding } from "@/components/brand/branding-provider";
 import { DiagonalStripes } from "@/components/brand/diagonal-stripes";
 import { QueueNumber } from "@/components/brand/queue-number";
+import { FullscreenButton, useFullscreenOnFirstTouch } from "@/components/ui/fullscreen";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import { kioskGrid, MIN_BUTTON_HEIGHT } from "@/lib/kiosk/layout";
@@ -26,6 +27,8 @@ type IssuedTicketView = {
 };
 
 export function KioskScreen({ timeZone, output }: { timeZone: string; output: TicketOutput }) {
+  // Di browser biasa, sentuhan pertama membuat kiosk memenuhi layar seperti Chrome --kiosk.
+  useFullscreenOnFirstTouch();
   const { state, error } = useQueueState();
   const pending = useRef(false);
   const [busy, setBusy] = useState<number | null>(null);
@@ -83,7 +86,15 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
 
   return (
     <div className="flex h-dvh select-none flex-col overflow-hidden bg-brand-white">
-      <BrandHeader branchName={branchName} trailing={<KioskClock timeZone={timeZone} />} />
+      <BrandHeader
+        branchName={branchName}
+        trailing={
+          <div className="flex items-center gap-4">
+            <FullscreenButton />
+            <KioskClock timeZone={timeZone} />
+          </div>
+        }
+      />
       <main className="relative flex min-h-0 flex-1 flex-col px-[clamp(16px,3vw,48px)] py-[clamp(12px,3vh,32px)]">
         {issued ? (
           <section

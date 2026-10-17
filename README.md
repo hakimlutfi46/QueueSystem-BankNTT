@@ -127,6 +127,8 @@ google-chrome --kiosk --kiosk-printing --app="http://192.168.1.10:3000/kiosk?tok
 
 Kalau kiosk dibuka tanpa token yang berlaku, halaman menolak perangkat itu.
 
+Perintah di atas membuat kiosk layar penuh tanpa bilah alamat. Bila kiosk dibuka di browser biasa, misalnya saat demo, sentuhan pertama membuatnya layar penuh; TV punya tombol **Layar penuh** di pojok kanan atas. Tombol itu hilang sendiri bila layar sudah penuh.
+
 Nasabah memilih layanan. Satu sentuhan menghasilkan satu nomor dan satu cetakan. Sentuhan ganda tidak membuat nomor kedua.
 
 Belum punya printer? Isi `TICKET_OUTPUT=pdf` di `.env`: setiap tiket diunduh sebagai PDF seukuran kertas thermal, dan tombol **Ulang** di laporan harian membuka PDF-nya. Bila kosong, `npm run dev` memakai PDF dan build produksi langsung mencetak ke printer. Isi `TICKET_OUTPUT=printer` untuk memaksa cetak ke printer.
