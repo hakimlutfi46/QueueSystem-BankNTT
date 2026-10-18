@@ -1,8 +1,13 @@
 import { RetryAfter } from "./retry";
 
-type State = "pending" | "revoked" | "unknown" | "limited";
+type State = "app" | "pending" | "revoked" | "unknown" | "limited";
 
 const MESSAGES: Record<State, { title: string; body: string; retrySeconds: number | null }> = {
+  app: {
+    title: "Perangkat belum diizinkan",
+    body: "Kiosk dan TV dibuka dengan aplikasi BANK NTT Ticket atau BANK NTT TV, yang tersambung sendiri dan menunggu persetujuan admin. Untuk browser, minta tautan pemasangan dari Admin → Perangkat.",
+    retrySeconds: null,
+  },
   pending: {
     title: "Menunggu persetujuan admin",
     body: "Perangkat ini sudah terdaftar. Minta admin membuka Admin → Perangkat lalu menekan Setujui. Layar terbuka sendiri setelah disetujui.",
@@ -15,12 +20,12 @@ const MESSAGES: Record<State, { title: string; body: string; retrySeconds: numbe
   },
   unknown: {
     title: "Perangkat tidak dikenal",
-    body: "Server tidak mengenali perangkat ini, misalnya karena database diatur ulang. Aplikasi kiosk dan TV mendaftar ulang sendiri; di browser, buka lagi halaman ini.",
+    body: "Server tidak mengenali perangkat ini, misalnya karena database diatur ulang. Aplikasi kiosk dan TV mendaftar ulang sendiri; untuk browser, minta tautan baru dari Admin → Perangkat.",
     retrySeconds: 30,
   },
   limited: {
     title: "Terlalu banyak perangkat baru",
-    body: "Terlalu banyak perangkat mendaftar atau menunggu persetujuan. Minta admin menyetujui atau mencabut perangkat di Admin → Perangkat. Mencoba lagi sebentar lagi.",
+    body: "Terlalu banyak perangkat mendaftar atau menunggu persetujuan. Minta admin menyetujui atau menolak perangkat di Admin → Perangkat. Mencoba lagi sebentar lagi.",
     retrySeconds: 30,
   },
 };
@@ -32,7 +37,7 @@ export default async function DeviceRequiredPage({
 }) {
   const params = await searchParams;
   const kind = params.kind === "display" ? "display" : "kiosk";
-  const state: State = params.state && params.state in MESSAGES ? (params.state as State) : "unknown";
+  const state: State = params.state && params.state in MESSAGES ? (params.state as State) : "app";
   const message = MESSAGES[state];
   const href = kind === "display" ? "/display" : "/kiosk";
 

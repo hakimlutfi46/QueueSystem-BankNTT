@@ -2,9 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 import { decideDevice, DISPLAY_COOKIE, KIOSK_COOKIE, type DeviceKind } from "@/lib/auth/device";
-import { AdminError } from "@/lib/admin/errors";
-import { autoRegisterDevice, deviceMatcher, deviceTokenStatus } from "@/lib/auth/devices";
-import { autoRegisterRateLimit, clientAddress, longestWait } from "@/lib/auth/rate-limit";
+import { deviceMatcher, deviceTokenStatus } from "@/lib/auth/devices";
 import { getPrisma } from "@/lib/db";
 
 const { auth } = NextAuth(authConfig);
@@ -54,7 +52,6 @@ export const proxy = auth(async (request) => {
   if (decision.type === "deny-page") {
     const kind: DeviceKind = request.nextUrl.pathname.startsWith("/display") ? "display" : "kiosk";
     const db = getPrisma();
-    const secure = isHttps(request);
     const status = (state: string) => {
       const url = new URL("/device-required", request.nextUrl);
       url.searchParams.set("kind", kind);
@@ -67,34 +64,18 @@ export const proxy = auth(async (request) => {
     if (token) {
       const state = await deviceTokenStatus(db, kind, token);
       const response = status(state === "active" ? "unknown" : state);
-      if (state === "pending") response.cookies.set(cookieName(kind), token, { ...cookieOptions, secure });
+      if (state === "pending") response.cookies.set(cookieName(kind), token, { ...cookieOptions, secure: isHttps(request) });
       return response;
     }
     const cookie = request.cookies.get(cookieName(kind))?.value;
     if (cookie) {
       const state = await deviceTokenStatus(db, kind, cookie);
-      if (state === "pending" || state === "revoked") return status(state);
-      // "unknown" (e.g. database reset): register again below, like a new browser.
+      return status(state === "active" ? "unknown" : state);
     }
-
-    // A browser with no device cookie registers itself and waits for approval in Admin → Perangkat.
-    const client = clientAddress(request.headers);
-    if (longestWait([[autoRegisterRateLimit.perAddress, client], [autoRegisterRateLimit.overall, "all"]]) > 0) {
-      return status("limited");
-    }
-    autoRegisterRateLimit.perAddress.fail(client);
-    autoRegisterRateLimit.overall.fail("all");
-    try {
-      const paired = await autoRegisterDevice(db, kind);
-      const url = request.nextUrl.clone();
-      url.searchParams.delete("token");
-      const response = paired.approved ? NextResponse.redirect(url) : status("pending");
-      response.cookies.set(cookieName(kind), paired.token, { ...cookieOptions, secure });
-      return response;
-    } catch (error) {
-      if (error instanceof AdminError && error.code === "TOO_MANY_PENDING") return status("limited");
-      throw error;
-    }
+    // A browser without a device token (e.g. a phone on the branch Wi-Fi) does not register itself:
+    // kiosks and TVs use the BANK NTT apps, which register through /api/devices/pair, or a link
+    // made in Admin → Perangkat.
+    return status("app");
   }
   if (decision.type === "set-cookie") {
     const url = request.nextUrl.clone();
