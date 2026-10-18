@@ -16,33 +16,42 @@ export type KioskInstaller = {
   appName: string | null;
   size: number;
   builtAt: string;
+  platform?: "win" | "mac";
 };
 
 export function downloadsDir(): string {
   return path.join(/* turbopackIgnore: true */ process.cwd(), "downloads");
 }
 
-export async function findKioskInstaller(env: NodeJS.ProcessEnv = process.env): Promise<KioskInstaller | null> {
+export async function findKioskInstaller(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: "win" | "mac" = "win",
+): Promise<KioskInstaller | null> {
   const configured = env.KIOSK_INSTALLER_PATH?.trim();
   if (configured) return describe(path.resolve(configured), null);
 
-  const manifest = await readManifest();
+  const manifest = await readManifest(platform);
   if (manifest) {
     const found = await describe(path.join(downloadsDir(), manifest.file), manifest.name);
-    if (found) return found;
+    if (found) return { ...found, platform };
   }
   return describe(path.join(downloadsDir(), LEGACY_INSTALLER_NAME), null);
 }
 
-async function readManifest(): Promise<{ file: string; name: string | null } | null> {
+async function readManifest(platform: "win" | "mac" = "win"): Promise<{ file: string; name: string | null } | null> {
   try {
     const raw = JSON.parse(await readFile(path.join(downloadsDir(), "kiosk-installer.json"), "utf8")) as {
       file?: unknown;
+      macFile?: unknown;
       name?: unknown;
     };
-    // Hanya nama berkas di dalam downloads/, bukan jalur ke tempat lain.
-    if (typeof raw.file !== "string" || raw.file !== path.basename(raw.file) || !raw.file.endsWith(".exe")) return null;
-    return { file: raw.file, name: typeof raw.name === "string" ? raw.name : null };
+    const target =
+      platform === "mac"
+        ? (typeof raw.macFile === "string" ? raw.macFile : null)
+        : (typeof raw.file === "string" ? raw.file : null);
+    const chosen = target ?? (typeof raw.file === "string" ? raw.file : (typeof raw.macFile === "string" ? raw.macFile : null));
+    if (!chosen || chosen !== path.basename(chosen) || (!chosen.endsWith(".exe") && !chosen.endsWith(".dmg"))) return null;
+    return { file: chosen, name: typeof raw.name === "string" ? raw.name : null };
   } catch {
     return null;
   }

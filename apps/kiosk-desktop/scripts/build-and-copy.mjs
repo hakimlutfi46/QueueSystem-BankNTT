@@ -56,9 +56,10 @@ function fail(message) {
 
 const platform = String(option('--platform') ?? process.env.KIOSK_PLATFORM ?? 'win').trim().toLowerCase();
 if (!['win', 'mac', 'linux'].includes(platform)) fail(`--platform harus win, mac, atau linux (bukan "${platform}").`);
-// Every non-Windows build is a simulation build.
-const simulation = platform !== 'win';
+const isProd = process.argv.includes('--prod') || process.env.KIOSK_PROD === '1';
+const simulation = isProd ? false : (process.argv.includes('--simulation') || process.env.KIOSK_SIMULATION === '1' || platform !== 'win');
 if (simulation && withServer) fail('--with-server hanya untuk Windows: bundle server berisi PostgreSQL dan layanan Windows.');
+if (!simulation && withServer && platform !== 'win') fail('--with-server hanya untuk Windows: bundle server berisi PostgreSQL dan layanan Windows.');
 
 const name = (option('--name') ?? process.env.KIOSK_APP_NAME ?? DEFAULT_NAME).trim().replace(/\s+/g, ' ');
 const icon = path.resolve(option('--icon') ?? process.env.KIOSK_APP_ICON ?? DEFAULT_ICON);
@@ -108,6 +109,67 @@ console.log(
 );
 const extraResources = [{ from: path.join(brandDir, 'icon.png'), to: 'brand-icon.png' }];
 if (withServer) extraResources.push({ from: serverDir, to: 'server' });
+
+if (platform === 'mac') {
+  console.log(
+    `\n> electron-builder --mac dmg --arm64  (prod, nama="${name}", ikon=${path.relative(repoRoot, icon)})`,
+  );
+  const config = {
+    ...pkg.build,
+    productName: name,
+    artifactName: `${artifactBase}.\${ext}`,
+    extraMetadata: { productName: name },
+    extraResources,
+    mac: {
+      target: [{ target: 'dmg', arch: ['arm64'] }],
+      icon,
+      identity: '-',
+      hardenedRuntime: false,
+      category: 'public.app-category.business',
+      extendInfo: { NSLocalNetworkUsageDescription: 'Mencari server antrian BANK NTT di jaringan lokal.' },
+    },
+    dmg: { title: name, sign: false },
+    electronFuses: { ...pkg.build.electronFuses, resetAdHocDarwinSignature: true },
+  };
+  try {
+    await builder.build({
+      projectDir: appDir,
+      targets: builder.Platform.MAC.createTarget('dmg', builder.Arch.arm64),
+      config,
+      publish: 'never',
+    });
+  } catch (error) {
+    fail(`electron-builder: ${error?.message ?? error}`);
+  }
+
+  const built = path.join(appDir, 'dist', `${artifactBase}.dmg`);
+  if (!existsSync(built)) fail(`Installer tidak ditemukan: ${built}`);
+  mkdirSync(outDir, { recursive: true });
+  const target = path.join(outDir, `${artifactBase}.dmg`);
+  copyFileSync(built, `${target}.tmp`);
+  renameSync(`${target}.tmp`, target);
+  copyFileSync(target, path.join(outDir, `${artifactBase}-mac-arm64.dmg`));
+
+  rmSync(path.join(appDir, 'dist', 'mac-arm64'), { recursive: true, force: true });
+
+  let manifest = {};
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  } catch {}
+  const size = statSync(target).size;
+  manifest.macFile = path.basename(target);
+  manifest.macSize = size;
+  manifest.name = name;
+  manifest.version = pkg.version;
+  manifest.builtAt = new Date().toISOString();
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  console.log(`\nSelesai: ${path.relative(repoRoot, target)} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+  process.exit(0);
+}
+
+console.log(
+  `\n> electron-builder --win nsis --x64  (nama="${name}", ikon=${path.relative(repoRoot, icon)}${withServer ? ', dengan server' : ''})`,
+);
 const config = {
   ...pkg.build,
   productName: name,
@@ -154,10 +216,16 @@ try {
   // first build
 }
 const size = statSync(target).size;
-writeFileSync(
-  manifestPath,
-  `${JSON.stringify({ file: path.basename(target), name, version: pkg.version, size, builtAt: new Date().toISOString() }, null, 2)}\n`,
-);
+let manifest = {};
+try {
+  manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+} catch {}
+manifest.file = path.basename(target);
+manifest.name = name;
+manifest.version = pkg.version;
+manifest.size = size;
+manifest.builtAt = new Date().toISOString();
+writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`\nSelesai: ${path.relative(repoRoot, target)} (${(size / 1024 / 1024).toFixed(1)} MB)`);
 
 /* ---------------------------------------------------------- simulation builds */

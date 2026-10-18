@@ -56,6 +56,8 @@ if (!roleIds.every((id) => ROLES[id])) fail(`--app harus admin, loket, tv, atau 
 const platformId = (option('--platform') ?? 'win').trim().toLowerCase();
 const platform = getPlatform(platformId);
 if (!platform) fail(`--platform harus win, mac, atau linux (bukan "${platformId}").`);
+const isProd = process.argv.includes('--prod') || process.env.BANKNTT_PROD === '1';
+const simulation = isProd ? false : (process.argv.includes('--simulation') || process.env.BANKNTT_SIMULATION === '1' || platform.simulation);
 
 const customName = option('--name');
 if (customName !== undefined && roleIds.length > 1) fail('--name hanya bisa dipakai bersama --app admin|loket|tv.');
@@ -129,6 +131,66 @@ async function buildRole(role) {
   mkdirSync(brandDir, { recursive: true });
   copyFileSync(icon, path.join(brandDir, 'icon.png'));
 
+  if (platform.id === 'mac') {
+    console.log(`\n> electron-builder macOS arm64 (dmg) (prod, app=${role.id}, nama="${name}", ikon=${path.relative(repoRoot, icon)})`);
+    const config = {
+      ...pkg.build,
+      appId: role.appId,
+      productName: name,
+      artifactName: `${artifactBase}.\${ext}`,
+      directories: { ...pkg.build.directories, output: roleOut },
+      extraMetadata: { name: role.packageName, productName: name, bankNttRole: role.id },
+      extraResources: [{ from: path.join(brandDir, 'icon.png'), to: 'brand-icon.png' }],
+      mac: {
+        target: [{ target: 'dmg', arch: ['arm64'] }],
+        icon,
+        category: 'public.app-category.business',
+        identity: null,
+        hardenedRuntime: false,
+        extendInfo: { NSLocalNetworkUsageDescription: 'Mencari server antrian BANK NTT di jaringan lokal.' },
+      },
+      dmg: { title: name, sign: false },
+      electronFuses: { ...pkg.build.electronFuses, resetAdHocDarwinSignature: true },
+      ...(electronDist ? { electronDist } : {}),
+    };
+    try {
+      await builder.build({
+        projectDir: appDir,
+        targets: builder.Platform.MAC.createTarget('dmg', builder.Arch.arm64),
+        config,
+        publish: 'never',
+      });
+    } catch (error) {
+      fail(`electron-builder (${role.id}): ${error?.message ?? error}`);
+    }
+
+    const built = path.join(roleOut, `${artifactBase}.dmg`);
+    if (!existsSync(built)) fail(`Installer tidak ditemukan: ${built}`);
+    mkdirSync(outDir, { recursive: true });
+    const target = path.join(outDir, `${artifactBase}.dmg`);
+    copyFileSync(built, `${target}.tmp`);
+    renameSync(`${target}.tmp`, target);
+    copyFileSync(target, path.join(outDir, `${artifactBase}-mac-arm64.dmg`));
+
+    rmSync(path.join(roleOut, 'mac-arm64'), { recursive: true, force: true });
+
+    const manifest = readManifest();
+    const size = statSync(target).size;
+    manifest.apps[role.id] = {
+      ...manifest.apps[role.id],
+      macFile: path.basename(target),
+      name,
+      appId: role.appId,
+      version: pkg.version,
+      macSize: size,
+      builtAt: new Date().toISOString(),
+    };
+    writeFileSync(`${manifestPath}.tmp`, `${JSON.stringify(manifest, null, 2)}\n`);
+    renameSync(`${manifestPath}.tmp`, manifestPath);
+    console.log(`\nSelesai: ${path.relative(repoRoot, target)} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+    return;
+  }
+
   console.log(`\n> electron-builder --win nsis --x64  (app=${role.id}, nama="${name}", ikon=${path.relative(repoRoot, icon)})`);
   const config = {
     ...pkg.build,
@@ -167,6 +229,7 @@ async function buildRole(role) {
   if (previous?.file && previous.file !== path.basename(target)) rmSync(path.join(outDir, path.basename(previous.file)), { force: true });
   const size = statSync(target).size;
   manifest.apps[role.id] = {
+    ...manifest.apps[role.id],
     file: path.basename(target),
     name,
     appId: role.appId,
@@ -281,4 +344,4 @@ async function buildSimulation(role) {
   for (const c of copied) console.log(`\nSelesai: ${path.relative(repoRoot, path.join(simOutDir, c.file))} (${(c.size / 1024 / 1024).toFixed(1)} MB)`);
 }
 
-for (const id of roleIds) await (platform.simulation ? buildSimulation(ROLES[id]) : buildRole(ROLES[id]));
+for (const id of roleIds) await (simulation ? buildSimulation(ROLES[id]) : buildRole(ROLES[id]));
