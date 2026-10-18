@@ -143,18 +143,17 @@
     rescanBtn.disabled = false;
     if (servers.size === 0) {
       scanText.textContent = 'Tidak ada server ditemukan. Ketik alamat manual di bawah atau tekan Cari ulang.';
-    } else if (servers.size === 1) {
-      const only = [...servers.values()][0];
-      scanText.textContent = `1 server ditemukan: ${only.name}.`;
+    } else {
+      const serverList = [...servers.values()];
+      const best = serverList.find((s) => !s.local) || serverList[0];
+      scanText.textContent = `${servers.size} server ditemukan: ${best.name}.`;
       if (!touched && (!serverInput.value || serverInput.value === 'http://127.0.0.1:3000')) {
-        select(only.url, { byUser: false });
+        select(best.url, { byUser: false });
         if (mode === 'first') {
-          showAlert('info', `Server "${only.name}" ditemukan. Menyambung…`);
+          showAlert('info', `Server "${best.name}" ditemukan. Menyambung otomatis…`);
           form.requestSubmit();
         }
       }
-    } else {
-      scanText.textContent = `${servers.size} server ditemukan. Pilih salah satu di bawah:`;
     }
   }
 

@@ -122,12 +122,13 @@
     scanText.textContent = total
       ? `${total} server ditemukan. Pilih salah satu.`
       : 'Tidak ada server ditemukan. Pastikan PC server menyala, atau ketik alamatnya di bawah.';
-    if (total === 1 && found.length === 1 && !touched) {
-      const only = found[0];
-      select(only.url, { byUser: false });
-      scanText.textContent = `Server ditemukan: ${only.name}.`;
+    if (total >= 1 && !touched) {
+      const serverList = [...servers.values()];
+      const best = serverList.find((s) => !s.local) || serverList[0];
+      select(best.url, { byUser: false });
+      scanText.textContent = `Server ditemukan: ${best.name}.`;
       if (mode === 'first') {
-        showAlert('info', `Server "${only.name}" ditemukan. Menyambung…`);
+        showAlert('info', `Server "${best.name}" ditemukan. Menyambung otomatis…`);
         form.requestSubmit();
       }
     }

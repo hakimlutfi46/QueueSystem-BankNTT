@@ -69,10 +69,10 @@ const env = {
 console.log("> Menjalankan migrasi database...");
 run(npx, ["prisma", "migrate", "deploy"], env);
 
-// Cek apakah build produksi (.next) sudah ada
-const nextDist = path.join(process.cwd(), ".next");
-if (!existsSync(nextDist) || args.includes("--rebuild")) {
-  console.log("> Membangun aplikasi Next.js (next build)...");
+// Cek apakah build produksi (.next/BUILD_ID) sudah ada
+const buildIdFile = path.join(process.cwd(), ".next", "BUILD_ID");
+if (!existsSync(buildIdFile) || args.includes("--rebuild")) {
+  console.log("> Membangun aplikasi Next.js produksi (next build)...");
   run(npx, ["next", "build"], env);
 }
 
@@ -123,9 +123,21 @@ Tekan Ctrl+C untuk menghentikan server.
 -------------------------------------------------------
 `);
 
-const server = spawn(npx, ["next", "start", "-H", "0.0.0.0", "-p", String(port)], {
+const standaloneServer = path.join(process.cwd(), ".next", "standalone", "server.js");
+const serverCmd = existsSync(standaloneServer) ? process.execPath : npx;
+const serverArgs = existsSync(standaloneServer)
+  ? [standaloneServer]
+  : ["next", "start", "-H", "0.0.0.0", "-p", String(port)];
+
+const serverEnv = {
+  ...env,
+  HOSTNAME: "0.0.0.0",
+  PORT: String(port),
+};
+
+const server = spawn(serverCmd, serverArgs, {
   stdio: "inherit",
-  env,
+  env: serverEnv,
 });
 
 const stop = () => server.kill("SIGINT");
