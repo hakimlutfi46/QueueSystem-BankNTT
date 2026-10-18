@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 import { decideDevice, DISPLAY_COOKIE, KIOSK_COOKIE, type DeviceKind } from "@/lib/auth/device";
-import { deviceMatcher } from "@/lib/auth/devices";
+import { autoRegisterDevice, deviceMatcher } from "@/lib/auth/devices";
 import { getPrisma } from "@/lib/db";
 
 const { auth } = NextAuth(authConfig);
@@ -40,7 +40,13 @@ export const proxy = auth(async (request) => {
     );
   }
   if (decision.type === "deny-page") {
-    return NextResponse.redirect(new URL("/device-required", request.url));
+    const kind: DeviceKind = request.nextUrl.pathname.startsWith("/display") ? "display" : "kiosk";
+    const paired = await autoRegisterDevice(getPrisma(), kind);
+    const url = request.nextUrl.clone();
+    url.searchParams.delete("token");
+    const response = NextResponse.redirect(url);
+    response.cookies.set(cookieName(kind), paired.token, { ...cookieOptions, secure: isHttps(request) });
+    return response;
   }
   if (decision.type === "set-cookie") {
     const url = request.nextUrl.clone();

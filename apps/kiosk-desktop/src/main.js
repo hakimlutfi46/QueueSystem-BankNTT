@@ -151,7 +151,9 @@ function enableAutoStart() {
 }
 
 function kioskUrl() {
-  return `${state.config.server}/kiosk?token=${encodeURIComponent(state.config.token)}`;
+  return state.config.token
+    ? `${state.config.server}/kiosk?token=${encodeURIComponent(state.config.token)}`
+    : `${state.config.server}/kiosk`;
 }
 
 /* ---------------------------------------------------------------- discovery */
@@ -230,12 +232,19 @@ function stopRetry() {
   state.relocateTimer = null;
 }
 
-function loadKiosk() {
+async function loadKiosk() {
   const win = state.kioskWin;
   if (!win || win.isDestroyed()) return;
   stopRetry();
   state.offline = false;
-  log.info('kiosk: memuat', state.config.server);
+  if (!state.config.token) {
+    log.info('kiosk: belum memiliki token, auto-pairing ke server', state.config.server);
+    const res = await pair(state.config.server, '');
+    if (res.ok) {
+      state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
+    }
+  }
+  log.info('kiosk: memuat', kioskUrl());
   win.loadURL(kioskUrl()).catch(() => {
     // did-fail-load handles the UI; the promise rejection is expected here.
   });
@@ -367,9 +376,17 @@ function createKioskWindow() {
     if (String(validatedURL).startsWith('file:')) return;
     showOffline(`${errorCode} ${errorDescription} (${validatedURL})`);
   });
-  wc.on('did-navigate', (_e, url, httpResponseCode) => {
+  wc.on('did-navigate', async (_e, url, httpResponseCode) => {
     if (httpResponseCode >= 502 && httpResponseCode <= 504 && sameOrigin(url, state.config.server)) {
       showOffline(`HTTP ${httpResponseCode}`);
+    }
+    if (String(url).includes('/device-required') && sameOrigin(url, state.config.server)) {
+      log.warn('kiosk: token perangkat ditolak server, mencoba auto-pairing ulang...');
+      const res = await pair(state.config.server, '');
+      if (res.ok) {
+        state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
+        loadKiosk();
+      }
     }
   });
   wc.on('did-finish-load', () => {

@@ -196,11 +196,18 @@ function stopRetry() {
   state.relocateTimer = null;
 }
 
-function loadMain() {
+async function loadMain() {
   const win = state.mainWin;
   if (!alive(win)) return;
   stopRetry();
   state.offline = false;
+  if (ROLE.pairing && !state.config.token) {
+    log.info('tv: belum memiliki token, auto-pairing ke server', state.config.server);
+    const res = await pair(state.config.server, '', { expectedKind: ROLE.expectedKind });
+    if (res.ok) {
+      state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
+    }
+  }
   log.info(`${ROLE.id}: memuat`, targetUrl());
   win.loadURL(targetUrl()).catch(() => {
     // did-fail-load handles the UI; the promise rejection is expected here.
@@ -382,9 +389,17 @@ function createMainWindow() {
     if (String(validatedURL).startsWith('file:')) return;
     showOffline(`${errorCode} ${errorDescription} (${validatedURL})`);
   });
-  wc.on('did-navigate', (_e, url, httpResponseCode) => {
+  wc.on('did-navigate', async (_e, url, httpResponseCode) => {
     if (httpResponseCode >= 502 && httpResponseCode <= 504 && sameOrigin(url, state.config.server)) {
       showOffline(`HTTP ${httpResponseCode}`);
+    }
+    if (ROLE.pairing && String(url).includes('/device-required') && sameOrigin(url, state.config.server)) {
+      log.warn('tv: token perangkat ditolak server, mencoba auto-pairing ulang...');
+      const res = await pair(state.config.server, '', { expectedKind: ROLE.expectedKind });
+      if (res.ok) {
+        state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
+        loadMain();
+      }
     }
   });
   if (ROLE.kiosk) {
