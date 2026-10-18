@@ -140,7 +140,9 @@ function Initialize-ServerEnv {
     $authSecret = New-RandomHex -Bytes 32
     $orgName = $BranchName.Trim()
     $lines = @(
-        '# Konfigurasi server antrian Bank NTT. Dibuat oleh install-server.ps1 pada ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + '.',
+        # Parenthesised: in an array literal the comma binds tighter than +, so without them this line
+        # would swallow every following element into one space-joined string.
+        ('# Konfigurasi server antrian Bank NTT. Dibuat oleh install-server.ps1 pada ' + (Get-Date -Format 'yyyy-MM-dd HH:mm') + '.'),
         '# JANGAN DIHAPUS: tanpa berkas ini database tidak bisa dibuka. Simpan salinannya di tempat aman.',
         '',
         '# PostgreSQL lokal (hanya 127.0.0.1).',
@@ -184,7 +186,12 @@ function Initialize-Database {
             throw "$script:PgData tidak kosong tetapi bukan database PostgreSQL. Periksa atau pindahkan isinya."
         }
         Write-Log 'Membuat database PostgreSQL baru (initdb)'
-        $pwFile = Join-Path $script:DataDir 'initdb-password.tmp'
+        # initdb drops the Administrators group from its own token (PostgreSQL does this on Windows), so it
+        # runs as the plain installing user: the password file lives in that user's TEMP, and the user gets
+        # temporary access to pgdata, which inherits only SYSTEM/Administrators/NetworkService.
+        $me = '*' + [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $pwFile = Join-Path ([System.IO.Path]::GetTempPath()) ('bankntt-initdb-' + [guid]::NewGuid().ToString('N') + '.tmp')
+        Set-Acl-Icacls -Path $script:PgData -Arguments @('/grant', ($me + ':(OI)(CI)F'))
         try {
             Write-Utf8File -Path $pwFile -Text $Config['PG_SUPERUSER_PASSWORD']
             $code = Invoke-Native -FilePath (Join-Path $script:PgBin 'initdb.exe') -Arguments @(
@@ -193,6 +200,7 @@ function Initialize-Database {
             if ($code -ne 0) { throw "initdb gagal (kode $code)" }
         } finally {
             Remove-Item -LiteralPath $pwFile -Force -ErrorAction SilentlyContinue
+            Set-Acl-Icacls -Path $script:PgData -Arguments @('/remove:g', $me, '/T')
         }
     }
     # Files written by initdb (as Administrator) must also be writable by NetworkService.
