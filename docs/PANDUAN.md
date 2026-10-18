@@ -408,6 +408,13 @@ pg_restore --clean --if-exists --no-owner --dbname="postgresql://USER:SANDI@127.
 
 Versi Docker ada di [README.md](../README.md#backup-database).
 
+**Server dari installer Windows (Ticket + Server):** cadangan harian otomatis pukul 22:30 ke
+`C:\ProgramData\BankNTT\backups`. Uninstall dan install ulang **tidak** menghapus data. Untuk mulai dari
+data kosong (misalnya membuang data uji sebelum go-live), klik dua kali
+`C:\Program Files\BANK NTT Ticket\resources\server\Reset-Data-Server.cmd` lalu ketik `RESET`. Cadangan
+`sebelum-reset-*.dump` dibuat lebih dulu; rincian dan cara memulihkannya ada di
+[apps/server-bundle/README.md](../apps/server-bundle/README.md#mengosongkan-data-mulai-dari-awal).
+
 ---
 
 ## 12. Isi berkas .env

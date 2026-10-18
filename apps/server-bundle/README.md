@@ -38,6 +38,8 @@ server\
   uninstall-server.ps1     hapus layanan (data tetap disimpan kecuali -RemoveData)
   stop-server.ps1          hentikan layanan sebelum berkas program ditimpa
   status-server.ps1        keadaan layanan, database, /api/health, cadangan, log
+  reset-server.ps1         kosongkan data (mulai dari awal), cadangan dibuat lebih dulu
+  Reset-Data-Server.cmd    klik dua kali untuk reset-server.ps1 (meminta izin Administrator)
   server-common.ps1        fungsi bersama skrip di atas
   bundle-manifest.json     versi, commit, waktu build, ukuran
 ```
@@ -89,6 +91,26 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<server>\status-server.
   dipanggil oleh installer baru) boleh dilewati, karena `install-server.ps1` mendaftarkan ulang.
 - Kode keluar: 0 berhasil, 1 gagal (rincian di `C:\ProgramData\BankNTT\logs\install.log`).
   `status-server.ps1` keluar 0 bila `/api/health` menjawab.
+
+## Mengosongkan data (mulai dari awal)
+
+Untuk membuang data uji sebelum dipakai di cabang. Uninstall **tidak** menghapus data, jadi pakai ini:
+
+```
+C:\Program Files\BANK NTT Ticket\resources\server\Reset-Data-Server.cmd      (klik dua kali)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<server>\reset-server.ps1" [-Force]
+```
+
+Skrip meminta konfirmasi (ketik `RESET`), membuat cadangan `backups\sebelum-reset-YYYYMMDD-HHMMSS.dump`,
+menghentikan layanan server, menghapus dan membuat ulang database `queue`, lalu menyalakan layanan lagi.
+Launcher menjalankan migrasi dan data awal: akun `admin` dengan sandi awal (`SEED_ADMIN_PASSWORD` di
+`server.env`, wajib diganti saat masuk), layanan CS dan Teller, loket contoh, tanpa petugas. Tiket,
+laporan, petugas, perangkat, dan pengaturan Admin terhapus; kiosk dan TV mendaftar ulang sendiri dan
+menunggu **Setujui** di Admin -> Perangkat. `server.env` tidak berubah. Rincian di `logs\reset.log`.
+
+Memulihkan cadangan (bila reset tidak disengaja): hentikan `BankNTT-Server`, lalu
+`pgsql\bin\pg_restore.exe -h 127.0.0.1 -p <PG_PORT> -U postgres -d queue --clean --if-exists <berkas.dump>`
+(sandi `PG_SUPERUSER_PASSWORD` dari `server.env`), dan nyalakan layanan lagi.
 
 ## Discovery di jaringan lokal
 
