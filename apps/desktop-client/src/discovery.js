@@ -187,11 +187,16 @@ function scan({
       resolve(sortServers([...found.values()]));
     };
 
+    const failedTargets = new Set();
     const sendAll = () => {
       for (const target of targets) {
         socket.send(request, port, target, (err) => {
-          // Unreachable networks / blocked broadcast on one interface are normal.
-          if (err && log) log.warn(`discovery: kirim ke ${target} gagal:`, err.code || err.message);
+          // Unreachable networks / blocked broadcast on one interface are normal (macOS may answer
+          // EHOSTUNREACH for 255.255.255.255, e.g. before Local Network access is granted, while
+          // the directed broadcasts and 127.0.0.1 still work). Logged once per target per scan.
+          if (!err || !log || failedTargets.has(target)) return;
+          failedTargets.add(target);
+          log.warn(`discovery: kirim ke ${target} gagal:`, err.code || err.message);
         });
       }
     };

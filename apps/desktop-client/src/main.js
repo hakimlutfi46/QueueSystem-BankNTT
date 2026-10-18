@@ -13,6 +13,7 @@ const { hashPin, verifyPin, isValidPin } = require('./pin');
 const { pair } = require('./pairing');
 const { normaliseServer, normaliseCode, isValidCode, sameOrigin, hostOf } = require('./server-url');
 const { lockKeyboard } = require('./keys');
+const { resolveSimulation, simulationName, simulationTitle, simulationIdentity } = require('./simulation');
 
 // --dev (or BANKNTT_DEV=1): TV runs windowed instead of kiosk, DevTools allowed.
 const DEV = process.argv.includes('--dev') || process.env.BANKNTT_DEV === '1';
@@ -32,6 +33,10 @@ if (!ROLE) {
   process.exit(1);
 }
 
+// Simulation build (macOS / Ubuntu developer laptop, see src/simulation.js); `--simulation` in dev.
+const SIMULATION = resolveSimulation({ packaged: app.isPackaged, argv: process.argv, env: process.env, pkg });
+const IS_MAC = process.platform === 'darwin';
+
 // Discovery port: fixed in packaged builds; overridable in development to test against a mock.
 const DISCOVERY_PORT =
   !app.isPackaged && Number(process.env.BANKNTT_DISCOVERY_PORT) > 0 ? Number(process.env.BANKNTT_DISCOVERY_PORT) : discovery.DISCOVERY_PORT;
@@ -39,10 +44,12 @@ const DISCOVERY_PORT =
 // Settings live in a fixed folder per role (%APPDATA%\bankntt-admin, -loket, -tv), not one named
 // after productName, so a rebuild under another name keeps the saved server (and the TV pairing).
 // The single-instance lock is per userData folder, so Admin and Loket may run side by side.
-if (!app.isPackaged) app.setName(ROLE.productName);
+// Simulation builds use <role>-sim so they never share settings with a real installation.
+if (!app.isPackaged) app.setName(SIMULATION ? simulationName(ROLE.productName) : ROLE.productName);
+const USER_DATA_DIR = SIMULATION ? simulationIdentity(ROLE).userData : ROLE.userData;
 app.setPath(
   'userData',
-  process.env.BANKNTT_USER_DATA ? path.resolve(process.env.BANKNTT_USER_DATA) : path.join(app.getPath('appData'), ROLE.userData),
+  process.env.BANKNTT_USER_DATA ? path.resolve(process.env.BANKNTT_USER_DATA) : path.join(app.getPath('appData'), USER_DATA_DIR),
 );
 
 // The TV announces calls by voice and chime without anyone touching it.
@@ -115,6 +122,10 @@ const alive = (win) => Boolean(win && !win.isDestroyed());
 
 function enableAutoStart() {
   if (!ROLE.kiosk) return;
+  if (SIMULATION) {
+    log.info('autostart: dilewati (simulasi)');
+    return;
+  }
   if (!app.isPackaged) {
     log.info('autostart: dilewati (mode pengembangan)');
     return;
@@ -566,14 +577,31 @@ function showAbout() {
         `Server: ${state.config.server || '-'}${state.config.serverName ? ` (${state.config.serverName})` : ''}`,
         `Pengaturan: ${config.path}`,
         `Log: ${log.file || '-'}`,
+        ...(SIMULATION ? ['Mode simulasi: tidak berjalan otomatis saat login.'] : []),
       ].join('\n'),
       buttons: ['Tutup'],
     })
     .catch(() => {});
 }
 
+// macOS only puts Cmd+C/V/X/A into text fields through Edit menu roles.
+const EDIT_MENU = {
+  label: 'Edit',
+  submenu: [
+    { label: 'Urungkan', role: 'undo' },
+    { label: 'Ulangi', role: 'redo' },
+    { type: 'separator' },
+    { label: 'Potong', role: 'cut' },
+    { label: 'Salin', role: 'copy' },
+    { label: 'Tempel', role: 'paste' },
+    { label: 'Pilih semua', role: 'selectAll' },
+  ],
+};
+
 function buildMenu() {
-  if (ROLE.kiosk) return null;
+  // TV on macOS: only the Edit menu (paste the pairing code in settings); no Quit item. The kiosk
+  // window blocks Cmd shortcuts in before-input-event, and before-quit refuses to quit anyway.
+  if (ROLE.kiosk) return IS_MAC ? Menu.buildFromTemplate([{ label: APP_NAME, submenu: [] }, EDIT_MENU]) : null;
   const view = [
     { label: 'Muat ulang', accelerator: 'CmdOrCtrl+R', click: reloadMain },
     { label: 'Muat ulang', accelerator: 'F5', click: reloadMain, visible: false, acceleratorWorksWhenHidden: true },
@@ -586,6 +614,36 @@ function buildMenu() {
     { label: 'Layar penuh', role: 'togglefullscreen', accelerator: 'F11' },
   ];
   if (DEV) view.push({ type: 'separator' }, { label: 'DevTools', role: 'toggleDevTools' });
+  if (IS_MAC) {
+    // A normal macOS app menu: the first menu is the app menu (named after the app).
+    return Menu.buildFromTemplate([
+      {
+        label: APP_NAME,
+        submenu: [
+          { label: `Tentang ${APP_NAME}`, click: showAbout },
+          { type: 'separator' },
+          { label: 'Ganti server…', accelerator: 'Cmd+Shift+S', click: changeServer },
+          { type: 'separator' },
+          { label: `Sembunyikan ${APP_NAME}`, role: 'hide' },
+          { label: 'Sembunyikan lainnya', role: 'hideOthers' },
+          { label: 'Tampilkan semua', role: 'unhide' },
+          { type: 'separator' },
+          { label: `Keluar dari ${APP_NAME}`, role: 'quit', accelerator: 'Cmd+Q' },
+        ],
+      },
+      EDIT_MENU,
+      { label: 'Tampilan', submenu: view },
+      {
+        label: 'Jendela',
+        submenu: [
+          { label: 'Kecilkan', role: 'minimize' },
+          { label: 'Perbesar jendela', role: 'zoom' },
+          { type: 'separator' },
+          { label: 'Bawa semua ke depan', role: 'front' },
+        ],
+      },
+    ]);
+  }
   return Menu.buildFromTemplate([
     {
       label: 'Aplikasi',
@@ -593,21 +651,10 @@ function buildMenu() {
         { label: 'Ganti server…', accelerator: 'CmdOrCtrl+Shift+S', click: changeServer },
         { label: `Tentang ${APP_NAME}`, click: showAbout },
         { type: 'separator' },
-        { label: 'Keluar', role: 'quit', accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Alt+F4' },
+        { label: 'Keluar', role: 'quit', accelerator: 'Alt+F4' },
       ],
     },
-    {
-      label: 'Edit',
-      submenu: [
-        { label: 'Urungkan', role: 'undo' },
-        { label: 'Ulangi', role: 'redo' },
-        { type: 'separator' },
-        { label: 'Potong', role: 'cut' },
-        { label: 'Salin', role: 'copy' },
-        { label: 'Tempel', role: 'paste' },
-        { label: 'Pilih semua', role: 'selectAll' },
-      ],
-    },
+    EDIT_MENU,
     { label: 'Tampilan', submenu: view },
   ]);
 }
@@ -846,6 +893,16 @@ function hardenSessions() {
     return ALLOWED_PERMISSIONS.has(permission) && sameOrigin(requestingOrigin, state.config.server);
   });
   ses.on('will-download', handleDownload);
+  // Simulation: every window title (pages set their own <title>) says "(Simulasi)".
+  if (SIMULATION) {
+    app.on('browser-window-created', (_e, win) => {
+      win.setTitle(simulationTitle(win.getTitle(), APP_NAME));
+      win.on('page-title-updated', (event, title) => {
+        event.preventDefault();
+        win.setTitle(simulationTitle(title, APP_NAME));
+      });
+    });
+  }
   app.on('web-contents-created', (_e, wc) => {
     wc.on('will-attach-webview', (event) => event.preventDefault());
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -883,7 +940,9 @@ app.whenReady().then(() => {
   log.init(app.getPath('userData'), `${ROLE.id}.log`);
   config.init(app.getPath('userData'));
   if (process.platform === 'win32') app.setAppUserModelId(ROLE.appId);
-  log.info(`aplikasi: mulai ${APP_NAME} (${ROLE.id}) versi ${app.getVersion()} ${DEV ? '(dev)' : ''} userData=${app.getPath('userData')}`);
+  log.info(
+    `aplikasi: mulai ${APP_NAME} (${ROLE.id}) versi ${app.getVersion()} ${DEV ? '(dev)' : ''}${SIMULATION ? ' (simulasi)' : ''} userData=${app.getPath('userData')}`,
+  );
 
   powerMonitor.on('shutdown', () => {
     state.quitting = true;
