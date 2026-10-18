@@ -3,6 +3,12 @@
 //
 //   npm run kiosk:build                                   # default name + Bank NTT icon
 //   npm run kiosk:build -- --name "BANK NTT Ticket" --icon path/to/icon.png
+//   npm run kiosk:build -- --with-server                  # kiosk + queue server for the main ticket machine
+//
+// --with-server embeds apps/server-bundle/dist/server (build it first with `npm run server:bundle`)
+// and produces <Name>-Server-Setup.exe: a per-machine installer that also installs PostgreSQL and the
+// queue server as Windows services. It is copied to downloads/ but not listed in kiosk-installer.json,
+// so Admin → Perangkat keeps offering the plain kiosk installer for additional kiosks.
 //
 // The admin panel runs this same script (Admin → Perangkat → Build ulang installer).
 // Works on macOS, Linux and Windows without wine: electron-builder edits the exe icon and
@@ -25,6 +31,9 @@ const DEFAULT_ICON = path.join(repoRoot, 'public', 'brand', 'kiosk-app-icon.png'
 // Letters, digits, space, dot, dash, underscore: valid in Windows file names and shortcuts.
 const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{1,39}$/;
 
+const withServer = process.argv.includes('--with-server') || process.env.KIOSK_WITH_SERVER === '1';
+const serverDir = path.join(repoRoot, 'apps', 'server-bundle', 'dist', 'server');
+
 function option(flag) {
   const index = process.argv.indexOf(flag);
   return index > -1 ? process.argv[index + 1] : undefined;
@@ -42,7 +51,10 @@ if (!NAME_PATTERN.test(name)) {
 }
 if (!existsSync(icon)) fail(`Ikon tidak ditemukan: ${icon}`);
 
-const artifactBase = `${name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '')}-Setup`;
+const artifactBase = `${name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '')}${withServer ? '-Server' : ''}-Setup`;
+if (withServer && !existsSync(path.join(serverDir, 'bundle-manifest.json'))) {
+  fail(`Bundle server belum ada di ${path.relative(repoRoot, serverDir)}. Jalankan dulu: npm run server:bundle`);
+}
 
 // Dependencies: install only when missing, so repeated builds from the admin panel are fast and
 // work offline once the Electron download is cached. --include=dev because the server may run
@@ -70,15 +82,24 @@ rmSync(brandDir, { recursive: true, force: true });
 mkdirSync(brandDir, { recursive: true });
 copyFileSync(icon, path.join(brandDir, 'icon.png'));
 
-console.log(`\n> electron-builder --win nsis --x64  (nama="${name}", ikon=${path.relative(repoRoot, icon)})`);
+console.log(
+  `\n> electron-builder --win nsis --x64  (nama="${name}", ikon=${path.relative(repoRoot, icon)}${withServer ? ', dengan server' : ''})`,
+);
+const extraResources = [{ from: path.join(brandDir, 'icon.png'), to: 'brand-icon.png' }];
+if (withServer) extraResources.push({ from: serverDir, to: 'server' });
 const config = {
   ...pkg.build,
   productName: name,
   artifactName: `${artifactBase}.\${ext}`,
   extraMetadata: { productName: name },
-  extraResources: [{ from: path.join(brandDir, 'icon.png'), to: 'brand-icon.png' }],
+  extraResources,
   win: { ...pkg.build.win, icon },
-  nsis: { ...pkg.build.nsis, shortcutName: name },
+  nsis: {
+    ...pkg.build.nsis,
+    shortcutName: name,
+    // Services run from resources\server, so the program folder must be writable by admins only.
+    ...(withServer ? { perMachine: true, include: path.join(appDir, 'build', 'installer-server.nsh') } : {}),
+  },
 };
 try {
   await builder.build({
@@ -97,6 +118,12 @@ mkdirSync(outDir, { recursive: true });
 const target = path.join(outDir, `${artifactBase}.exe`);
 copyFileSync(built, `${target}.tmp`);
 renameSync(`${target}.tmp`, target);
+
+if (withServer) {
+  // Not served from Admin → Perangkat: the manifest keeps pointing at the plain kiosk installer.
+  console.log(`\nSelesai: ${path.relative(repoRoot, target)} (${(statSync(target).size / 1024 / 1024).toFixed(1)} MB)`);
+  process.exit(0);
+}
 
 // Remove the previous installer when the name (and so the file name) changed.
 try {

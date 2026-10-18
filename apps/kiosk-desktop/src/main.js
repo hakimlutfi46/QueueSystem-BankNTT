@@ -3,7 +3,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
-const { app, BrowserWindow, ipcMain, Menu, session, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, session, powerMonitor, shell } = require('electron');
 
 const log = require('./logger');
 const config = require('./config');
@@ -40,6 +40,12 @@ const APP_NAME = app.getName();
 const BRAND_ICON = app.isPackaged
   ? path.join(process.resourcesPath, 'brand-icon.png')
   : path.join(__dirname, '..', '..', '..', 'public', 'brand', 'kiosk-app-icon.png');
+// The "Ticket + Server" installer (build-and-copy.mjs --with-server) ships the queue server in
+// resources/server and runs it as a Windows service on this PC, so setup starts from 127.0.0.1.
+const BUNDLED_SERVER = app.isPackaged
+  ? fs.existsSync(path.join(process.resourcesPath, 'server', 'bundle-manifest.json'))
+  : process.env.KIOSK_BUNDLED_SERVER === '1';
+const LOCAL_SERVER = 'http://127.0.0.1:3000';
 const windowIcon = () => (fs.existsSync(BRAND_ICON) ? BRAND_ICON : undefined);
 
 function brandIconDataUrl() {
@@ -476,7 +482,8 @@ function registerIpc() {
       version: app.getVersion(),
       appName: APP_NAME,
       icon: brandIconDataUrl(),
-      server: cfg.server,
+      server: cfg.server || (BUNDLED_SERVER ? LOCAL_SERVER : ''),
+      bundledServer: BUNDLED_SERVER,
       printerName: cfg.printerName,
       deviceName: cfg.deviceName,
       printers: list.map((p) => ({ name: p.name, displayName: p.displayName || p.name })),
@@ -501,6 +508,16 @@ function registerIpc() {
     url.searchParams.set('server', state.config.server || '-');
     url.searchParams.set('app', APP_NAME);
     return enqueuePrint({ url: url.href, printerName, label: 'cetak uji', allowedOrigin: 'null' });
+  });
+
+  // Opens Admin → Perangkat in the default browser so the pairing code can be made on this PC.
+  ipcMain.handle('setup:open-admin', async (event, input) => {
+    if (!fromSetup(event)) throw new Error('forbidden');
+    const server = normaliseServer(input) || (BUNDLED_SERVER ? LOCAL_SERVER : null);
+    if (!server) return { ok: false, message: 'Isi alamat server dulu.' };
+    log.info('setup: membuka panel admin di browser', server);
+    await shell.openExternal(`${server}/admin/devices`);
+    return { ok: true };
   });
 
   ipcMain.handle('setup:cancel', async (event) => {

@@ -146,6 +146,10 @@
   });
 
   $('cancel').addEventListener('click', () => api.cancel());
+  $('open-admin').addEventListener('click', async () => {
+    const result = await api.openAdmin($('server').value.trim());
+    if (!result.ok) setError('server', result.message);
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && mode === 'edit') api.cancel();
   });
@@ -163,6 +167,10 @@
       $('logo').hidden = false;
     }
     $('footer').textContent = `${appName} v${init.version}${init.logFile ? ` · Log: ${init.logFile}` : ''}`;
+    if (mode !== 'edit' && init.bundledServer) {
+      $('subtitle').textContent =
+        'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi. Buka panel admin untuk membuat kode pemasangan.';
+    }
     if (mode === 'edit') {
       $('title').textContent = 'Pengaturan Kiosk';
       $('subtitle').textContent = init.deviceName

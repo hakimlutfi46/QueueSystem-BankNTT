@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld(
         pinConfirm: String(form?.pinConfirm ?? ''),
       }),
     cancel: () => ipcRenderer.invoke('setup:cancel'),
+    openAdmin: (server) => ipcRenderer.invoke('setup:open-admin', String(server ?? '')),
   }),
 );

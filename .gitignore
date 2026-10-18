@@ -64,3 +64,6 @@ next-env.d.ts
 
 # build Next.js untuk bundle server Windows (npm run server:bundle)
 /.next-bundle/
+
+# worktree sementara Claude Code
+/.claude/worktrees/

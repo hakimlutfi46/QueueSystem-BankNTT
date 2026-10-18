@@ -59,6 +59,33 @@ dengan cetak sungguhan. Bisa juga lewat `KIOSK_NO_PRINTER=1`. Mode ini hanya ber
 dijalankan dari kode sumber; aplikasi yang terpasang dari installer mengabaikannya, jadi kiosk di cabang
 tetap tidak mengeluarkan nomor tanpa tiket tercetak.
 
+## Installer Ticket + Server (mesin tiket utama)
+
+Untuk cabang tanpa server terpisah: mesin tiket utama sekaligus menjadi server antrian. Installer ini
+memuat aplikasi kiosk **dan** server lengkap (PostgreSQL, Node.js, aplikasi web), jadi PC tidak perlu
+internet, npm, atau Docker.
+
+```bash
+npm run server:bundle                          # sekali, atau setelah kode web berubah
+npm run kiosk:build -- --with-server           # -> downloads/BANK-NTT-Ticket-Server-Setup.exe
+```
+
+- Dipasang untuk semua pengguna (`C:\Program Files\BANK NTT Ticket`) dan meminta izin Administrator.
+  Setelah berkas disalin, installer menjalankan `resources\server\install-server.ps1`: PostgreSQL dan
+  server antrian menjadi layanan Windows yang menyala otomatis, port 3000 dan UDP 41234 (penemuan
+  server) dibuka untuk jaringan lokal, dan cadangan harian dijadwalkan. Rincian di
+  [`apps/server-bundle/README.md`](../server-bundle/README.md).
+- Data ada di `C:\ProgramData\BankNTT` dan tidak ikut terhapus saat pembaruan maupun uninstall.
+  Pembaruan: jalankan installer versi baru; layanan dihentikan, berkas program diganti, migrasi
+  database berjalan saat server menyala lagi.
+- Saat pemasangan pertama, alamat server sudah terisi `127.0.0.1:3000`. Tekan **Buka panel admin**
+  untuk masuk ke Admin → Perangkat di browser, daftarkan kiosk, lalu buat **Kode aplikasi**.
+- Installer ini tidak muncul di Admin → Perangkat. Kiosk tambahan di cabang yang sama memakai
+  installer biasa (`BANK-NTT-Ticket-Setup.exe`), supaya tidak ada server kedua.
+- Bila gagal, installer menampilkan pesan dan rinciannya ada di
+  `C:\ProgramData\BankNTT\logs\install.log`. Pemeriksaan cepat:
+  `powershell -ExecutionPolicy Bypass -File "C:\Program Files\BANK NTT Ticket\resources\server\status-server.ps1"`.
+
 ## Memasang di PC kiosk
 
 1. Di PC kiosk, buka panel admin web → **Perangkat** → **Unduh installer (.exe)** (atau salin

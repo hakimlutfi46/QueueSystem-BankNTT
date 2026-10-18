@@ -464,7 +464,10 @@ function verifyBundle() {
       .map((line) => /^\s*([A-Z0-9_]+)\s*=\s*"?([^"#]*)"?/.exec(line))
       .filter((match) => match && /SECRET|PASSWORD|TOKEN|DATABASE_URL|KEY/.test(match[1]) && match[2].trim().length >= 8)
       .map((match) => match[2].trim())
-      .filter((value) => value !== "Password123");
+      .filter((value) => value !== "Password123")
+      // A value that already appears in tracked source (e.g. "admin123" in the weak-password list)
+      // is public, not a secret, and would only produce false alarms.
+      .filter((value) => spawnSync("git", ["grep", "-q", "-F", "-e", value], { cwd: repoRoot }).status !== 0);
     const textFile = /\.(c?js|mjs|json|html|txt|xml|ps1|toml|sql|rsc|map|body|meta)$/;
     walk(outDir, (full, entry) => {
       if (!secrets.length || !entry.isFile() || !textFile.test(entry.name) || fs.statSync(full).size > 20 * 1024 * 1024) return;
