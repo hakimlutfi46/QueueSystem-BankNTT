@@ -89,3 +89,10 @@ test('installId is generated once, saved, and only shown masked', (t) => {
   assert.equal(config.maskInstallId(first.installId), `${first.installId.slice(0, 8)}…`);
   assert.notEqual(config.ensureInstallId({ installId: 'bogus' }, { persist: (c) => c }).installId, 'bogus');
 });
+
+test('sends the local device key only with automatic registration', () => {
+  const { pairPayload } = require('../src/pairing');
+  assert.equal(pairPayload({ installId: 'abcdef12-0000', localKey: 'k'.repeat(64) }).localKey, 'k'.repeat(64));
+  assert.equal('localKey' in pairPayload({ installId: 'abcdef12-0000' }), false);
+  assert.equal('localKey' in pairPayload({ code: 'ABC234', installId: 'abcdef12-0000', localKey: 'k'.repeat(64) }), false);
+});

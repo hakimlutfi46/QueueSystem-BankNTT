@@ -76,6 +76,23 @@ const BUNDLED_SERVER = app.isPackaged
   ? fs.existsSync(path.join(process.resourcesPath, 'server', 'bundle-manifest.json'))
   : process.env.KIOSK_BUNDLED_SERVER === '1';
 const LOCAL_SERVER = 'http://127.0.0.1:3000';
+
+/**
+ * Key written by the bundled server installer (C:\ProgramData\BankNTT\local-device.key). Sent only to
+ * the server on this PC (loopback), which then approves this kiosk at once: it is the branch's own
+ * ticket machine. Other devices on the network wait for approval in Admin → Perangkat.
+ */
+function localDeviceKey(server) {
+  if (!BUNDLED_SERVER) return undefined;
+  try {
+    if (!['127.0.0.1', 'localhost'].includes(new URL(server).hostname)) return undefined;
+    const file = path.join(process.env.ProgramData || 'C:\\ProgramData', 'BankNTT', 'local-device.key');
+    const key = fs.readFileSync(file, 'utf8').trim();
+    return key || undefined;
+  } catch {
+    return undefined;
+  }
+}
 const PDF_DIR = path.join(app.getPath('downloads'), 'kiosk-tiket-pdf');
 const windowIcon = () => (fs.existsSync(BRAND_ICON) ? BRAND_ICON : undefined);
 
@@ -257,7 +274,7 @@ function autoPair(reason) {
   state.lastRepairAt = Date.now();
   const server = state.config.server;
   log.info(`kiosk: pemasangan otomatis (${reason}) installId=${config.maskInstallId(state.config.installId)}`);
-  state.repairing = pair(server, '', { installId: state.config.installId })
+  state.repairing = pair(server, '', { installId: state.config.installId, localKey: localDeviceKey(server) })
     .then((res) => {
       if (res.ok && state.config.server === server) {
         state.pairBlocked = false;
@@ -801,7 +818,7 @@ function registerIpc() {
     const needsToken = !token || server !== cfg.server;
     if (code || needsToken) {
       log.info(`setup: ${code ? 'memasangkan perangkat dengan kode' : 'menyambungkan perangkat otomatis'} ke`, server);
-      const result = await pair(server, code, { installId: cfg.installId });
+      const result = await pair(server, code, { installId: cfg.installId, localKey: localDeviceKey(server) });
       if (!result.ok) return { ok: false, field: result.field, message: result.message };
       token = result.token;
       deviceName = result.name || deviceName;

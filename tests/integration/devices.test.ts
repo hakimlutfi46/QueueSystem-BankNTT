@@ -209,6 +209,14 @@ describe("devices", () => {
     await expect(autoRegisterDevice(prisma, "display")).rejects.toMatchObject({ code: "TOO_MANY_PENDING" });
   });
 
+  it("approves the kiosk on the server PC itself at once when it proves the local key", async () => {
+    const local = await autoRegisterDevice(prisma, "kiosk", "Kiosk Mesin Tiket", "c0ffee00-0000-4000-8000-000000000001", { approve: true });
+    expect(local.approved).toBe(true);
+    await expect(verifyDeviceToken(prisma, "kiosk", local.token)).resolves.toBe(true);
+    const other = await autoRegisterDevice(prisma, "display", "TV Lobi", "c0ffee00-0000-4000-8000-000000000002");
+    expect(other.approved).toBe(false);
+  });
+
   it("approves devices created or paired by the admin without a separate step", async () => {
     const created = await createDevice(prisma, { kind: "display", name: "TV Lobi" });
     expect(created.device.approvedAt).not.toBeNull();

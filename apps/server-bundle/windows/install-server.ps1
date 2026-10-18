@@ -171,6 +171,23 @@ function Initialize-ServerEnv {
     Write-Log "server.env dibuat (PostgreSQL port $port)"
 }
 
+# Random key that lets the kiosk app on this PC register itself as already approved. server.env keeps
+# the original (read by the server); local-device.key is a copy any user of this PC may read, because
+# the kiosk app runs as the signed-in Windows user. Devices elsewhere on the network cannot read it.
+function Initialize-LocalDeviceKey {
+    $values = Read-ServerEnv
+    $key = $values['LOCAL_DEVICE_KEY']
+    if (-not $key) {
+        $key = New-RandomHex -Bytes 32
+        Add-Content -LiteralPath $script:EnvFile -Value ("`r`n# Kunci kiosk di PC ini (langsung disetujui). Jangan dibagikan.`r`nLOCAL_DEVICE_KEY=$key") -Encoding ASCII
+        Write-Log 'Kunci perangkat lokal dibuat'
+    }
+    $keyFile = Join-Path $script:DataDir 'local-device.key'
+    Write-Utf8File -Path $keyFile -Text $key
+    Set-Acl-Icacls -Path $keyFile -Arguments @('/inheritance:r', '/grant:r',
+        ($script:SidSystem + ':F'), ($script:SidAdmins + ':F'), '*S-1-5-32-545:R')
+}
+
 function Protect-ServerEnv {
     Set-Acl-Icacls -Path $script:EnvFile -Arguments @('/inheritance:r', '/grant:r',
         ($script:SidSystem + ':F'), ($script:SidAdmins + ':F'), ($script:SidNetworkService + ':R'))
@@ -403,6 +420,7 @@ try {
 
     Install-VcRuntime
     Initialize-ServerEnv
+    Initialize-LocalDeviceKey
     Protect-ServerEnv
     $config = Read-ServerEnv
     Initialize-Database -Config $config

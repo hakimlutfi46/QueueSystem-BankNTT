@@ -17,9 +17,11 @@ function defaultDeviceName(hostname = os.hostname()) {
 }
 
 /** Request body: with a code the old pairing-code flow, without one automatic registration. */
-function pairPayload({ code = '', installId, name } = {}) {
+function pairPayload({ code = '', installId, name, localKey } = {}) {
   if (code) return { code, installId };
-  return { kind: KIND, name: name || defaultDeviceName(), installId };
+  const payload = { kind: KIND, name: name || defaultDeviceName(), installId };
+  if (localKey) payload.localKey = localKey;
+  return payload;
 }
 
 /**
@@ -33,14 +35,14 @@ function pairPayload({ code = '', installId, name } = {}) {
  * Runs in the main process (Node fetch) so no CORS and the token never touches a renderer.
  * Failures return { ok: false, field?, code?, message }.
  */
-async function pair(server, code = '', { installId, name, fetchImpl = fetch, timeoutMs = TIMEOUT_MS } = {}) {
+async function pair(server, code = '', { installId, name, localKey, fetchImpl = fetch, timeoutMs = TIMEOUT_MS } = {}) {
   const url = `${server}/api/devices/pair`;
   let res;
   try {
     res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(pairPayload({ code, installId, name })),
+      body: JSON.stringify(pairPayload({ code, installId, name, localKey })),
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {

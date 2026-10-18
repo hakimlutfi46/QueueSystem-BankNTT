@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { AdminError, adminErrorResponse } from "@/lib/admin/errors";
 import { autoRegisterDevice, redeemPairCode } from "@/lib/auth/devices";
 import { autoRegisterRateLimit, clientAddress, longestWait, pairRateLimit, waitText } from "@/lib/auth/rate-limit";
@@ -9,6 +10,19 @@ export const dynamic = "force-dynamic";
 const OVERALL = "all";
 
 /**
+ * Kunci acak yang dibuat installer server Windows (LOCAL_DEVICE_KEY di server.env, salinannya di
+ * C:\ProgramData\BankNTT\local-device.key). Hanya aplikasi kiosk di PC server itu sendiri yang bisa
+ * membacanya, jadi kiosk tersebut langsung disetujui tanpa menunggu admin.
+ */
+function isLocalDeviceKey(input: unknown): boolean {
+  const expected = process.env.LOCAL_DEVICE_KEY?.trim();
+  if (!expected || expected.length < 32 || typeof input !== "string") return false;
+  const left = Buffer.from(input.trim());
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+/**
  * Dipanggil aplikasi kiosk atau TV saat pemasangan. Tidak memerlukan login.
  * - Dengan `code`: tukar kode pendek dari Admin → Perangkat dengan token perangkat (langsung disetujui).
  *   Kode sekali pakai, berlaku 30 menit, dan percobaan yang salah dibatasi.
@@ -18,7 +32,7 @@ const OVERALL = "all";
 export async function POST(request: Request): Promise<Response> {
   const client = clientAddress(request.headers);
   const body = (await request.json().catch(() => null)) as
-    | { code?: unknown; kind?: unknown; name?: unknown; installId?: unknown }
+    | { code?: unknown; kind?: unknown; name?: unknown; installId?: unknown; localKey?: unknown }
     | null;
 
   if (typeof body?.code === "string" && body.code.trim()) {
@@ -61,7 +75,9 @@ export async function POST(request: Request): Promise<Response> {
   autoRegisterRateLimit.perAddress.fail(client);
   autoRegisterRateLimit.overall.fail(OVERALL);
   try {
-    const paired = await autoRegisterDevice(getPrisma(), body?.kind, body?.name, body?.installId);
+    const paired = await autoRegisterDevice(getPrisma(), body?.kind, body?.name, body?.installId, {
+      approve: isLocalDeviceKey(body?.localKey),
+    });
     return Response.json(paired, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const known = adminErrorResponse(error);

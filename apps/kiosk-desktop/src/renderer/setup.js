@@ -17,6 +17,7 @@
   let mode = 'first';
   let defaultPrinter = null;
   let touched = false;
+  let bundledServer = false;
   let busy = false;
   const servers = new Map();
 
@@ -144,7 +145,11 @@
       if (net && net.blocked) scanText.textContent = net.message;
     } else {
       const serverList = [...servers.values()];
-      const best = serverList.find((s) => !s.local) || serverList[0];
+      // On the ticket machine that runs the server, stay on 127.0.0.1: it never changes when the PC
+      // moves to another Wi-Fi network. Elsewhere, prefer a LAN address.
+      const best = bundledServer
+        ? serverList.find((s) => s.local) || serverList[0]
+        : serverList.find((s) => !s.local) || serverList[0];
       scanText.textContent = `${servers.size} server ditemukan: ${best.name}.`;
       if (!touched && (!serverInput.value || serverInput.value === 'http://127.0.0.1:3000')) {
         select(best.url, { byUser: false });
@@ -267,6 +272,7 @@
       $('simulation').hidden = false;
       $('simulation').classList.add('show');
     }
+    bundledServer = Boolean(init.bundledServer);
     if (mode !== 'edit' && init.bundledServer) {
       $('subtitle').textContent =
         'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi. Setujui kiosk ini lewat Buka panel admin → Perangkat.';

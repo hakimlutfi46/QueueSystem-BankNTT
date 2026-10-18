@@ -268,12 +268,14 @@ export async function autoRegisterDevice(
   kindInput: unknown,
   nameInput?: unknown,
   installIdInput?: unknown,
+  /** Disetujui langsung: kiosk di PC server sendiri yang membuktikan diri dengan kunci lokal. */
+  options: { approve?: boolean } = {},
 ): Promise<PairedDevice> {
   const kind: DeviceKind = kindInput === "display" || kindInput === "DISPLAY" ? "display" : "kiosk";
   const dbKind = kind === "kiosk" ? "KIOSK" : "DISPLAY";
   const installId = normalizeInstallId(installIdInput);
   const token = generateDeviceToken();
-  const autoApprove = await readAutoApprove(db);
+  const autoApprove = options.approve === true || (await readAutoApprove(db));
 
   return db.$transaction(async (tx) => {
     if (installId) {
