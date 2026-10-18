@@ -49,16 +49,33 @@ function isBlocked(input, { allowEscape = false } = {}) {
   return false;
 }
 
+function isQuitShortcut(input, platform = process.platform) {
+  if (input.type !== 'keyDown') return false;
+  if (input.alt && (input.key === 'F4' || input.code === 'F4')) return true;
+  const mod = platform === 'darwin' ? input.meta && !input.control : input.control && !input.meta;
+  return (
+    mod &&
+    !input.shift &&
+    !input.alt &&
+    (input.code === 'KeyQ' || String(input.key).toLowerCase() === 'q')
+  );
+}
+
 /** Attach to a webContents; `onAdmin` is called for Ctrl+Shift+Alt+K. */
-function lockKeyboard(webContents, { onAdmin, allowEscape = false } = {}) {
+function lockKeyboard(webContents, { onAdmin, onQuit, allowEscape = false } = {}) {
   webContents.on('before-input-event', (event, input) => {
     if (onAdmin && isAdminShortcut(input)) {
       event.preventDefault();
       onAdmin();
       return;
     }
+    if (onQuit && isQuitShortcut(input)) {
+      event.preventDefault();
+      onQuit();
+      return;
+    }
     if (isBlocked(input, { allowEscape })) event.preventDefault();
   });
 }
 
-module.exports = { lockKeyboard, isBlocked, isAdminShortcut };
+module.exports = { lockKeyboard, isBlocked, isAdminShortcut, isQuitShortcut };

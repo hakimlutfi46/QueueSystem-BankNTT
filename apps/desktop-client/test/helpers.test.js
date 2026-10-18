@@ -72,3 +72,29 @@ test('pair accepts only the expected device kind', async (t) => {
   const down = await pair('http://127.0.0.1:1', 'ABC234', { expectedKind: 'display', timeoutMs: 1000 });
   assert.equal(down.field, 'server');
 });
+
+test('pair auto-registers without code when empty', async (t) => {
+  const server = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      const body = JSON.parse(raw);
+      res.setHeader('content-type', 'application/json');
+      if (!body.code && body.kind === 'display') {
+        return res.end(JSON.stringify({ token: 't-auto-display', kind: 'display', name: 'Layar TV' }));
+      }
+      res.statusCode = 400;
+      res.end(JSON.stringify({ error: { code: 'INVALID', message: 'Gagal' } }));
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const url = `http://127.0.0.1:${server.address().port}`;
+
+  assert.deepEqual(await pair(url, '', { expectedKind: 'display' }), {
+    ok: true,
+    token: 't-auto-display',
+    kind: 'display',
+    name: 'Layar TV',
+  });
+});

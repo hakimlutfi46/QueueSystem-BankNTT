@@ -308,7 +308,7 @@ function createKioskWindow() {
   state.kioskWin = win;
   const wc = win.webContents;
 
-  lockKeyboard(wc, { onAdmin: openAdmin, onQuit: SIMULATION ? simulationQuit : undefined });
+  lockKeyboard(wc, { onAdmin: openSettingsFromKiosk, onQuit: simulationQuit });
   // Keep the simulation note in the title instead of the page's own <title>.
   if (SIMULATION) win.on('page-title-updated', (event) => event.preventDefault());
 
@@ -319,8 +319,8 @@ function createKioskWindow() {
 
   win.on('close', (event) => {
     if (!state.quitting && !state.allowKioskClose) {
-      event.preventDefault();
-      log.info('kiosk: penutupan jendela diblokir');
+      state.quitting = true;
+      app.quit();
     }
   });
   win.on('closed', () => {
@@ -522,17 +522,15 @@ function authorisedExit() {
   app.quit();
 }
 
-// Simulation only: Cmd+Q (macOS) / Ctrl+Q (Linux) and Dock → Quit close the app without the PIN,
-// so a developer's laptop is never stuck behind the kiosk. Production keeps the PIN-only exit.
 function simulationQuit() {
-  log.info('simulasi: keluar aplikasi tanpa PIN');
+  log.info('kiosk: keluar aplikasi');
   state.quitting = true;
   closeAdmin();
   app.quit();
 }
 
 function openSettingsFromKiosk() {
-  log.info('admin: membuka pengaturan (PIN benar)');
+  log.info('kiosk: membuka pengaturan');
   closeAdmin();
   openSetup('edit');
   const kiosk = state.kioskWin;
@@ -675,18 +673,8 @@ function registerIpc() {
     if (!server) return { ok: false, field: 'server', message: 'Alamat server tidak valid. Contoh: 10.70.10.67:3000' };
 
     const code = normaliseCode(form.code);
-    const needsCode = !edit || server !== cfg.server || !cfg.token;
-    if (code || needsCode) {
-      if (!code) return { ok: false, field: 'code', message: 'Kode pemasangan wajib diisi.' };
-      if (!isValidCode(code)) {
-        return { ok: false, field: 'code', message: 'Kode pemasangan harus 6 karakter (huruf dan angka).' };
-      }
-    }
-
-    const pinGiven = form.pin !== '' || form.pinConfirm !== '';
-    if (!edit || pinGiven) {
-      if (!isValidPin(form.pin)) return { ok: false, field: 'pin', message: 'PIN admin minimal 4 angka (hanya angka).' };
-      if (form.pin !== form.pinConfirm) return { ok: false, field: 'pinConfirm', message: 'Konfirmasi PIN tidak sama.' };
+    if (code && !isValidCode(code)) {
+      return { ok: false, field: 'code', message: 'Kode pemasangan harus 6 karakter (huruf dan angka).' };
     }
 
     if (form.printerName && !(await printerExists(form.printerName))) {
@@ -695,15 +683,18 @@ function registerIpc() {
 
     let token = cfg.token;
     let deviceName = cfg.deviceName;
-    if (code) {
-      log.info('setup: memasangkan perangkat ke', server);
-      const result = await pair(server, code);
+    // Sambungkan otomatis ke server (atau gunakan kode bila diisi)
+    const needsToken = !token || server !== cfg.server;
+    if (code || needsToken) {
+      log.info('setup: menyambungkan perangkat otomatis ke', server);
+      const result = await pair(server, code || '');
       if (!result.ok) return { ok: false, field: result.field, message: result.message };
       token = result.token;
       deviceName = result.name;
     }
 
-    const pinHash = !edit || pinGiven ? await hashPin(form.pin) : cfg.pinHash;
+    const pinGiven = Boolean(form.pin && form.pin.trim());
+    const pinHash = pinGiven ? await hashPin(form.pin) : (cfg.pinHash || '');
     const serverName = (await learnServerName(server)) || cfg.serverName || '';
     state.config = config.save({ ...cfg, server, serverName, token, printerName: form.printerName, pinHash, deviceName });
     printers.invalidate();

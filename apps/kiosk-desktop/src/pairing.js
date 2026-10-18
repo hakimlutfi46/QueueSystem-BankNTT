@@ -10,14 +10,15 @@ const TIMEOUT_MS = 10_000;
  * Runs in the main process (Node fetch) so no CORS and the token never touches
  * a renderer.
  */
-async function pair(server, code) {
+async function pair(server, code = '') {
   const url = `${server}/api/devices/pair`;
   let res;
   try {
+    const payload = code ? { code, kind: 'kiosk' } : { kind: 'kiosk', name: 'Kiosk Tiket' };
     res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {

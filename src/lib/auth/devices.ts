@@ -215,6 +215,50 @@ export async function redeemPairCode(db: PrismaClient, input: unknown): Promise<
 }
 
 /**
+ * Pendaftaran otomatis perangkat di jaringan lokal tanpa kode pemasangan manual.
+ * Mengeluarkan token perangkat aktif dan mendaftarkan perangkat baru atau menggunakan yang ada.
+ */
+export async function autoRegisterDevice(
+  db: PrismaClient,
+  kindInput: unknown,
+  nameInput?: unknown,
+): Promise<PairedDevice> {
+  const kind: DeviceKind = kindInput === "display" || kindInput === "DISPLAY" ? "display" : "kiosk";
+  const token = generateDeviceToken();
+
+  return db.$transaction(async (tx) => {
+    const existing = await tx.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*) as count
+      FROM devices
+      WHERE kind = ${kind === "kiosk" ? "KIOSK" : "DISPLAY"}::device_kind AND revoked_at IS NULL
+    `;
+    const count = Number(existing[0]?.count ?? 0);
+    const defaultName = kind === "kiosk"
+      ? (count === 0 ? "Kiosk Tiket" : `Kiosk Tiket ${count + 1}`)
+      : (count === 0 ? "Layar TV" : `Layar TV ${count + 1}`);
+
+    const name = typeof nameInput === "string" && nameInput.trim() ? nameInput.trim().slice(0, 60) : defaultName;
+
+    const created = await tx.$queryRaw<DeviceRow[]>`
+      INSERT INTO devices (kind, name, token_hash, token_hint, last_seen_at)
+      VALUES (
+        ${kind === "kiosk" ? "KIOSK" : "DISPLAY"}::device_kind,
+        ${name},
+        ${hashDeviceToken(token)},
+        ${token.slice(-4)},
+        now()
+      )
+      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+    `;
+    const row = created[0];
+    if (!row) throw new AdminError("NOT_FOUND", "Perangkat gagal didaftarkan.");
+    await notifyQueue(tx, { type: "CONFIG_CHANGED" });
+    const device = mapDevice(row);
+    return { token, kind: device.kind, name: device.name };
+  });
+}
+
+/**
  * Hapus perangkat dari daftar. Hanya perangkat yang sudah dicabut, supaya kiosk atau TV yang masih dipakai
  * tidak hilang karena salah klik. Tidak ada tabel lain yang merujuk perangkat, jadi tiket dan laporan utuh.
  */

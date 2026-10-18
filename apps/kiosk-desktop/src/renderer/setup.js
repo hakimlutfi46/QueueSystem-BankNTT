@@ -117,7 +117,6 @@
     }
     button.addEventListener('click', () => {
       select(server.url);
-      $('code').focus();
     });
     li.append(button);
     if (server.local) list.append(li);
@@ -149,6 +148,10 @@
       scanText.textContent = `1 server ditemukan: ${only.name}.`;
       if (!touched && (!serverInput.value || serverInput.value === 'http://127.0.0.1:3000')) {
         select(only.url, { byUser: false });
+        if (mode === 'first') {
+          showAlert('info', `Server "${only.name}" ditemukan. Menyambung…`);
+          form.requestSubmit();
+        }
       }
     } else {
       scanText.textContent = `${servers.size} server ditemukan. Pilih salah satu di bawah:`;
@@ -158,22 +161,15 @@
   function formValues() {
     return {
       server: $('server').value.trim(),
-      code: $('code').value.trim(),
+      code: '',
       printerName: printerSelect.value,
-      pin: $('pin').value,
-      pinConfirm: $('pinConfirm').value,
+      pin: '',
+      pinConfirm: '',
     };
   }
 
   function validateLocally(v) {
     if (!v.server) return ['server', 'Alamat server wajib diisi.'];
-    const code = normaliseCodeInput(v.code);
-    if (mode === 'first' && !code) return ['code', 'Kode pemasangan wajib diisi.'];
-    if (code && code.length !== 6) return ['code', 'Kode pemasangan harus 6 karakter.'];
-    if (mode === 'first' || v.pin || v.pinConfirm) {
-      if (!/^\d{4,12}$/.test(v.pin)) return ['pin', 'PIN admin minimal 4 angka (hanya angka).'];
-      if (v.pin !== v.pinConfirm) return ['pinConfirm', 'Konfirmasi PIN tidak sama.'];
-    }
     return null;
   }
 
@@ -193,11 +189,10 @@
     try {
       const result = await api.submit(values);
       if (result.ok) {
-        showAlert('ok', result.deviceName ? `Berhasil. Terdaftar sebagai "${result.deviceName}". Membuka kiosk…` : 'Tersimpan. Membuka kiosk…');
+        showAlert('ok', result.deviceName ? `Berhasil terhubung ke "${result.deviceName}". Membuka kiosk…` : 'Tersimpan. Membuka kiosk…');
         return;
       }
-      if (result.field && result.field !== 'server' && result.field !== 'code') setError(result.field, result.message);
-      else if (result.field) setError(result.field, result.message);
+      if (result.field) setError(result.field, result.message);
       else showAlert('error', result.message);
     } catch {
       showAlert('error', 'Terjadi kesalahan. Coba lagi.');
@@ -207,13 +202,10 @@
     }
   });
 
-  $('code').addEventListener('input', (e) => {
-    const raw = normaliseCodeInput(e.target.value).slice(0, 6);
-    e.target.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
-  });
-  for (const id of ['pin', 'pinConfirm']) {
-    $(id).addEventListener('input', (e) => {
-      e.target.value = e.target.value.replace(/\D/g, '');
+  if ($('code')) {
+    $('code').addEventListener('input', (e) => {
+      const raw = normaliseCodeInput(e.target.value).slice(0, 6);
+      e.target.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
     });
   }
   form.addEventListener('input', (e) => {
@@ -271,21 +263,18 @@
     }
     if (mode !== 'edit' && init.bundledServer) {
       $('subtitle').textContent =
-        'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi. Buka panel admin untuk membuat kode pemasangan.';
+        'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi.';
     }
     if (mode === 'edit') {
       $('title').textContent = 'Pengaturan Kiosk';
       $('subtitle').textContent = init.deviceName
-        ? `Perangkat ini terdaftar sebagai "${init.deviceName}". Kosongkan kode dan PIN jika tidak ingin mengubahnya.`
-        : 'Kosongkan kode dan PIN jika tidak ingin mengubahnya.';
-      $('code-hint').textContent = 'Isi hanya untuk memasangkan ulang (wajib jika alamat server diubah).';
-      $('pin-hint').textContent = 'Kosongkan untuk tetap memakai PIN lama.';
-      $('pin').placeholder = 'Tidak diubah';
+        ? `Perangkat ini terdaftar sebagai "${init.deviceName}".`
+        : 'Pengaturan server dan printer.';
       $('cancel').hidden = false;
       submitBtn.textContent = 'Simpan';
     }
     if (init.server) markSelected();
-    $(mode === 'edit' ? 'server' : init.server ? 'code' : 'server').focus();
+    $('server').focus();
     scan();
   });
 

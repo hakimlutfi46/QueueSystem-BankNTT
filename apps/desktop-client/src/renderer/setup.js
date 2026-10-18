@@ -93,7 +93,6 @@
     }
     button.addEventListener('click', () => {
       select(server.url);
-      if (pairing) $('code').focus();
     });
     li.append(button);
     // LAN addresses first, "PC ini" (127.0.0.1) last.
@@ -127,40 +126,22 @@
       const only = found[0];
       select(only.url, { byUser: false });
       scanText.textContent = `Server ditemukan: ${only.name}.`;
-      // Admin/Loket first run: nothing else to fill in, so connect straight away.
-      if (mode === 'first' && !pairing) {
+      if (mode === 'first') {
         showAlert('info', `Server "${only.name}" ditemukan. Menyambung…`);
         form.requestSubmit();
-      } else if (pairing && !$('code').value) {
-        $('code').focus();
       }
     }
-  }
-
-  function normaliseCodeInput(value) {
-    return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
   }
 
   function formValues() {
     return {
       server: serverInput.value.trim(),
-      code: pairing ? $('code').value.trim() : '',
-      pin: pairing ? $('pin').value : '',
-      pinConfirm: pairing ? $('pinConfirm').value : '',
     };
   }
 
   function validateLocally(v) {
     if (!v.server) return ['server', 'Pilih server dari daftar atau ketik alamatnya.'];
     if (!originOf(v.server)) return ['server', 'Alamat server tidak valid. Contoh: 192.168.1.53:3000'];
-    if (!pairing) return null;
-    const code = normaliseCodeInput(v.code);
-    if (mode === 'first' && !code) return ['code', 'Kode pemasangan wajib diisi.'];
-    if (code && code.length !== 6) return ['code', 'Kode pemasangan harus 6 karakter.'];
-    if (mode === 'first' || v.pin || v.pinConfirm) {
-      if (!/^\d{4,12}$/.test(v.pin)) return ['pin', 'PIN admin minimal 4 angka (hanya angka).'];
-      if (v.pin !== v.pinConfirm) return ['pinConfirm', 'Konfirmasi PIN tidak sama.'];
-    }
     return null;
   }
 
@@ -226,15 +207,6 @@
     touched = true;
     markSelected();
   });
-  $('code').addEventListener('input', (e) => {
-    const raw = normaliseCodeInput(e.target.value).slice(0, 6);
-    e.target.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
-  });
-  for (const id of ['pin', 'pinConfirm']) {
-    $(id).addEventListener('input', (e) => {
-      e.target.value = e.target.value.replace(/\D/g, '');
-    });
-  }
   form.addEventListener('input', (e) => {
     const field = e.target.closest('.field');
     if (field) field.classList.remove('invalid');
@@ -253,10 +225,8 @@
 
   api.init().then((init) => {
     mode = init.mode === 'edit' ? 'edit' : 'first';
-    pairing = Boolean(init.pairing);
     appName = init.appName || appName;
     serverInput.value = init.server || '';
-    $('pairing').hidden = !pairing;
     document.title = `Pengaturan ${appName}`;
     if (init.icon) {
       $('logo').src = init.icon;
@@ -264,31 +234,17 @@
     }
     $('footer').textContent = `${appName} v${init.version}${init.logFile ? ` · Log: ${init.logFile}` : ''}`;
 
-    if (pairing) {
-      $('title').textContent = `Pemasangan ${appName}`;
-      $('subtitle').textContent = 'Pilih server antrian, lalu masukkan kode pemasangan dari admin (menu Perangkat).';
-      submitBtn.textContent = 'Simpan & pasangkan';
-    } else {
-      $('title').textContent = `Sambungkan ${appName}`;
-      $('subtitle').textContent = `Pilih server antrian untuk membuka ${init.label || 'aplikasi'}.`;
-    }
+    $('title').textContent = `Sambungkan ${appName}`;
+    $('subtitle').textContent = `Pilih server antrian untuk membuka ${init.label || 'aplikasi'}.`;
+    submitBtn.textContent = 'Simpan & sambungkan';
+
     if (mode === 'edit') {
       $('cancel').hidden = false;
       submitBtn.textContent = 'Simpan';
-      if (pairing) {
-        $('title').textContent = `Pengaturan ${appName}`;
-        $('subtitle').textContent = init.deviceName
-          ? `TV ini terdaftar sebagai "${init.deviceName}". Kosongkan kode dan PIN jika tidak ingin mengubahnya.`
-          : 'Kosongkan kode dan PIN jika tidak ingin mengubahnya.';
-        $('code-hint').textContent = 'Isi hanya untuk memasangkan ulang (wajib bila memilih server lain).';
-        $('pin-hint').textContent = 'Kosongkan untuk tetap memakai PIN lama.';
-        $('pin').placeholder = 'Tidak diubah';
-      } else {
-        $('title').textContent = 'Ganti server';
-        $('subtitle').textContent = init.serverName
-          ? `Saat ini tersambung ke "${init.serverName}" (${init.server}).`
-          : `Saat ini tersambung ke ${init.server || '-'}.`;
-      }
+      $('title').textContent = 'Ganti server';
+      $('subtitle').textContent = init.serverName
+        ? `Saat ini tersambung ke "${init.serverName}" (${init.server}).`
+        : `Saat ini tersambung ke ${init.server || '-'}.`;
       // Keep the current address unless the user picks another one.
       touched = true;
     }

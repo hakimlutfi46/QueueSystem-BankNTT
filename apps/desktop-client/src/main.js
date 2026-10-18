@@ -339,7 +339,7 @@ function createMainWindow() {
   state.mainWin = win;
   const wc = win.webContents;
 
-  if (ROLE.kiosk) lockKeyboard(wc, { onAdmin: openPin });
+  if (ROLE.kiosk) lockKeyboard(wc, { onAdmin: openSettingsFromTv, onQuit: exitTv });
 
   win.once('ready-to-show', () => {
     if (!ROLE.kiosk) win.maximize();
@@ -350,8 +350,8 @@ function createMainWindow() {
   if (ROLE.kiosk) {
     win.on('close', (event) => {
       if (!state.quitting && !state.allowMainClose) {
-        event.preventDefault();
-        log.info('tv: penutupan jendela diblokir');
+        state.quitting = true;
+        app.quit();
       }
     });
     win.on('leave-full-screen', () => {
@@ -539,15 +539,15 @@ function closePin() {
   if (alive(win)) win.destroy();
 }
 
-function authorisedExit() {
-  log.info('admin: keluar aplikasi (PIN benar)');
+function exitTv() {
+  log.info('tv: keluar aplikasi');
   state.quitting = true;
   closePin();
   app.quit();
 }
 
 function openSettingsFromTv() {
-  log.info('admin: membuka pengaturan (PIN benar)');
+  log.info('tv: membuka pengaturan');
   closePin();
   openSetup('edit');
   const main = state.mainWin;
@@ -788,17 +788,9 @@ function registerIpc() {
     const server = normaliseServer(form.server);
     if (!server) return { ok: false, field: 'server', message: 'Alamat server tidak valid. Contoh: 192.168.1.53:3000' };
 
-    let code = '';
-    const pinGiven = form.pin !== '' || form.pinConfirm !== '';
-    if (ROLE.pairing) {
-      code = normaliseCode(form.code);
-      if (code && !isValidCode(code)) {
-        return { ok: false, field: 'code', message: 'Kode pemasangan harus 6 karakter (huruf dan angka).' };
-      }
-      if (!edit || pinGiven) {
-        if (!isValidPin(form.pin)) return { ok: false, field: 'pin', message: 'PIN admin minimal 4 angka (hanya angka).' };
-        if (form.pin !== form.pinConfirm) return { ok: false, field: 'pinConfirm', message: 'Konfirmasi PIN tidak sama.' };
-      }
+    let code = normaliseCode(form.code || '');
+    if (code && !isValidCode(code)) {
+      return { ok: false, field: 'code', message: 'Kode pemasangan harus 6 karakter (huruf dan angka).' };
     }
 
     if (!(await discovery.checkHealth(server))) {
@@ -810,19 +802,22 @@ function registerIpc() {
     if (ROLE.pairing) {
       // The same server at a new address (same announced name) keeps its device token.
       const sameServer = server === cfg.server || Boolean(serverName && serverName === cfg.serverName);
-      if (!code && (!edit || !token || !sameServer)) {
-        return { ok: false, field: 'code', message: 'Kode pemasangan wajib diisi.' };
-      }
       if (code) {
         log.info('setup: memasangkan perangkat ke', server);
         const result = await pair(server, code, { expectedKind: ROLE.expectedKind });
         if (!result.ok) return { ok: false, field: result.field, message: result.message };
         token = result.token;
         deviceName = result.name;
+      } else if (!token || !sameServer) {
+        log.info('setup: auto-pairing TV ke server', server);
+        const result = await pair(server, '', { expectedKind: ROLE.expectedKind });
+        if (!result.ok) return { ok: false, field: result.field, message: result.message };
+        token = result.token;
+        deviceName = result.name;
       }
     }
 
-    const pinHash = ROLE.pairing ? (!edit || pinGiven ? await hashPin(form.pin) : cfg.pinHash) : '';
+    const pinHash = cfg.pinHash || '';
     const changed = server !== cfg.server || token !== cfg.token;
     state.config = config.save({ ...cfg, server, serverName, token, pinHash, deviceName });
     log.info(`setup: pengaturan disimpan server=${server} nama="${serverName || '-'}" perangkat="${deviceName || '-'}"`);

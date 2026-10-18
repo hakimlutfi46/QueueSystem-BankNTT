@@ -37,11 +37,12 @@ function isAdminShortcut(input) {
   );
 }
 
-/** Simulation builds only: Cmd+Q on macOS, Ctrl+Q elsewhere. */
+/** Cmd+Q on macOS, Ctrl+Q or Alt+F4 elsewhere. */
 function isQuitShortcut(input, platform = process.platform) {
+  if (input.type !== 'keyDown') return false;
+  if (input.alt && (input.key === 'F4' || input.code === 'F4')) return true;
   const mod = platform === 'darwin' ? input.meta && !input.control : input.control && !input.meta;
   return (
-    input.type === 'keyDown' &&
     mod &&
     !input.shift &&
     !input.alt &&

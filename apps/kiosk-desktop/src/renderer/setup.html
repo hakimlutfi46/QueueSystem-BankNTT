@@ -14,7 +14,7 @@
       <img class="logo" id="logo" alt="" hidden>
       <div>
         <h1 id="title">Pemasangan Kiosk</h1>
-        <p id="subtitle">Hubungkan kiosk ini ke server antrian. Minta kode pemasangan dari admin di menu Perangkat.</p>
+        <p id="subtitle">Hubungkan kiosk ini ke server antrian.</p>
       </div>
     </header>
 
@@ -41,15 +41,6 @@
         <span class="error"></span>
       </div>
 
-      <div class="field" data-field="code">
-        <label for="code">Kode pemasangan</label>
-        <input id="code" name="code" type="text" spellcheck="false" autocapitalize="characters" maxlength="9" placeholder="4K7-Q2M" class="code">
-        <span class="hint" id="code-hint">6 karakter. Tanda hubung dan huruf kecil boleh.</span>
-        <span class="error"></span>
-        <span class="hint code-help">Belum punya kode?
-          <button type="button" class="btn-link" id="open-admin">Buka panel admin <span class="arrow" aria-hidden="true">&nearr;</span></button>
-          lalu <strong>Perangkat</strong> &rarr; <strong>Kode aplikasi</strong>.</span>
-      </div>
 
       <div class="field" data-field="printer">
         <label for="printer">Printer tiket</label>
@@ -64,23 +55,9 @@
         <span class="error"></span>
       </div>
 
-      <div class="grid">
-        <div class="field" data-field="pin">
-          <label for="pin">PIN admin</label>
-          <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" placeholder="Minimal 4 angka">
-          <span class="hint" id="pin-hint">Dipakai untuk keluar dari kiosk (Ctrl+Shift+Alt+K).</span>
-          <span class="error"></span>
-        </div>
-        <div class="field" data-field="pinConfirm">
-          <label for="pinConfirm">Ulangi PIN admin</label>
-          <input id="pinConfirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12">
-          <span class="error"></span>
-        </div>
-      </div>
-
       <div class="actions">
         <button type="button" class="btn btn-ghost" id="cancel" hidden>Batal</button>
-        <button type="submit" class="btn btn-primary" id="submit">Simpan &amp; pasangkan</button>
+        <button type="submit" class="btn btn-primary" id="submit">Simpan &amp; sambungkan</button>
       </div>
     </form>
     <footer id="footer"></footer>

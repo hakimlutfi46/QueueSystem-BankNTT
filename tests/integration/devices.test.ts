@@ -2,6 +2,7 @@ import "dotenv/config";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
+  autoRegisterDevice,
   createDevice,
   deleteDevice,
   deviceMatcher,
@@ -153,5 +154,22 @@ describe("devices", () => {
     await expect(listDevices(prisma)).resolves.toEqual([]);
     await expect(verifyDeviceToken(prisma, "display", token)).resolves.toBe(false);
     await expect(deleteDevice(prisma, device.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("auto-registers a device dynamically without pairing code", async () => {
+    const first = await autoRegisterDevice(prisma, "kiosk");
+    expect(first).toMatchObject({ kind: "kiosk", name: "Kiosk Tiket" });
+    await expect(verifyDeviceToken(prisma, "kiosk", first.token)).resolves.toBe(true);
+
+    const second = await autoRegisterDevice(prisma, "kiosk");
+    expect(second).toMatchObject({ kind: "kiosk", name: "Kiosk Tiket 2" });
+    await expect(verifyDeviceToken(prisma, "kiosk", second.token)).resolves.toBe(true);
+
+    const tv = await autoRegisterDevice(prisma, "display");
+    expect(tv).toMatchObject({ kind: "display", name: "Layar TV" });
+    await expect(verifyDeviceToken(prisma, "display", tv.token)).resolves.toBe(true);
+
+    const list = await listDevices(prisma);
+    expect(list).toHaveLength(3);
   });
 });

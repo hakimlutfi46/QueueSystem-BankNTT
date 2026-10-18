@@ -35,7 +35,7 @@ function load() {
 }
 
 function isComplete(cfg) {
-  return Boolean(cfg && cfg.server && cfg.token && cfg.pinHash);
+  return Boolean(cfg && cfg.server);
 }
 
 /** Atomic write: temp file + rename so a power cut never leaves half a file. */

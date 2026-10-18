@@ -13,14 +13,15 @@ const KIND_LABELS = Object.freeze({ kiosk: 'kiosk', display: 'TV antrian' });
  * a renderer. Only a code issued for `expectedKind` is accepted: a kiosk code
  * typed into the TV app (or the reverse) is rejected before the token is kept.
  */
-async function pair(server, code, { expectedKind, fetchImpl = fetch, timeoutMs = TIMEOUT_MS } = {}) {
+async function pair(server, code = '', { expectedKind, fetchImpl = fetch, timeoutMs = TIMEOUT_MS } = {}) {
   const url = `${server}/api/devices/pair`;
   let res;
   try {
+    const payload = code ? { code } : { kind: expectedKind || 'display', name: expectedKind === 'display' ? 'Layar TV' : 'Perangkat' };
     res = await fetchImpl(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {

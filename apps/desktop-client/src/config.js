@@ -34,7 +34,7 @@ function load() {
 
 function isComplete(cfg, role) {
   if (!cfg || !cfg.server) return false;
-  if (role && role.pairing) return Boolean(cfg.token && cfg.pinHash);
+  if (role && role.pairing) return Boolean(cfg.token);
   return true;
 }
 
