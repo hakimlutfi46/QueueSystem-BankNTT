@@ -37,6 +37,22 @@ function isAdminShortcut(input) {
   );
 }
 
+/**
+ * Production lockdown: packaged, non-simulation builds. There the quit shortcuts and window
+ * close never quit the app; only the admin menu (PIN) or OS shutdown does. Development runs
+ * keep quick quit unless `lockdownEnv` (e.g. KIOSK_LOCKDOWN=1) asks for the production behaviour.
+ */
+function isLockdown({ packaged, simulation, lockdownEnv } = {}) {
+  if (simulation) return false;
+  if (packaged) return true;
+  return lockdownEnv === '1';
+}
+
+/** What a quit shortcut does: 'quit' (simulation / development) or 'block' (production). */
+function quitShortcutAction(lockdown) {
+  return lockdown ? 'block' : 'quit';
+}
+
 /** Cmd+Q on macOS, Ctrl+Q or Alt+F4 elsewhere. */
 function isQuitShortcut(input, platform = process.platform) {
   if (input.type !== 'keyDown') return false;
@@ -68,7 +84,8 @@ function isBlocked(input, { allowEscape = false } = {}) {
 
 /**
  * Attach to a webContents; `onAdmin` is called for Ctrl+Shift+Alt+K.
- * `onQuit` (simulation builds only) is called for Cmd+Q / Ctrl+Q instead of blocking it.
+ * `onQuit` is called for Cmd+Q / Ctrl+Q / Alt+F4 instead of silently blocking them; the caller
+ * decides with quitShortcutAction() whether that quits or only logs.
  */
 function lockKeyboard(webContents, { onAdmin, onQuit, allowEscape = false } = {}) {
   webContents.on('before-input-event', (event, input) => {
@@ -86,4 +103,4 @@ function lockKeyboard(webContents, { onAdmin, onQuit, allowEscape = false } = {}
   });
 }
 
-module.exports = { lockKeyboard, isBlocked, isAdminShortcut, isQuitShortcut };
+module.exports = { lockKeyboard, isBlocked, isAdminShortcut, isQuitShortcut, isLockdown, quitShortcutAction };

@@ -42,7 +42,7 @@ Untuk mencoba di komputer pengembang (mode berjendela, bukan kiosk):
 cd apps/kiosk-desktop
 npm install
 node node_modules/electron/install.js   # unduh binari Electron (npm memblokir install script)
-node scripts/mock-server.mjs 4545        # server tiruan; kode pemasangan: ABC234
+node scripts/mock-server.mjs 4545        # server tiruan; disetujui otomatis setelah 10 detik
 npm run dev                              # isi "Alamat server" dengan 127.0.0.1:4545
 npm run check                            # node --check untuk semua file JS
 ```
@@ -85,10 +85,11 @@ Bedanya dengan aplikasi Windows:
 - Tidak berjalan otomatis saat login.
 - Pengaturan dan log terpisah dari kiosk sungguhan: `~/Library/Application Support/kiosk-antrian-sim`
   (Mac) atau `~/.config/kiosk-antrian-sim` (Ubuntu), log di `logs/kiosk.log`.
-- Keluar: **Ctrl + Shift + Alt + K** lalu PIN, seperti di Windows (di Mac **Cmd + Shift + Option + K**
-  juga bisa). Khusus simulasi, **Cmd + Q** (Mac), **Ctrl + Q** (Ubuntu), dan Dock → Keluar langsung
-  menutup aplikasi tanpa PIN, supaya laptop pengembang tidak terkunci. Di kiosk Windows tetap hanya
-  lewat PIN.
+- Keluar: **Ctrl + Shift + Alt + K** (di Mac **Cmd + Shift + Option + K** juga bisa), lalu PIN bila
+  dipasang, seperti di Windows. Khusus simulasi (dan `npm run dev`), **Cmd + Q** (Mac), **Ctrl + Q**
+  (Ubuntu), menutup jendela, dan Dock → Keluar langsung menutup aplikasi, supaya laptop pengembang
+  tidak terkunci. Di kiosk Windows terpasang, Alt+F4, Ctrl+Q, dan menutup jendela diblokir.
+  `KIOSK_LOCKDOWN=1 npm run dev` mencoba penguncian produksi saat pengembangan.
 
 ### Memasang di Mac
 
@@ -115,8 +116,8 @@ atau di PC lain di jaringan yang sama.
 
 Layar pemasangan **otomatis memindai jaringan lokal lewat UDP 41234** untuk menemukan server antrian.
 Server yang menjawab akan langsung muncul di daftar "Server di jaringan" dan terpilih otomatis bila
-hanya ada satu server. Pairing sama dengan di cabang: Admin → Perangkat → daftarkan kiosk →
-**Kode aplikasi**, lalu isi kode (6 karakter) dan PIN di layar pemasangan. Bila IP server cabang berubah
+hanya ada satu server. Pemasangan sama dengan di cabang: kiosk mendaftar otomatis, lalu admin
+menyetujuinya di Admin → Perangkat (lihat "Pemasangan pertama"). Bila IP server cabang berubah
 karena DHCP, aplikasi akan mendeteksi dan memperbarui alamatnya secara otomatis.
 
 ## Installer Ticket + Server (mesin tiket utama)
@@ -138,8 +139,8 @@ npm run kiosk:build -- --with-server           # -> downloads/BANK-NTT-Ticket-Se
 - Data ada di `C:\ProgramData\BankNTT` dan tidak ikut terhapus saat pembaruan maupun uninstall.
   Pembaruan: jalankan installer versi baru; layanan dihentikan, berkas program diganti, migrasi
   database berjalan saat server menyala lagi.
-- Saat pemasangan pertama, alamat server sudah terisi `127.0.0.1:3000`. Tekan **Buka panel admin**
-  untuk masuk ke Admin → Perangkat di browser, daftarkan kiosk, lalu buat **Kode aplikasi**.
+- Saat pemasangan pertama, alamat server sudah terisi `127.0.0.1:3000`. Setelah tersambung, tekan
+  **Buka panel admin** untuk masuk ke Admin → Perangkat di browser dan setujui kiosk ini.
 - Installer ini tidak muncul di Admin → Perangkat. Kiosk tambahan di cabang yang sama memakai
   installer biasa (`BANK-NTT-Ticket-Setup.exe`), supaya tidak ada server kedua.
 - Bila gagal, installer menampilkan pesan dan rinciannya ada di
@@ -161,27 +162,43 @@ npm run kiosk:build -- --with-server           # -> downloads/BANK-NTT-Ticket-Se
 
 ## Pemasangan pertama (pairing)
 
-1. Di panel admin web → **Perangkat**, daftarkan kiosk (atau pilih kiosk yang sudah ada) lalu tekan
-   **Kode aplikasi**. Catat **alamat server** dan **kode pemasangan** (6 karakter, berlaku 30 menit,
-   sekali pakai). Tautan lama kiosk itu berhenti berlaku begitu kode dipakai.
-2. Di jendela "Pemasangan BANK NTT Ticket" isi:
-   - **Alamat server**: misalnya `10.70.10.67:3000` (otomatis menjadi `http://10.70.10.67:3000`).
-   - **Kode pemasangan**: boleh ditulis dengan tanda hubung atau huruf kecil (`4k7-q2m`).
-   - **Printer tiket**: default printer bawaan Windows. Tekan **Cetak uji** untuk mencoba.
-   - **PIN admin** (minimal 4 angka) dan ulangi.
-3. Tekan **Simpan & pasangkan**. Bila berhasil, kiosk langsung terbuka dan aplikasi diatur
-   agar berjalan otomatis saat Windows login.
+Pemasangan kini otomatis, tanpa kode:
+
+1. Di jendela "Pemasangan BANK NTT Ticket", server di jaringan dicari dan dipilih otomatis (atau
+   ketik **Alamat server**, misalnya `10.70.10.67:3000`). Pilih **Printer tiket** (tekan **Cetak uji**
+   untuk mencoba) dan, disarankan, isi **PIN admin** (minimal 4 angka) dua kali.
+2. Tekan **Simpan & sambungkan**. Kiosk mendaftar sendiri ke server dengan ID instalasi acak yang
+   dibuat sekali dan disimpan di `config.json` (`installId`), jadi memasang ulang atau menyambung
+   ulang tidak pernah membuat perangkat ganda.
+3. Kiosk menampilkan "menunggu persetujuan" sampai admin menyetujuinya di panel admin web →
+   **Perangkat** (atau admin menyalakan **Terima perangkat baru otomatis**). Halaman itu memeriksa
+   sendiri tiap 5 detik dan langsung membuka kiosk begitu disetujui. Aplikasi diatur agar berjalan
+   otomatis saat Windows login.
+
+**Kode pemasangan (opsional)**: cara lama tetap bisa. Bila admin memberi kode 6 karakter dari
+Admin → Perangkat → **Kode aplikasi**, isi di kolom **Kode pemasangan** (boleh `4k7-q2m`).
+
+Status perangkat yang ditampilkan server dan reaksi aplikasi:
+
+| Status | Arti | Aplikasi |
+| --- | --- | --- |
+| menunggu persetujuan | Admin belum menyetujui | Diam; halaman memeriksa sendiri tiap 5 detik |
+| dicabut | Admin mencabut instalasi ini | Diam, tidak memasangkan ulang otomatis |
+| tidak dikenal | Token tidak dikenal server (mis. database direset) | Memasangkan ulang sekali dengan `installId` (paling sering sekali per menit), lalu memuat ulang kiosk |
+| dibatasi | Terlalu banyak percobaan | Diam; halaman mencoba lagi sendiri |
 
 ## Keluar / mengubah pengaturan
 
-Tekan **Ctrl + Shift + Alt + K** di kiosk, masukkan PIN admin, lalu pilih:
+Tekan **Ctrl + Shift + Alt + K** di kiosk:
 
-- **Keluar aplikasi**: menutup kiosk.
-- **Ubah pengaturan**: membuka lagi jendela pengaturan. Kosongkan kode dan PIN bila tidak
-  ingin mengubahnya; isi kode baru untuk memasangkan ulang (wajib bila alamat server diganti).
-- **Batal**.
+- **Dengan PIN admin**: masukkan PIN, lalu pilih **Keluar aplikasi**, **Ubah pengaturan**, atau
+  **Batal**. Setelah 5 kali PIN salah, prompt dikunci 60 detik.
+- **Tanpa PIN**: jendela pengaturan langsung terbuka. Artinya siapa pun yang memegang keyboard bisa
+  membuka pengaturan, jadi PIN sangat disarankan.
 
-Setelah 5 kali PIN salah, prompt dikunci 60 detik.
+Di jendela pengaturan, kosongkan kode dan PIN bila tidak ingin mengubahnya. Tombol **Keluar aplikasi**
+di pengaturan menutup kiosk. Di kiosk Windows terpasang, Alt+F4, Ctrl+Q, dan menutup jendela tidak
+pernah menutup aplikasi; hanya **Keluar aplikasi** atau Windows shutdown / log off.
 
 Lupa PIN? Tutup aplikasi lewat Task Manager (atau login sebagai admin Windows), hapus
 `%APPDATA%\kiosk-antrian\config.json`, lalu jalankan aplikasi untuk memasangkan ulang.
@@ -213,7 +230,8 @@ tidak bisa diblokir aplikasi apa pun. Untuk penguncian penuh:
 | "Kertas habis." / "Kertas macet." | Isi/rapikan kertas lalu tutup penutup printer. Tidak semua driver USB melaporkan status ini. |
 | Tiket terpotong, terlalu kecil, atau kertas keluar panjang | Aplikasi mengirim ukuran halaman sesuai lebar `@page` (80/58 mm) dan tinggi isi tiket. Bila driver menolak ukuran kustom, tambahkan `"usePrinterDefaultPageSize": true` di `config.json` dan atur ukuran kertas di driver. |
 | Layar "Menyambung ke server…" terus | Server mati atau alamat salah. Aplikasi mencoba lagi tiap 5 detik. Cek jaringan dan alamat di pengaturan. |
-| Halaman kiosk meminta login / "Sesi kiosk tidak valid" | Token perangkat dicabut di server. Pasangkan ulang dengan kode baru lewat **Ubah pengaturan**. |
+| Kiosk "menunggu persetujuan" terus | Setujui kiosk di Admin → Perangkat, atau nyalakan **Terima perangkat baru otomatis**. |
+| Kiosk "dicabut" | Admin mencabut instalasi ini. Pulihkan di Admin → Perangkat, atau pasangkan dengan kode baru lewat **Ubah pengaturan**. |
 | Windows memblokir installer | Lihat bagian SmartScreen di atas. |
 
 Detail kejadian ada di `%APPDATA%\kiosk-antrian\logs\kiosk.log`.

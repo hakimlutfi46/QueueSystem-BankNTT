@@ -27,7 +27,7 @@ function init(userDataDir, fileName = 'app.log') {
 function redact(text) {
   return String(text)
     .replace(/([?&]token=)[^&#\s"')]*/gi, '$1***')
-    .replace(/("?(?:token|pin|pinHash|pinConfirm)"?\s*[:=]\s*)"[^"]*"/gi, '$1"***"');
+    .replace(/("?(?:token|pin|pinHash|pinConfirm|installId)"?\s*[:=]\s*)"[^"]*"/gi, '$1"***"');
 }
 
 function rotateIfNeeded() {

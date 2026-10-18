@@ -127,22 +127,41 @@
       const best = serverList.find((s) => !s.local) || serverList[0];
       select(best.url, { byUser: false });
       scanText.textContent = `Server ditemukan: ${best.name}.`;
-      if (mode === 'first') {
+      // Connect right away on first run, unless the user already started typing a code or PIN.
+      if (mode === 'first' && !typedPairingFields()) {
         showAlert('info', `Server "${best.name}" ditemukan. Menyambung otomatis…`);
         form.requestSubmit();
       }
     }
   }
 
+  function typedPairingFields() {
+    return pairing && Boolean($('code').value || $('pin').value || $('pinConfirm').value);
+  }
+
+  function normaliseCodeInput(value) {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
   function formValues() {
     return {
       server: serverInput.value.trim(),
+      code: pairing ? $('code').value.trim() : '',
+      pin: pairing ? $('pin').value : '',
+      pinConfirm: pairing ? $('pinConfirm').value : '',
     };
   }
 
   function validateLocally(v) {
     if (!v.server) return ['server', 'Pilih server dari daftar atau ketik alamatnya.'];
     if (!originOf(v.server)) return ['server', 'Alamat server tidak valid. Contoh: 192.168.1.53:3000'];
+    if (!pairing) return null;
+    const code = normaliseCodeInput(v.code);
+    if (code && code.length !== 6) return ['code', 'Kode pemasangan harus 6 karakter.'];
+    if (v.pin || v.pinConfirm) {
+      if (!/^\d{4,12}$/.test(v.pin)) return ['pin', 'PIN admin minimal 4 angka (hanya angka).'];
+      if (v.pin !== v.pinConfirm) return ['pinConfirm', 'Konfirmasi PIN tidak sama.'];
+    }
     return null;
   }
 
@@ -164,7 +183,11 @@
     try {
       const result = await api.submit(values);
       if (result.ok) {
-        showAlert('ok', result.deviceName ? `Berhasil. Terdaftar sebagai "${result.deviceName}". Membuka ${appName}…` : `Tersambung. Membuka ${appName}…`);
+        if (result.approved === false) {
+          showAlert('info', 'Tersambung. TV menunggu persetujuan admin di Admin → Perangkat…');
+        } else {
+          showAlert('ok', result.deviceName ? `Berhasil. Terdaftar sebagai "${result.deviceName}". Membuka ${appName}…` : `Tersambung. Membuka ${appName}…`);
+        }
         return;
       }
       hideAlert();
@@ -217,7 +240,25 @@
     hideAlert();
     scan();
   });
+  $('code').addEventListener('input', (e) => {
+    const raw = normaliseCodeInput(e.target.value).slice(0, 6);
+    e.target.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
+  });
+  for (const id of ['pin', 'pinConfirm']) {
+    $(id).addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '');
+    });
+  }
   $('cancel').addEventListener('click', () => api.cancel());
+  $('exit').addEventListener('click', async () => {
+    $('exit').disabled = true;
+    showAlert('info', 'Menutup aplikasi…');
+    const result = await api.exit().catch(() => ({ ok: false }));
+    if (!result.ok) {
+      $('exit').disabled = false;
+      showAlert('error', 'Aplikasi tidak dapat ditutup dari sini.');
+    }
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && mode === 'edit') api.cancel();
   });
@@ -226,6 +267,8 @@
 
   api.init().then((init) => {
     mode = init.mode === 'edit' ? 'edit' : 'first';
+    pairing = Boolean(init.pairing);
+    $('pairing').hidden = !pairing;
     appName = init.appName || appName;
     serverInput.value = init.server || '';
     document.title = `Pengaturan ${appName}`;
@@ -248,6 +291,20 @@
         : `Saat ini tersambung ke ${init.server || '-'}.`;
       // Keep the current address unless the user picks another one.
       touched = true;
+    }
+    if (pairing) {
+      if (init.hasPin) {
+        $('pin-hint').textContent = 'PIN sudah dipasang. Kosongkan untuk tetap memakai PIN lama, atau isi untuk menggantinya.';
+        $('pin').placeholder = 'Tidak diubah';
+      }
+      if (mode === 'edit') {
+        $('title').textContent = `Pengaturan ${appName}`;
+        $('subtitle').textContent = init.deviceName
+          ? `TV ini terdaftar sebagai "${init.deviceName}". Kosongkan kode dan PIN jika tidak ingin mengubahnya.`
+          : 'Kosongkan kode dan PIN jika tidak ingin mengubahnya.';
+        $('code-hint').textContent = 'Isi hanya untuk memasangkan ulang dengan kode dari admin. Tanpa kode, TV tersambung otomatis.';
+        $('exit').hidden = false;
+      }
     }
     serverInput.focus();
     scan();

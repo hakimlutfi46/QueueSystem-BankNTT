@@ -40,8 +40,30 @@
         <span class="error"></span>
       </div>
 
+      <div id="pairing" hidden>
+        <div class="field" data-field="code">
+          <label for="code">Kode pemasangan (opsional)</label>
+          <input id="code" name="code" type="text" spellcheck="false" autocapitalize="characters" maxlength="9" placeholder="4K7-Q2M" class="code">
+          <span class="hint" id="code-hint">Biasanya kosongkan saja: TV tersambung otomatis lalu disetujui admin di Admin → Perangkat. Isi hanya bila admin memberi kode (6 karakter).</span>
+          <span class="error"></span>
+        </div>
+        <div class="grid">
+          <div class="field" data-field="pin">
+            <label for="pin">PIN admin (disarankan)</label>
+            <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" placeholder="Minimal 4 angka">
+            <span class="hint" id="pin-hint">Diminta saat menekan Ctrl+Shift+Alt+K. Tanpa PIN, siapa pun yang memegang keyboard bisa membuka pengaturan TV.</span>
+            <span class="error"></span>
+          </div>
+          <div class="field" data-field="pinConfirm">
+            <label for="pinConfirm">Ulangi PIN admin</label>
+            <input id="pinConfirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12">
+            <span class="error"></span>
+          </div>
+        </div>
+      </div>
 
       <div class="actions">
+        <button type="button" class="btn btn-danger" id="exit" hidden>Keluar aplikasi</button>
         <button type="button" class="btn btn-ghost" id="cancel" hidden>Batal</button>
         <button type="submit" class="btn btn-primary" id="submit">Simpan &amp; sambungkan</button>
       </div>

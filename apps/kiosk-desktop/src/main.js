@@ -10,7 +10,8 @@ const config = require('./config');
 const { hashPin, verifyPin, isValidPin } = require('./pin');
 const { pair } = require('./pairing');
 const { normaliseServer, normaliseCode, isValidCode, sameOrigin, isValidTicketId } = require('./server-url');
-const { lockKeyboard } = require('./keys');
+const { lockKeyboard, isLockdown, quitShortcutAction } = require('./keys');
+const { parseDeviceRequired, deviceRequiredAction, repairAllowed, repairDelay, deviceRequiredUrl } = require('./device-required');
 const { createPrintQueue, createPdfPrinterStatus } = require('./printing');
 const { createPrinterStatus } = require('./printer-status');
 const discovery = require('./discovery');
@@ -23,6 +24,10 @@ const DEV = process.argv.includes('--dev') || process.env.KIOSK_DEV === '1';
 // Simulation installers (build-and-copy.mjs --platform mac|linux) bake bankNttSimulation: true into
 // the packaged package.json. The Windows production installers never carry the flag.
 const SIMULATION = app.isPackaged && readPackageFlag('bankNttSimulation');
+// Production lockdown (packaged, non-simulation): window close, Alt+F4 and Ctrl+Q / Cmd+Q never
+// quit the kiosk; only "Keluar aplikasi" (PIN prompt or settings) or OS shutdown does.
+// KIOSK_LOCKDOWN=1 tries the production behaviour in development.
+const LOCKDOWN = isLockdown({ packaged: app.isPackaged, simulation: SIMULATION, lockdownEnv: process.env.KIOSK_LOCKDOWN });
 // --no-printer (or KIOSK_NO_PRINTER=1): tickets are saved as PDF files instead of printed, for
 // trying the kiosk on a laptop without a thermal printer. Ignored in a packaged (installed) app,
 // so a branch kiosk can never hand out numbers without a printed ticket. Simulation builds always
@@ -102,6 +107,11 @@ const state = {
   unresponsiveTimer: null,
   adminFailures: 0,
   adminLockedUntil: 0,
+  lastRepairAt: 0, // last automatic pairing attempt (ms), at most one per minute
+  repairing: null, // pending automatic pairing promise
+  repairTimer: null,
+  pairBlocked: false, // server answered DEVICE_REVOKED: no automatic pairing until settings are saved
+  lastDeviceState: '',
 };
 
 const printers = NO_PRINTER
@@ -226,10 +236,65 @@ async function relocate() {
 /* ------------------------------------------------------------- kiosk window */
 
 function stopRetry() {
+  clearRepairTimer();
   if (state.retryTimer) clearInterval(state.retryTimer);
   if (state.relocateTimer) clearInterval(state.relocateTimer);
   state.retryTimer = null;
   state.relocateTimer = null;
+}
+
+/**
+ * Automatic pairing without a code: { kind, name, installId }. The server reuses the device row of
+ * this installId, so this never creates duplicates. Callers respect the once-per-minute limit.
+ */
+function autoPair(reason) {
+  if (state.repairing) return state.repairing;
+  state.lastRepairAt = Date.now();
+  const server = state.config.server;
+  log.info(`kiosk: pemasangan otomatis (${reason}) installId=${config.maskInstallId(state.config.installId)}`);
+  state.repairing = pair(server, '', { installId: state.config.installId })
+    .then((res) => {
+      if (res.ok && state.config.server === server) {
+        state.pairBlocked = false;
+        state.config = config.save({ ...state.config, token: res.token, deviceName: res.name || state.config.deviceName });
+        if (!res.approved) log.info('kiosk: menunggu persetujuan admin di Admin → Perangkat');
+      } else if (res.code === 'DEVICE_REVOKED') {
+        state.pairBlocked = true;
+        log.warn('kiosk: instalasi ini dicabut admin, tidak ada pemasangan ulang otomatis');
+      }
+      return res;
+    })
+    .finally(() => {
+      state.repairing = null;
+    });
+  return state.repairing;
+}
+
+function clearRepairTimer() {
+  if (state.repairTimer) clearTimeout(state.repairTimer);
+  state.repairTimer = null;
+}
+
+/** Reload the kiosk once the next automatic pairing is allowed (the reload re-checks the token). */
+function scheduleRepair() {
+  if (state.repairTimer) return;
+  const ms = Math.max(repairDelay(state.lastRepairAt), 1_000);
+  log.info(`kiosk: pemasangan ulang otomatis dicoba lagi dalam ${Math.ceil(ms / 1000)} detik`);
+  state.repairTimer = setTimeout(() => {
+    state.repairTimer = null;
+    if (!state.offline) loadKiosk();
+  }, ms);
+}
+
+/** No token yet: pair first. Returns a /device-required state to show instead, or null. */
+async function pairWithoutToken() {
+  if (state.pairBlocked) return 'revoked';
+  if (!repairAllowed(state.lastRepairAt)) return null; // the server answers "unknown"; retried later
+  const res = await autoPair('belum ada token');
+  if (res.ok) return null;
+  if (res.code === 'DEVICE_REVOKED') return 'revoked';
+  if (res.code === 'RATE_LIMITED') return 'limited';
+  return null; // unreachable server: loading fails and the offline page takes over
 }
 
 async function loadKiosk() {
@@ -238,16 +303,47 @@ async function loadKiosk() {
   stopRetry();
   state.offline = false;
   if (!state.config.token) {
-    log.info('kiosk: belum memiliki token, auto-pairing ke server', state.config.server);
-    const res = await pair(state.config.server, '');
-    if (res.ok) {
-      state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
+    const blocked = await pairWithoutToken();
+    if (win.isDestroyed()) return;
+    if (blocked) {
+      log.info(`kiosk: menampilkan status perangkat "${blocked}" dari server`);
+      win.loadURL(deviceRequiredUrl(state.config.server, 'kiosk', blocked)).catch(() => {});
+      return;
     }
   }
   log.info('kiosk: memuat', kioskUrl());
   win.loadURL(kioskUrl()).catch(() => {
     // did-fail-load handles the UI; the promise rejection is expected here.
   });
+}
+
+/**
+ * The server shows /device-required?state=pending|revoked|unknown|limited when this kiosk may not
+ * open /kiosk. Only "unknown" (token unknown, e.g. database reset) re-pairs, at most once a minute;
+ * pending and limited pages re-check by themselves, revoked stays as it is.
+ */
+async function handleDeviceRequired(url) {
+  const info = parseDeviceRequired(url, state.config.server);
+  if (!info) {
+    state.lastDeviceState = '';
+    return;
+  }
+  const action = deviceRequiredAction(url, {
+    server: state.config.server,
+    lastRepairAt: state.lastRepairAt,
+    blocked: state.pairBlocked,
+  });
+  if (state.lastDeviceState !== info.state) {
+    state.lastDeviceState = info.state;
+    log.info(`kiosk: server menampilkan status perangkat "${info.state || '-'}" -> ${action}`);
+  }
+  if (action === 'repair') {
+    const res = await autoPair('token tidak dikenal server');
+    if (res.ok) loadKiosk();
+    else if (res.code !== 'DEVICE_REVOKED') scheduleRepair();
+  } else if (action === 'wait' && info.state === 'unknown') {
+    scheduleRepair();
+  }
 }
 
 async function serverReachable() {
@@ -317,7 +413,7 @@ function createKioskWindow() {
   state.kioskWin = win;
   const wc = win.webContents;
 
-  lockKeyboard(wc, { onAdmin: openSettingsFromKiosk, onQuit: simulationQuit });
+  lockKeyboard(wc, { onAdmin: openAdminMenu, onQuit: handleQuitShortcut });
   // Keep the simulation note in the title instead of the page's own <title>.
   if (SIMULATION) win.on('page-title-updated', (event) => event.preventDefault());
 
@@ -327,10 +423,14 @@ function createKioskWindow() {
   });
 
   win.on('close', (event) => {
-    if (!state.quitting && !state.allowKioskClose) {
-      state.quitting = true;
-      app.quit();
+    if (state.quitting || state.allowKioskClose) return;
+    if (LOCKDOWN) {
+      event.preventDefault();
+      log.info('kiosk: penutupan jendela diblokir');
+      return;
     }
+    state.quitting = true;
+    app.quit();
   });
   win.on('closed', () => {
     if (state.kioskWin === win) state.kioskWin = null;
@@ -376,18 +476,15 @@ function createKioskWindow() {
     if (String(validatedURL).startsWith('file:')) return;
     showOffline(`${errorCode} ${errorDescription} (${validatedURL})`);
   });
-  wc.on('did-navigate', async (_e, url, httpResponseCode) => {
+  wc.on('did-navigate', (_e, url, httpResponseCode) => {
     if (httpResponseCode >= 502 && httpResponseCode <= 504 && sameOrigin(url, state.config.server)) {
       showOffline(`HTTP ${httpResponseCode}`);
+      return;
     }
-    if (String(url).includes('/device-required') && sameOrigin(url, state.config.server)) {
-      log.warn('kiosk: token perangkat ditolak server, mencoba auto-pairing ulang...');
-      const res = await pair(state.config.server, '');
-      if (res.ok) {
-        state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
-        loadKiosk();
-      }
-    }
+    handleDeviceRequired(url).catch((err) => log.warn('kiosk: status perangkat:', err.message));
+  });
+  wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
+    if (isMainFrame) handleDeviceRequired(url).catch((err) => log.warn('kiosk: status perangkat:', err.message));
   });
   wc.on('did-finish-load', () => {
     wc.setVisualZoomLevelLimits(1, 1).catch(() => {});
@@ -453,8 +550,11 @@ function openSetup(mode) {
   });
   win.setMenu(null);
   state.setupWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true, onQuit: SIMULATION ? simulationQuit : undefined });
+  lockKeyboard(win.webContents, { allowEscape: true, onQuit: handleQuitShortcut });
   if (SIMULATION) win.on('page-title-updated', (event) => event.preventDefault());
+  win.on('session-end', () => {
+    state.quitting = true;
+  });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.once('ready-to-show', () => {
@@ -511,7 +611,10 @@ function openAdmin() {
   win.setMenu(null);
   win.setAlwaysOnTop(true, 'screen-saver');
   state.adminWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true, onQuit: SIMULATION ? simulationQuit : undefined });
+  lockKeyboard(win.webContents, { allowEscape: true, onQuit: handleQuitShortcut });
+  win.on('session-end', () => {
+    state.quitting = true;
+  });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.once('ready-to-show', () => {
@@ -532,18 +635,26 @@ function closeAdmin() {
   if (win && !win.isDestroyed()) win.destroy();
 }
 
-function authorisedExit() {
-  log.info('admin: keluar aplikasi (PIN benar)');
+function authorisedExit(reason = 'PIN benar') {
+  log.info(`admin: keluar aplikasi (${reason})`);
   state.quitting = true;
   closeAdmin();
   app.quit();
 }
 
-function simulationQuit() {
-  log.info('kiosk: keluar aplikasi');
-  state.quitting = true;
-  closeAdmin();
-  app.quit();
+/** Ctrl+Q / Cmd+Q / Alt+F4: quick quit in simulation and development, blocked in production. */
+function handleQuitShortcut() {
+  if (quitShortcutAction(LOCKDOWN) === 'quit') {
+    authorisedExit('pintasan keluar, bukan mode produksi');
+    return;
+  }
+  log.info('kiosk: pintasan keluar diblokir (pakai Ctrl+Shift+Alt+K)');
+}
+
+/** Ctrl+Shift+Alt+K: the PIN prompt when a PIN is set, else the settings window directly. */
+function openAdminMenu() {
+  if (state.config.pinHash) openAdmin();
+  else openSettingsFromKiosk();
 }
 
 function openSettingsFromKiosk() {
@@ -620,6 +731,8 @@ function registerIpc() {
       simulation: SIMULATION ? { note: SIMULATION_NOTE, pdfDir: PDF_DIR } : null,
       printerName: cfg.printerName,
       deviceName: cfg.deviceName,
+      hasPin: Boolean(cfg.pinHash),
+      lockdown: LOCKDOWN,
       printers: list.map((p) => ({ name: p.name, displayName: p.displayName || p.name })),
       defaultPrinter,
       logFile: log.file,
@@ -681,10 +794,18 @@ function registerIpc() {
     return { ok: true };
   });
 
+  // "Keluar aplikasi" in the settings window: reaching edit-mode settings already needed the PIN
+  // (when one is set), so this is an authorised exit.
+  ipcMain.handle('setup:exit', async (event) => {
+    if (!fromSetup(event)) throw new Error('forbidden');
+    if (state.setupMode !== 'edit' || !config.isComplete(state.config)) return { ok: false };
+    setImmediate(() => authorisedExit('dari pengaturan'));
+    return { ok: true };
+  });
+
   ipcMain.handle('setup:submit', async (event, form) => {
     if (!fromSetup(event)) throw new Error('forbidden');
     const cfg = state.config;
-    const edit = state.setupMode === 'edit' && config.isComplete(cfg);
 
     const server = normaliseServer(form.server);
     if (!server) return { ok: false, field: 'server', message: 'Alamat server tidak valid. Contoh: 10.70.10.67:3000' };
@@ -694,24 +815,34 @@ function registerIpc() {
       return { ok: false, field: 'code', message: 'Kode pemasangan harus 6 karakter (huruf dan angka).' };
     }
 
+    // The PIN stays optional (recommended); when typed it must be valid and confirmed.
+    const pinGiven = form.pin !== '' || form.pinConfirm !== '';
+    if (pinGiven) {
+      if (!isValidPin(form.pin)) return { ok: false, field: 'pin', message: 'PIN admin minimal 4 angka (hanya angka).' };
+      if (form.pin !== form.pinConfirm) return { ok: false, field: 'pinConfirm', message: 'Konfirmasi PIN tidak sama.' };
+    }
+
     if (form.printerName && !(await printerExists(form.printerName))) {
       return { ok: false, field: 'printer', message: `Printer ${form.printerName} tidak ditemukan.` };
     }
 
     let token = cfg.token;
     let deviceName = cfg.deviceName;
-    // Sambungkan otomatis ke server (atau gunakan kode bila diisi)
+    let approved = true;
+    // Automatic pairing with the installId, or the pairing code when one was typed.
     const needsToken = !token || server !== cfg.server;
     if (code || needsToken) {
-      log.info('setup: menyambungkan perangkat otomatis ke', server);
-      const result = await pair(server, code || '');
+      log.info(`setup: ${code ? 'memasangkan perangkat dengan kode' : 'menyambungkan perangkat otomatis'} ke`, server);
+      const result = await pair(server, code, { installId: cfg.installId });
       if (!result.ok) return { ok: false, field: result.field, message: result.message };
       token = result.token;
-      deviceName = result.name;
+      deviceName = result.name || deviceName;
+      approved = result.approved;
+      state.pairBlocked = false;
+      state.lastRepairAt = Date.now();
     }
 
-    const pinGiven = Boolean(form.pin && form.pin.trim());
-    const pinHash = pinGiven ? await hashPin(form.pin) : (cfg.pinHash || '');
+    const pinHash = pinGiven ? await hashPin(form.pin) : cfg.pinHash || '';
     const serverName = (await learnServerName(server)) || cfg.serverName || '';
     state.config = config.save({ ...cfg, server, serverName, token, printerName: form.printerName, pinHash, deviceName });
     printers.invalidate();
@@ -724,7 +855,7 @@ function registerIpc() {
     // Open the kiosk first so the app never has zero windows.
     openKiosk();
     closeSetup();
-    return { ok: true, deviceName };
+    return { ok: true, deviceName, approved };
   });
 
   ipcMain.handle('admin:state', async (event) => {
@@ -799,11 +930,12 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
-  // Simulation: any quit request (Cmd+Q, Dock → Quit, logout) is allowed.
-  if (SIMULATION) state.quitting = true;
-  // Only an authorised exit (or OS shutdown) may quit while the kiosk is up.
-  if (state.kioskWin && !state.quitting) {
+  // Simulation / development: any quit request (Cmd+Q, Dock → Quit, logout) is allowed.
+  if (!LOCKDOWN) state.quitting = true;
+  // Production: once set up, only an authorised exit or OS shutdown / session end may quit.
+  if (!state.quitting && config.isComplete(state.config)) {
     event.preventDefault();
+    log.info('aplikasi: permintaan keluar diblokir');
     return;
   }
   printers.stop();
@@ -816,7 +948,7 @@ app.whenReady().then(() => {
   config.init(app.getPath('userData'));
   if (process.platform === 'win32') app.setAppUserModelId('id.kiosk-antrian.app');
   log.info(
-    `aplikasi: mulai versi ${app.getVersion()} ${DEV ? '(dev)' : ''}${SIMULATION ? ' (simulasi)' : ''} userData=${app.getPath('userData')}`,
+    `aplikasi: mulai versi ${app.getVersion()} ${DEV ? '(dev)' : ''}${SIMULATION ? ' (simulasi)' : ''}${LOCKDOWN ? ' (terkunci)' : ''} userData=${app.getPath('userData')}`,
   );
   if (NO_PRINTER) log.warn(`printer: mode tanpa printer, tiket disimpan sebagai PDF di ${PDF_DIR}`);
   else if (NO_PRINTER_REQUESTED) log.warn('printer: --no-printer diabaikan karena aplikasi terpasang (bukan mode pengembangan)');
@@ -828,7 +960,7 @@ app.whenReady().then(() => {
 
   hardenSessions();
   registerIpc();
-  state.config = config.load();
+  state.config = config.ensureInstallId(config.load());
 
   if (config.isComplete(state.config)) {
     enableAutoStart();

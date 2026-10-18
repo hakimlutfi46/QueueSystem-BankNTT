@@ -149,7 +149,8 @@
       scanText.textContent = `${servers.size} server ditemukan: ${best.name}.`;
       if (!touched && (!serverInput.value || serverInput.value === 'http://127.0.0.1:3000')) {
         select(best.url, { byUser: false });
-        if (mode === 'first') {
+        // Connect right away on first run, unless staff already started typing a code or PIN.
+        if (mode === 'first' && !$('code').value && !$('pin').value && !$('pinConfirm').value) {
           showAlert('info', `Server "${best.name}" ditemukan. Menyambung otomatis…`);
           form.requestSubmit();
         }
@@ -160,15 +161,21 @@
   function formValues() {
     return {
       server: $('server').value.trim(),
-      code: '',
+      code: $('code').value.trim(),
       printerName: printerSelect.value,
-      pin: '',
-      pinConfirm: '',
+      pin: $('pin').value,
+      pinConfirm: $('pinConfirm').value,
     };
   }
 
   function validateLocally(v) {
     if (!v.server) return ['server', 'Alamat server wajib diisi.'];
+    const code = normaliseCodeInput(v.code);
+    if (code && code.length !== 6) return ['code', 'Kode pemasangan harus 6 karakter.'];
+    if (v.pin || v.pinConfirm) {
+      if (!/^\d{4,12}$/.test(v.pin)) return ['pin', 'PIN admin minimal 4 angka (hanya angka).'];
+      if (v.pin !== v.pinConfirm) return ['pinConfirm', 'Konfirmasi PIN tidak sama.'];
+    }
     return null;
   }
 
@@ -188,7 +195,11 @@
     try {
       const result = await api.submit(values);
       if (result.ok) {
-        showAlert('ok', result.deviceName ? `Berhasil terhubung ke "${result.deviceName}". Membuka kiosk…` : 'Tersimpan. Membuka kiosk…');
+        if (result.approved === false) {
+          showAlert('info', 'Tersambung. Kiosk menunggu persetujuan admin di Admin → Perangkat…');
+        } else {
+          showAlert('ok', result.deviceName ? `Berhasil. Terdaftar sebagai "${result.deviceName}". Membuka kiosk…` : 'Tersimpan. Membuka kiosk…');
+        }
         return;
       }
       if (result.field) setError(result.field, result.message);
@@ -201,10 +212,13 @@
     }
   });
 
-  if ($('code')) {
-    $('code').addEventListener('input', (e) => {
-      const raw = normaliseCodeInput(e.target.value).slice(0, 6);
-      e.target.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
+  $('code').addEventListener('input', (e) => {
+    const raw = normaliseCodeInput(e.target.value).slice(0, 6);
+    e.target.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
+  });
+  for (const id of ['pin', 'pinConfirm']) {
+    $(id).addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '');
     });
   }
   form.addEventListener('input', (e) => {
@@ -234,6 +248,15 @@
   });
 
   $('cancel').addEventListener('click', () => api.cancel());
+  $('exit').addEventListener('click', async () => {
+    $('exit').disabled = true;
+    showAlert('info', 'Menutup aplikasi…');
+    const result = await api.exit().catch(() => ({ ok: false }));
+    if (!result.ok) {
+      $('exit').disabled = false;
+      showAlert('error', 'Aplikasi tidak dapat ditutup dari sini.');
+    }
+  });
   $('open-admin').addEventListener('click', async () => {
     const result = await api.openAdmin($('server').value.trim());
     if (!result.ok) setError('server', result.message);
@@ -262,14 +285,20 @@
     }
     if (mode !== 'edit' && init.bundledServer) {
       $('subtitle').textContent =
-        'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi.';
+        'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi. Setujui kiosk ini lewat Buka panel admin → Perangkat.';
+    }
+    if (init.hasPin) {
+      $('pin-hint').textContent = 'PIN sudah dipasang. Kosongkan untuk tetap memakai PIN lama, atau isi untuk menggantinya.';
+      $('pin').placeholder = 'Tidak diubah';
     }
     if (mode === 'edit') {
       $('title').textContent = 'Pengaturan Kiosk';
       $('subtitle').textContent = init.deviceName
-        ? `Perangkat ini terdaftar sebagai "${init.deviceName}".`
-        : 'Pengaturan server dan printer.';
+        ? `Perangkat ini terdaftar sebagai "${init.deviceName}". Kosongkan kode dan PIN jika tidak ingin mengubahnya.`
+        : 'Pengaturan server, printer, dan PIN admin.';
+      $('code-hint').textContent = 'Isi hanya untuk memasangkan ulang dengan kode dari admin. Tanpa kode, kiosk tersambung otomatis.';
       $('cancel').hidden = false;
+      $('exit').hidden = false;
       submitBtn.textContent = 'Simpan';
     }
     if (init.server) markSelected();

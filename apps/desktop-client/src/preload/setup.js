@@ -20,5 +20,6 @@ contextBridge.exposeInMainWorld(
         pinConfirm: String(form?.pinConfirm ?? ''),
       }),
     cancel: () => ipcRenderer.invoke('setup:cancel'),
+    exit: () => ipcRenderer.invoke('setup:exit'),
   }),
 );

@@ -24,5 +24,6 @@ contextBridge.exposeInMainWorld(
       }),
     cancel: () => ipcRenderer.invoke('setup:cancel'),
     openAdmin: (server) => ipcRenderer.invoke('setup:open-admin', String(server ?? '')),
+    exit: () => ipcRenderer.invoke('setup:exit'),
   }),
 );

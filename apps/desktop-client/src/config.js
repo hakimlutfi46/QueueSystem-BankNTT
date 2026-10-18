@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const log = require('./logger');
@@ -12,9 +13,10 @@ const log = require('./logger');
  *   token:      "<device token from /api/devices/pair>"   (TV only)
  *   pinHash:    "scrypt$N$r$p$salt$hash"                   (TV only)
  *   deviceName: "<name returned by the server>"            (TV only)
+ *   installId:  "<random UUID made once per installation>" (TV only; the server reuses one device row per id)
  * }
  */
-const EMPTY = Object.freeze({ server: '', serverName: '', token: '', pinHash: '', deviceName: '' });
+const EMPTY = Object.freeze({ server: '', serverName: '', token: '', pinHash: '', deviceName: '', installId: '' });
 
 let configPath = null;
 
@@ -38,6 +40,19 @@ function isComplete(cfg, role) {
   return true;
 }
 
+const INSTALL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Returns cfg with a valid installId, generating (and saving) one the first time. */
+function ensureInstallId(cfg, { persist = save } = {}) {
+  if (cfg && typeof cfg.installId === 'string' && INSTALL_ID.test(cfg.installId)) return cfg;
+  return persist({ ...cfg, installId: crypto.randomUUID() });
+}
+
+/** Short form for logs: the full installId is never logged. */
+function maskInstallId(id) {
+  return id ? `${String(id).slice(0, 8)}…` : '-';
+}
+
 /** Atomic write: temp file + rename so a power cut never leaves half a file. */
 function save(cfg) {
   const data = { ...EMPTY, ...cfg };
@@ -48,4 +63,4 @@ function save(cfg) {
   return data;
 }
 
-module.exports = { init, load, save, isComplete, get path() { return configPath; } };
+module.exports = { init, load, save, isComplete, ensureInstallId, maskInstallId, get path() { return configPath; } };
