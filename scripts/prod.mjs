@@ -76,6 +76,12 @@ if (!existsSync(buildIdFile) || args.includes("--rebuild")) {
   run(npx, ["next", "build"], env);
 }
 
+// Pastikan asset statis (.next/static dan public/) tersalin ke standalone server
+const standaloneStatic = path.join(process.cwd(), ".next", "standalone", ".next", "static");
+if (!existsSync(standaloneStatic)) {
+  run(process.execPath, [path.join(process.cwd(), "scripts", "postbuild.mjs")], env);
+}
+
 let name = "";
 async function refreshName() {
   const client = new pg.Client({ connectionString: databaseUrl, connectionTimeoutMillis: 5000 });
