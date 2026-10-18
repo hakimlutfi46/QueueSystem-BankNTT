@@ -68,3 +68,6 @@ next-env.d.ts
 
 # worktree sementara Claude Code
 /.claude/worktrees/
+
+# sertifikat penandatanganan lokal app Mac (jangan di-commit)
+/apps/desktop-client/.signing/
