@@ -346,7 +346,7 @@ Dua pilihan:
 
 ### Daftar periksa sebelum dipakai nasabah
 
-- [ ] `.env`: `AUTH_SECRET` acak, `APP_TIMEZONE` sesuai cabang, `SEED_ADMIN_PASSWORD`/`SEED_STAFF_PASSWORD` bukan bawaan.
+- [ ] `.env`: `AUTH_SECRET` acak, `APP_TIMEZONE` sesuai cabang, `SEED_ADMIN_PASSWORD` bukan bawaan, `SEED_STAFF_PASSWORD` kosong.
 - [ ] `KIOSK_TOKEN` dan `DISPLAY_TOKEN` dikosongkan setelah semua perangkat didaftarkan dari Admin.
 - [ ] `AUTH_ALLOW_WEAK_PASSWORDS` **tidak** diisi.
 - [ ] Server memakai IP tetap di jaringan cabang.
@@ -390,7 +390,7 @@ Versi Docker ada di [README.md](../README.md#backup-database).
 | `AUTH_SECRET` | Ya | String acak panjang (`openssl rand -base64 32`) untuk sesi login |
 | `APP_TIMEZONE` | Ya | `Asia/Jakarta` (WIB), `Asia/Makassar` (WITA), `Asia/Jayapura` (WIT). Bisa diganti di Admin → Pengaturan. |
 | `SEED_ADMIN_PASSWORD` | Saat seed | Sandi awal akun `admin` |
-| `SEED_STAFF_PASSWORD` | Saat seed | Sandi awal akun petugas contoh |
+| `SEED_STAFF_PASSWORD` | Saat seed (opsional) | Kosong: tidak ada akun petugas awal. Diisi: dibuat `petugas.cs` dan `petugas.teller` dengan sandi ini (untuk uji end-to-end) |
 | `SEED_ORG_NAME` | Tidak | Nama lembaga bila bukan Bank NTT |
 | `KIOSK_TOKEN`, `DISPLAY_TOKEN` | Tidak | Token cadangan kiosk/TV. Kosongkan di cabang bila semua perangkat terdaftar dari Admin. Dipakai uji e2e. |
 | `TICKET_OUTPUT` | Tidak | `printer` atau `pdf` |

@@ -74,11 +74,11 @@ cp .env.example .env
 Isi `.env` sebelum dinyalakan:
 
 - `AUTH_SECRET`: string acak yang panjang.
-- `SEED_ADMIN_PASSWORD` dan `SEED_STAFF_PASSWORD`: kata sandi awal. Bila kosong saat `npm run db:seed`, dipakai `Password123`. Akun yang masuk dengan sandi bawaan atau lemah langsung diminta menggantinya (lihat **Kata sandi dan keamanan masuk**).
+- `SEED_ADMIN_PASSWORD`: kata sandi awal admin. Bila kosong saat `npm run db:seed`, dipakai `Password123`. Akun yang masuk dengan sandi bawaan atau lemah langsung diminta menggantinya (lihat **Kata sandi dan keamanan masuk**).
 - `APP_TIMEZONE`: `Asia/Makassar` untuk WITA, `Asia/Jakarta` untuk WIB, `Asia/Jayapura` untuk WIT. Setelah masuk, zona waktu juga bisa diganti dari Admin → Pengaturan.
 - `SEED_ORG_NAME` (opsional): nama lembaga bila bukan Bank NTT.
 
-Tiga nilai pertama wajib. Compose menolak menyala dan menyebut nama variabelnya bila salah satunya kosong, supaya server tidak pernah berjalan dengan rahasia bawaan. String acak bisa dibuat dengan `openssl rand -base64 32`.
+`AUTH_SECRET` dan `SEED_ADMIN_PASSWORD` wajib. Compose menolak menyala dan menyebut nama variabelnya bila salah satunya kosong, supaya server tidak pernah berjalan dengan rahasia bawaan. String acak bisa dibuat dengan `openssl rand -base64 32`.
 
 Lalu jalankan:
 
@@ -88,7 +88,7 @@ docker compose up --build -d
 
 Compose menyalakan Postgres, menjalankan migrasi dan data awal, lalu aplikasi di port 3000. Buka `http://localhost:3000` di server.
 
-Masuk admin di `http://localhost:3000/login` dengan nama pengguna `admin` dan kata sandi dari `SEED_ADMIN_PASSWORD`. Petugas awal adalah `petugas.cs` dan `petugas.teller`, dengan kata sandi dari `SEED_STAFF_PASSWORD`.
+Masuk admin di `http://localhost:3000/login` dengan nama pengguna `admin` dan kata sandi dari `SEED_ADMIN_PASSWORD`. Data awal tidak berisi akun petugas; tambahkan sendiri dari Admin → Petugas.
 
 Data awal berisi layanan Customer Service (`A`) dan Teller (`B`), plus loket CS 1, CS 2, Teller 1, dan Teller 2. Loket baru ditambah dari Admin dan langsung muncul di TV setelah petugas membukanya.
 

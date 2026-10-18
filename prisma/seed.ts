@@ -18,17 +18,15 @@ const SETTINGS: Array<{ key: string; value: SettingValue }> = [
   { key: "ticket_width_mm", value: 80 },
 ];
 
-// Kata sandi awal bila SEED_ADMIN_PASSWORD atau SEED_STAFF_PASSWORD kosong. Ganti dari Admin setelah masuk.
+// Kata sandi awal admin bila SEED_ADMIN_PASSWORD kosong. Ganti setelah masuk.
 const DEFAULT_PASSWORD = "Password123";
-
-function passwordEnv(name: string): string {
-  return process.env[name]?.trim() || DEFAULT_PASSWORD;
-}
 
 async function main(): Promise<void> {
   const prisma = getPrisma();
-  const adminPassword = passwordEnv("SEED_ADMIN_PASSWORD");
-  const staffPassword = passwordEnv("SEED_STAFF_PASSWORD");
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD?.trim() || DEFAULT_PASSWORD;
+  // Petugas ditambahkan sendiri dari Admin → Petugas. Akun petugas.cs dan petugas.teller
+  // hanya dibuat bila SEED_STAFF_PASSWORD diisi, misalnya untuk uji end-to-end.
+  const staffPassword = process.env.SEED_STAFF_PASSWORD?.trim();
 
   const customerService = await prisma.service.upsert({
     where: { prefix: "A" },
@@ -41,39 +39,30 @@ async function main(): Promise<void> {
     update: {},
   });
 
-  const adminHash = await argon2.hash(adminPassword);
-  const staffHash = await argon2.hash(staffPassword);
-
   await prisma.user.upsert({
     where: { username: "admin" },
     create: {
       username: "admin",
       name: "Admin",
-      passwordHash: adminHash,
+      passwordHash: await argon2.hash(adminPassword),
       role: "ADMIN",
     },
     update: {},
   });
-  await prisma.user.upsert({
-    where: { username: "petugas.cs" },
-    create: {
-      username: "petugas.cs",
-      name: "Petugas CS",
-      passwordHash: staffHash,
-      role: "STAFF",
-    },
-    update: {},
-  });
-  await prisma.user.upsert({
-    where: { username: "petugas.teller" },
-    create: {
-      username: "petugas.teller",
-      name: "Petugas Teller",
-      passwordHash: staffHash,
-      role: "STAFF",
-    },
-    update: {},
-  });
+
+  if (staffPassword) {
+    const staffHash = await argon2.hash(staffPassword);
+    for (const staff of [
+      { username: "petugas.cs", name: "Petugas CS" },
+      { username: "petugas.teller", name: "Petugas Teller" },
+    ]) {
+      await prisma.user.upsert({
+        where: { username: staff.username },
+        create: { ...staff, passwordHash: staffHash, role: "STAFF" },
+        update: {},
+      });
+    }
+  }
 
   const servicesByPrefix = new Map([
     [customerService.prefix, customerService.id],

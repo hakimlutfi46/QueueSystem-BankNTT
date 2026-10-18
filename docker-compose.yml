@@ -27,7 +27,8 @@ services:
       APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
       # Wajib diisi di .env; Compose berhenti dengan pesan bila kosong.
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Isi SEED_ADMIN_PASSWORD di .env}
-      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:?Isi SEED_STAFF_PASSWORD di .env}
+      # Opsional; kosong berarti tidak ada akun petugas awal.
+      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-}
       SEED_ORG_NAME: ${SEED_ORG_NAME:-}
     depends_on:
       db:
