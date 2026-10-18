@@ -11,6 +11,7 @@ Dokumen lain yang lebih rinci:
 | [DECISIONS.md](../DECISIONS.md) | Catatan keputusan desain beserta alasannya |
 | [PLAN.md](../PLAN.md) | Spesifikasi awal proyek |
 | [apps/kiosk-desktop/README.md](../apps/kiosk-desktop/README.md) | Rincian aplikasi kiosk Windows |
+| [PANDUAN_PEMASANGAN_PC_KIOSK.md](PANDUAN_PEMASANGAN_PC_KIOSK.md) | Panduan langkah demi langkah pemasangan mode produksi di PC Kios Tiket |
 
 ## Daftar isi
 
