@@ -36,6 +36,12 @@ npm run dev
 
 Buka `http://localhost:3000`. Dari kiosk, TV, atau HP di jaringan yang sama, pakai IP laptop, misalnya `http://192.168.1.97:3000`. IP laptop ada di pengaturan Wi-Fi.
 
+Supaya aplikasi Admin, Loket, TV, dan kiosk (termasuk installer simulasi Mac/Ubuntu) menemukan server ini sendiri tanpa mengetik IP, jalankan di terminal kedua:
+
+```bash
+npm run discovery        # menjawab pencarian server di UDP 41234; tambahkan -- --port 3100 bila web memakai port lain
+```
+
 | Halaman | Alamat | Masuk dengan |
 | --- | --- | --- |
 | Admin | `/admin` | `admin`, kata sandi dari `SEED_ADMIN_PASSWORD` |
