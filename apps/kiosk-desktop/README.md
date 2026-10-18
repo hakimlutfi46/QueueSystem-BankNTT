@@ -59,6 +59,61 @@ dengan cetak sungguhan. Bisa juga lewat `KIOSK_NO_PRINTER=1`. Mode ini hanya ber
 dijalankan dari kode sumber; aplikasi yang terpasang dari installer mengabaikannya, jadi kiosk di cabang
 tetap tidak mengeluarkan nomor tanpa tiket tercetak.
 
+## Installer simulasi (Mac dan Ubuntu)
+
+Untuk mensimulasikan cabang di MacBook (Apple Silicon) atau PC Ubuntu 24.04 LTS x64 tanpa printer
+thermal. Kodenya sama dengan aplikasi Windows, hanya saja build ini selalu dalam **mode simulasi**.
+
+```bash
+npm run kiosk:build:mac      # -> downloads/simulasi/BANK-NTT-Ticket-Simulasi-mac-arm64.dmg
+npm run kiosk:build:linux    # -> downloads/simulasi/BANK-NTT-Ticket-Simulasi-linux-x86_64.AppImage
+                             #    dan downloads/simulasi/BANK-NTT-Ticket-Simulasi-linux-amd64.deb
+```
+
+Keduanya bisa dibuat di Mac (juga Apple Silicon tanpa Rosetta). Build pertama butuh internet untuk
+mengunduh Electron dan alat build dari GitHub; setelah itu tersimpan di cache. `--with-server` tidak
+bisa dipakai di sini karena bundle server hanya untuk Windows. Installer simulasi tidak masuk
+`downloads/kiosk-installer.json`, jadi tidak pernah ditawarkan di Admin → Perangkat.
+
+Bedanya dengan aplikasi Windows:
+
+- Nama aplikasi **BANK NTT Ticket (Simulasi)**. Judul jendela dan layar pemasangan menulis
+  "Simulasi — tiket disimpan sebagai PDF".
+- Tiket (juga **Cetak uji**) selalu disimpan sebagai PDF di `~/Downloads/kiosk-tiket-pdf`, lalu dibuka
+  dengan penampil PDF bawaan. Saat kiosk layar penuh, penampil itu bisa muncul di belakangnya; berkasnya
+  tetap ada di folder tadi.
+- Tidak berjalan otomatis saat login.
+- Pengaturan dan log terpisah dari kiosk sungguhan: `~/Library/Application Support/kiosk-antrian-sim`
+  (Mac) atau `~/.config/kiosk-antrian-sim` (Ubuntu), log di `logs/kiosk.log`.
+- Keluar: **Ctrl + Shift + Alt + K** lalu PIN, seperti di Windows (di Mac **Cmd + Shift + Option + K**
+  juga bisa). Khusus simulasi, **Cmd + Q** (Mac), **Ctrl + Q** (Ubuntu), dan Dock → Keluar langsung
+  menutup aplikasi tanpa PIN, supaya laptop pengembang tidak terkunci. Di kiosk Windows tetap hanya
+  lewat PIN.
+
+### Memasang di Mac
+
+1. Buka file `.dmg`, seret **BANK NTT Ticket (Simulasi)** ke **Applications**.
+2. Aplikasi ditandatangani *ad-hoc* (tanpa sertifikat Apple). Di Mac tempat build dibuat, aplikasi
+   langsung terbuka. Di Mac lain (diunduh, AirDrop), Gatekeeper menolaknya: klik kanan aplikasi →
+   **Open** → **Open**, atau bila muncul pesan "rusak" jalankan
+   `xattr -cr "/Applications/BANK NTT Ticket (Simulasi).app"`.
+3. Kiosk layar penuh di Mac menyembunyikan Dock dan menonaktifkan Cmd+Tab; tutup dengan Cmd+Q.
+
+### Memasang di Ubuntu 24.04
+
+- **deb** (disarankan): `sudo apt install ./BANK-NTT-Ticket-Simulasi-linux-amd64.deb`. Aplikasi muncul
+  di menu sebagai "BANK NTT Ticket (Simulasi)" (perintah `kiosk-antrian-sim`); paket memasang profil
+  AppArmor yang dibutuhkan sandbox Electron di Ubuntu 24.04. Hapus: `sudo apt remove kiosk-antrian-sim`.
+- **AppImage**: `chmod +x BANK-NTT-Ticket-Simulasi-linux-x86_64.AppImage`, lalu jalankan. Bila menolak
+  jalan karena FUSE, pasang `sudo apt install libfuse2t64`. Bila berhenti dengan pesan tentang
+  *SUID sandbox helper* (pembatasan AppArmor Ubuntu 24.04), jalankan dengan `--no-sandbox` atau pakai deb.
+
+### Server dan pemasangan
+
+Jalankan server dari repo di laptop itu (`npm run dev`, alamat `127.0.0.1:3000`) atau di PC lain di
+jaringan yang sama (alamat IP PC itu). Pairing sama dengan di cabang: Admin → Perangkat → daftarkan
+kiosk → **Kode aplikasi**, lalu isi alamat server, kode, dan PIN di layar pemasangan.
+
 ## Installer Ticket + Server (mesin tiket utama)
 
 Untuk cabang tanpa server terpisah: mesin tiket utama sekaligus menjadi server antrian. Installer ini

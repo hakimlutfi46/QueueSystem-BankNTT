@@ -16,11 +16,16 @@ const { createPrinterStatus } = require('./printer-status');
 
 // --dev (or KIOSK_DEV=1): windowed instead of kiosk/fullscreen, DevTools allowed.
 const DEV = process.argv.includes('--dev') || process.env.KIOSK_DEV === '1';
+// Simulation installers (build-and-copy.mjs --platform mac|linux) bake bankNttSimulation: true into
+// the packaged package.json. The Windows production installers never carry the flag.
+const SIMULATION = app.isPackaged && readPackageFlag('bankNttSimulation');
 // --no-printer (or KIOSK_NO_PRINTER=1): tickets are saved as PDF files instead of printed, for
 // trying the kiosk on a laptop without a thermal printer. Ignored in a packaged (installed) app,
-// so a branch kiosk can never hand out numbers without a printed ticket.
+// so a branch kiosk can never hand out numbers without a printed ticket. Simulation builds always
+// save PDFs.
 const NO_PRINTER_REQUESTED = process.argv.includes('--no-printer') || process.env.KIOSK_NO_PRINTER === '1';
-const NO_PRINTER = NO_PRINTER_REQUESTED && !app.isPackaged;
+const NO_PRINTER = SIMULATION || (NO_PRINTER_REQUESTED && !app.isPackaged);
+const SIMULATION_NOTE = 'Simulasi — tiket disimpan sebagai PDF';
 const RENDERER = path.join(__dirname, 'renderer');
 const PRELOAD = path.join(__dirname, 'preload');
 const RETRY_MS = 5_000;
@@ -28,11 +33,22 @@ const UNRESPONSIVE_GRACE_MS = 10_000;
 const ADMIN_MAX_FAILURES = 5;
 const ADMIN_LOCK_MS = 60_000;
 
+function readPackageFlag(key) {
+  try {
+    return require('../package.json')[key] === true;
+  } catch {
+    return false;
+  }
+}
+
 // Settings live in a fixed folder (%APPDATA%\kiosk-antrian), not one named after productName, so a
 // rebuild with another app name from the admin panel keeps the pairing, printer, and PIN.
+// Simulation builds use their own folder so they never share a real kiosk's configuration.
 app.setPath(
   'userData',
-  process.env.KIOSK_USER_DATA ? path.resolve(process.env.KIOSK_USER_DATA) : path.join(app.getPath('appData'), 'kiosk-antrian'),
+  process.env.KIOSK_USER_DATA
+    ? path.resolve(process.env.KIOSK_USER_DATA)
+    : path.join(app.getPath('appData'), SIMULATION ? 'kiosk-antrian-sim' : 'kiosk-antrian'),
 );
 
 // Name and icon are chosen when the installer is built (scripts/build-and-copy.mjs).
@@ -46,6 +62,7 @@ const BUNDLED_SERVER = app.isPackaged
   ? fs.existsSync(path.join(process.resourcesPath, 'server', 'bundle-manifest.json'))
   : process.env.KIOSK_BUNDLED_SERVER === '1';
 const LOCAL_SERVER = 'http://127.0.0.1:3000';
+const PDF_DIR = path.join(app.getPath('downloads'), 'kiosk-tiket-pdf');
 const windowIcon = () => (fs.existsSync(BRAND_ICON) ? BRAND_ICON : undefined);
 
 function brandIconDataUrl() {
@@ -81,9 +98,9 @@ const state = {
 };
 
 const printers = NO_PRINTER
-  ? createPdfPrinterStatus()
+  ? createPdfPrinterStatus({ simulation: SIMULATION })
   : createPrinterStatus({ getPrinterName: () => state.config?.printerName || '' });
-const enqueuePrint = createPrintQueue(NO_PRINTER ? { pdfDir: path.join(app.getPath('downloads'), 'kiosk-tiket-pdf') } : {});
+const enqueuePrint = createPrintQueue(NO_PRINTER ? { pdfDir: PDF_DIR } : {});
 
 process.on('uncaughtException', (err) => log.error('uncaughtException:', err));
 process.on('unhandledRejection', (err) => log.error('unhandledRejection:', err));
@@ -111,6 +128,11 @@ function rendererFile(name) {
 function enableAutoStart() {
   if (!app.isPackaged) {
     log.info('autostart: dilewati (mode pengembangan)');
+    return;
+  }
+  if (SIMULATION) {
+    // A simulation build runs on a developer's laptop: never start it at login.
+    log.info('autostart: dilewati (simulasi)');
     return;
   }
   try {
@@ -193,7 +215,7 @@ function createKioskWindow() {
     height: 800,
     backgroundColor: '#ffffff',
     autoHideMenuBar: true,
-    title: APP_NAME,
+    title: SIMULATION ? `${APP_NAME} — ${SIMULATION_NOTE}` : APP_NAME,
     icon: windowIcon(),
     webPreferences: {
       ...baseWebPreferences('kiosk.js'),
@@ -204,7 +226,9 @@ function createKioskWindow() {
   state.kioskWin = win;
   const wc = win.webContents;
 
-  lockKeyboard(wc, { onAdmin: openAdmin });
+  lockKeyboard(wc, { onAdmin: openAdmin, onQuit: SIMULATION ? simulationQuit : undefined });
+  // Keep the simulation note in the title instead of the page's own <title>.
+  if (SIMULATION) win.on('page-title-updated', (event) => event.preventDefault());
 
   win.once('ready-to-show', () => {
     win.show();
@@ -324,13 +348,14 @@ function openSetup(mode) {
     minHeight: 640,
     backgroundColor: '#0a4ea3',
     autoHideMenuBar: true,
-    title: `Pengaturan ${APP_NAME}`,
+    title: SIMULATION ? `Pengaturan ${APP_NAME} — ${SIMULATION_NOTE}` : `Pengaturan ${APP_NAME}`,
     icon: windowIcon(),
     webPreferences: baseWebPreferences('setup.js'),
   });
   win.setMenu(null);
   state.setupWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true });
+  lockKeyboard(win.webContents, { allowEscape: true, onQuit: SIMULATION ? simulationQuit : undefined });
+  if (SIMULATION) win.on('page-title-updated', (event) => event.preventDefault());
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.once('ready-to-show', () => {
@@ -386,7 +411,7 @@ function openAdmin() {
   win.setMenu(null);
   win.setAlwaysOnTop(true, 'screen-saver');
   state.adminWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true });
+  lockKeyboard(win.webContents, { allowEscape: true, onQuit: SIMULATION ? simulationQuit : undefined });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.once('ready-to-show', () => {
@@ -409,6 +434,15 @@ function closeAdmin() {
 
 function authorisedExit() {
   log.info('admin: keluar aplikasi (PIN benar)');
+  state.quitting = true;
+  closeAdmin();
+  app.quit();
+}
+
+// Simulation only: Cmd+Q (macOS) / Ctrl+Q (Linux) and Dock → Quit close the app without the PIN,
+// so a developer's laptop is never stuck behind the kiosk. Production keeps the PIN-only exit.
+function simulationQuit() {
+  log.info('simulasi: keluar aplikasi tanpa PIN');
   state.quitting = true;
   closeAdmin();
   app.quit();
@@ -484,6 +518,7 @@ function registerIpc() {
       icon: brandIconDataUrl(),
       server: cfg.server || (BUNDLED_SERVER ? LOCAL_SERVER : ''),
       bundledServer: BUNDLED_SERVER,
+      simulation: SIMULATION ? { note: SIMULATION_NOTE, pdfDir: PDF_DIR } : null,
       printerName: cfg.printerName,
       deviceName: cfg.deviceName,
       printers: list.map((p) => ({ name: p.name, displayName: p.displayName || p.name })),
@@ -651,6 +686,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
+  // Simulation: any quit request (Cmd+Q, Dock → Quit, logout) is allowed.
+  if (SIMULATION) state.quitting = true;
   // Only an authorised exit (or OS shutdown) may quit while the kiosk is up.
   if (state.kioskWin && !state.quitting) {
     event.preventDefault();
@@ -665,8 +702,10 @@ app.whenReady().then(() => {
   log.init(app.getPath('userData'));
   config.init(app.getPath('userData'));
   if (process.platform === 'win32') app.setAppUserModelId('id.kiosk-antrian.app');
-  log.info(`aplikasi: mulai versi ${app.getVersion()} ${DEV ? '(dev)' : ''} userData=${app.getPath('userData')}`);
-  if (NO_PRINTER) log.warn(`printer: mode tanpa printer, tiket disimpan sebagai PDF di ${path.join(app.getPath('downloads'), 'kiosk-tiket-pdf')}`);
+  log.info(
+    `aplikasi: mulai versi ${app.getVersion()} ${DEV ? '(dev)' : ''}${SIMULATION ? ' (simulasi)' : ''} userData=${app.getPath('userData')}`,
+  );
+  if (NO_PRINTER) log.warn(`printer: mode tanpa printer, tiket disimpan sebagai PDF di ${PDF_DIR}`);
   else if (NO_PRINTER_REQUESTED) log.warn('printer: --no-printer diabaikan karena aplikasi terpasang (bukan mode pengembangan)');
 
   powerMonitor.on('shutdown', () => {

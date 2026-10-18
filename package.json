@@ -19,6 +19,8 @@
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:backup": "node scripts/backup-db.mjs",
     "kiosk:build": "node apps/kiosk-desktop/scripts/build-and-copy.mjs",
+    "kiosk:build:mac": "node apps/kiosk-desktop/scripts/build-and-copy.mjs --platform mac",
+    "kiosk:build:linux": "node apps/kiosk-desktop/scripts/build-and-copy.mjs --platform linux",
     "apps:build": "node apps/desktop-client/scripts/build.mjs --app all",
     "server:bundle": "node apps/server-bundle/build.mjs"
   },

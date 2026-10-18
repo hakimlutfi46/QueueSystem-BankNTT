@@ -263,7 +263,7 @@ async function runJob({ url, printerName, label, allowedOrigin, expectPathPrefix
 }
 
 /**
- * Development only (--no-printer): renders the same ticket page at the same paper size,
+ * Development (--no-printer) and simulation builds: renders the same ticket page at the same paper size,
  * but saves it as a PDF in `outDir` and opens it instead of sending it to a printer.
  */
 async function runPdfJob({ url, label, allowedOrigin, expectPathPrefix }, outDir) {
@@ -292,7 +292,7 @@ async function runPdfJob({ url, label, allowedOrigin, expectPathPrefix }, outDir
 
 /**
  * Serialises jobs so two quick tickets never race for the printer.
- * With `pdfDir` (development --no-printer), tickets are saved as PDF files there instead.
+ * With `pdfDir` (development --no-printer or a simulation build), tickets are saved as PDF files there instead.
  */
 function createPrintQueue({ pdfDir } = {}) {
   let tail = Promise.resolve();
@@ -303,9 +303,9 @@ function createPrintQueue({ pdfDir } = {}) {
   };
 }
 
-/** Development only (--no-printer): a single always-ready "PDF" printer. */
-function createPdfPrinterStatus() {
-  const printer = { name: '', displayName: 'PDF (mode pengembangan, tanpa printer)' };
+/** Development (--no-printer) and simulation builds: a single always-ready "PDF" printer. */
+function createPdfPrinterStatus({ simulation = false } = {}) {
+  const printer = { name: '', displayName: simulation ? 'PDF (simulasi, tanpa printer)' : 'PDF (mode pengembangan, tanpa printer)' };
   return {
     listPrinters: async () => [printer],
     status: async () => ({ ready: true, printer: printer.displayName, message: null }),
