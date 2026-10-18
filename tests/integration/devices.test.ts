@@ -112,6 +112,21 @@ describe("devices", () => {
     await expect(redeemPairCode(prisma, "ABC")).rejects.toMatchObject({ code: "VALIDATION" });
   });
 
+  it("pairs the Windows TV app with a short code and the new token opens only the TV", async () => {
+    const { device, token: linkToken } = await createDevice(prisma, { kind: "display", name: "TV Ruang Tunggu" });
+    const issued = await issuePairCode(prisma, device.id);
+    expect(issued.device).toMatchObject({ kind: "display", name: "TV Ruang Tunggu" });
+    expect(issued.code).toMatch(/^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$/);
+    await expect(verifyDeviceToken(prisma, "display", linkToken)).resolves.toBe(true);
+
+    const paired = await redeemPairCode(prisma, issued.code);
+    expect(paired).toMatchObject({ kind: "display", name: "TV Ruang Tunggu" });
+    await expect(verifyDeviceToken(prisma, "display", paired.token)).resolves.toBe(true);
+    await expect(verifyDeviceToken(prisma, "kiosk", paired.token)).resolves.toBe(false);
+    await expect(verifyDeviceToken(prisma, "display", linkToken)).resolves.toBe(false);
+    await expect(redeemPairCode(prisma, issued.code)).rejects.toMatchObject({ code: "PAIR_CODE_INVALID" });
+  });
+
   it("rejects an expired code, keeps only the newest code, and drops codes when the device is revoked", async () => {
     const { device } = await createDevice(prisma, { kind: "kiosk", name: "Kiosk Lobi" });
     const first = await issuePairCode(prisma, device.id);

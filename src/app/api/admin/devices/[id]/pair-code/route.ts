@@ -6,7 +6,7 @@ import { resourceId, runAdmin } from "@/app/api/admin/guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Kode pendek untuk memasangkan aplikasi kiosk Windows ke perangkat ini. Kode lama langsung tidak berlaku. */
+/** Kode pendek untuk memasangkan aplikasi Windows (kiosk atau TV) ke perangkat ini. Kode lama langsung tidak berlaku. */
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },

@@ -138,7 +138,7 @@ Belum punya printer? Isi `TICKET_OUTPUT=pdf` di `.env`: setiap tiket diunduh seb
 
 ## Kiosk dengan aplikasi Windows (disarankan)
 
-PC kiosk yang memakai Windows bisa memakai aplikasi **BANK NTT Ticket** sebagai pengganti Chrome. Aplikasi ini membuka kiosk layar penuh yang terkunci (Alt+F4, F11, Esc, dan pindah ke situs lain diblokir), menyala otomatis saat Windows login, dan mencetak tiket langsung ke printer thermal pilihan tanpa dialog. Bila printer mati, offline, atau kertas habis, kiosk menampilkan "Mohon hubungi petugas" dan tidak membuat nomor. TV tetap memakai tautan.
+PC kiosk yang memakai Windows bisa memakai aplikasi **BANK NTT Ticket** sebagai pengganti Chrome. Aplikasi ini membuka kiosk layar penuh yang terkunci (Alt+F4, F11, Esc, dan pindah ke situs lain diblokir), menyala otomatis saat Windows login, dan mencetak tiket langsung ke printer thermal pilihan tanpa dialog. Bila printer mati, offline, atau kertas habis, kiosk menampilkan "Mohon hubungi petugas" dan tidak membuat nomor. TV memakai tautan atau aplikasi **BANK NTT TV** (lihat bagian TV).
 
 1. **Buat installer sekali di server cabang** (sekitar 100 MB, tidak masuk git). Di **Admin → Perangkat → Aplikasi kiosk Windows**, tekan **Build installer**, atau dari terminal:
 
@@ -150,12 +150,12 @@ PC kiosk yang memakai Windows bisa memakai aplikasi **BANK NTT Ticket** sebagai 
 
    Nama aplikasi bawaannya **BANK NTT Ticket** dengan ikon simbol logo Bank NTT. Keduanya bisa diganti lewat tombol **Ubah** di panel itu (unggah gambar apa saja, dibuat persegi otomatis), lalu **Simpan & build ulang**. Build memakan sekitar setengah sampai tiga menit; build pertama perlu internet untuk mengunduh Electron. Tombol build hanya ada bila server berjalan dari folder proyek lengkap (`npm run start`); image Docker tidak memuat `apps/kiosk-desktop`, jadi di sana build dilakukan di komputer lain lalu isi `downloads/` disalin ke server.
 2. Di PC kiosk, unduh dan jalankan installer. Installer belum ditandatangani, jadi Windows SmartScreen bisa menampilkan "Windows protected your PC": klik **More info → Run anyway**.
-3. Di Admin → Perangkat, daftarkan kiosk lalu tekan **Kode aplikasi**. Dialog menampilkan alamat server dan kode 6 karakter, misalnya `4K7-Q2M`, yang berlaku 30 menit dan sekali pakai.
+3. Di Admin → Perangkat, daftarkan kiosk lalu tekan **Kode aplikasi** (tombol ini ada untuk kiosk dan TV). Dialog menampilkan alamat server dan kode 6 karakter, misalnya `4K7-Q2M`, yang berlaku 30 menit dan sekali pakai.
 4. Di aplikasi, isi alamat server (misalnya `10.70.10.67:3000`) dan kode itu, pilih printer thermal, tekan **Cetak uji**, lalu buat PIN admin. Kiosk langsung terbuka dan status di Admin berubah menjadi Tersambung.
 
 Untuk keluar atau mengubah pengaturan, tekan **Ctrl + Shift + Alt + K** di kiosk dan masukkan PIN admin. Tombol Windows dan Ctrl+Alt+Del tidak bisa diblokir aplikasi apa pun; untuk penguncian penuh pakai akun Windows khusus dengan auto-login dan Shell Launcher. Langkahnya ada di [`apps/kiosk-desktop/README.md`](apps/kiosk-desktop/README.md).
 
-Tautan lama kiosk tetap berlaku sampai kode dipakai. Setelah itu hanya aplikasi yang dipasangkan yang bisa membuka kiosk itu. Kode yang salah dibatasi 10 kali per 10 menit per alamat IP.
+Tautan lama perangkat tetap berlaku sampai kode dipakai. Setelah itu hanya aplikasi yang dipasangkan yang bisa membuka kiosk atau TV itu. Kode yang salah dibatasi 10 kali per 10 menit per alamat IP.
 
 ## TV
 
@@ -168,6 +168,8 @@ google-chrome --kiosk --autoplay-policy=no-user-gesture-required --app="http://1
 Layar TV dibagi dua: nomor yang sedang dipanggil dan empat panggilan sebelumnya di kiri, semua loket beserta statusnya (Buka, Istirahat, Tutup) di kanan.
 
 Suara menyala sendiri bila Chrome dijalankan dengan perintah di atas, karena `--autoplay-policy=no-user-gesture-required` mengizinkan suara tanpa sentuhan. Bila TV dibuka di browser biasa, tombol **Aktifkan suara** muncul; tekan sekali. Setiap panggilan dan panggil ulang dibacakan, dan dua panggilan berdekatan dibacakan berurutan.
+
+PC TV yang memakai Windows bisa memakai aplikasi **BANK NTT TV** sebagai pengganti Chrome. Pemasangannya sama dengan aplikasi kiosk: di Admin → Perangkat, daftarkan TV lalu tekan **Kode aplikasi**, kemudian isi alamat server dan kode 6 karakter itu (berlaku 30 menit, sekali pakai) di aplikasi. Installer aplikasi TV tidak dibuat dari Admin.
 
 ## Loket petugas
 

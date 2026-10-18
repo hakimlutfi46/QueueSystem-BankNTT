@@ -22,12 +22,12 @@ export type AdminDevice = {
 
 export type IssuedDevice = { device: AdminDevice; token: string };
 
-/** Kode pemasangan untuk aplikasi kiosk Windows. `code` ditampilkan sekali, misalnya "4K7-Q2M". */
+/** Kode pemasangan untuk aplikasi Windows kiosk atau TV. `code` ditampilkan sekali, misalnya "4K7-Q2M". */
 export type PairCode = { device: AdminDevice; code: string; expiresAt: string };
 
 export type PairedDevice = { token: string; kind: DeviceKind; name: string };
 
-/** Tanpa 0/O, 1/I, dan huruf mirip lain, supaya kode mudah dibaca dan diketik di kiosk. */
+/** Tanpa 0/O, 1/I, dan huruf mirip lain, supaya kode mudah dibaca dan diketik di PC kiosk atau TV. */
 export const PAIR_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const PAIR_CODE_LENGTH = 6;
 export const PAIR_CODE_TTL_MINUTES = 30;
@@ -160,8 +160,8 @@ function hashPairCode(code: string): string {
 
 /**
  * Buat kode pemasangan baru untuk perangkat. Kode lama untuk perangkat yang sama langsung tidak berlaku.
- * Token perangkat belum diganti di sini; baru diganti saat kode ditukar, jadi kiosk yang terpasang tetap jalan
- * sampai aplikasi di PC kiosk benar-benar dipasangkan.
+ * Token perangkat belum diganti di sini; baru diganti saat kode ditukar, jadi kiosk atau TV yang terpasang tetap
+ * jalan sampai aplikasi di PC perangkat itu benar-benar dipasangkan.
  */
 export async function issuePairCode(db: PrismaClient, id: number): Promise<PairCode> {
   for (let attempt = 0; attempt < 5; attempt += 1) {

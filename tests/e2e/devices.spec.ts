@@ -104,6 +104,46 @@ test("the Windows kiosk app pairs with a short code from the admin page", async 
   await kioskContext.close();
 });
 
+test("the Windows TV app pairs with a short code from the admin page", async ({ browser, request }) => {
+  const name = `TV Windows E2E ${Date.now()}`;
+  const adminContext = await browser.newContext();
+  const tvContext = await browser.newContext();
+  const admin = await adminContext.newPage();
+  const tv = await tvContext.newPage();
+
+  await login(admin, "admin");
+  await admin.goto("/admin/devices");
+  await admin.getByRole("radiogroup", { name: "Jenis perangkat" }).getByRole("radio", { name: "Layar TV" }).click();
+  await admin.getByLabel("Nama perangkat").fill(name);
+  await admin.getByRole("button", { name: "Buat tautan pemasangan" }).click();
+  await admin.getByRole("dialog", { name: `Tautan pemasangan ${name}` }).getByRole("button", { name: "Buat kode aplikasi" }).click();
+
+  const dialog = admin.getByRole("dialog", { name: `Kode aplikasi ${name}` });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("BANK NTT TV")).toBeVisible();
+  await expect(dialog.getByText(/printer thermal/)).toHaveCount(0);
+  const code = (await dialog.getByTestId("pair-code").textContent())?.trim() ?? "";
+  expect(code).toMatch(/^[A-Z2-9]{3}-[A-Z2-9]{3}$/);
+
+  const paired = await request.post("/api/devices/pair", { data: { code } });
+  expect(paired.status()).toBe(200);
+  const body = (await paired.json()) as { token: string; kind: string; name: string };
+  expect(body).toMatchObject({ kind: "display", name });
+
+  await tv.goto(`/display?token=${encodeURIComponent(body.token)}`);
+  await expect(tv.getByRole("button", { name: "Aktifkan suara" })).toBeVisible();
+  expect(tv.url()).not.toContain("token=");
+
+  await dialog.getByRole("button", { name: "Selesai" }).click();
+  await admin.reload();
+  await admin.getByRole("button", { name: `Cabut ${name}`, exact: true }).click();
+  await admin.getByRole("dialog", { name: `Cabut ${name}?` }).getByRole("button", { name: "Cabut izin" }).click();
+  await expect(admin.getByText(`${name} dicabut.`)).toBeVisible();
+
+  await adminContext.close();
+  await tvContext.close();
+});
+
 async function login(page: Page, username: string) {
   await page.goto("/login");
   await page.getByLabel("Nama pengguna").fill(username);

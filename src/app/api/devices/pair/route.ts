@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const OVERALL = "all";
 
 /**
- * Dipanggil aplikasi kiosk Windows saat pemasangan pertama: tukar kode pendek dari Admin → Perangkat
+ * Dipanggil aplikasi Windows kiosk atau TV saat pemasangan pertama: tukar kode pendek dari Admin → Perangkat
  * dengan token perangkat. Tidak memerlukan login; kode sekali pakai, berlaku 30 menit, dan percobaan
  * yang salah dibatasi.
  */

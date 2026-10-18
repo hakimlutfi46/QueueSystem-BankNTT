@@ -201,7 +201,7 @@ Satu browser hanya memegang satu akun. Untuk mencoba beberapa akun di satu kompu
 | **Loket** | Tambah, ganti nama, aktif/nonaktifkan loket; atur layanan yang dilayani tiap loket; tutup paksa loket yang ditinggal |
 | **Layanan** | Tambah layanan dan huruf awalannya, urutan di kiosk, aktif/nonaktif; **Atur loket** untuk memilih loket yang melayaninya |
 | **Petugas** | Tambah akun (sandi sementara), ubah nama/peran, reset sandi, nonaktifkan. Akun tidak dihapus supaya laporan lama utuh. Tanda **Wajib ganti sandi** untuk akun yang belum mengganti sandi. |
-| **Perangkat** | Daftarkan kiosk dan TV, tautan pemasangan, **Kode aplikasi** untuk aplikasi Windows, cabut izin, status tersambung. Panel **Aplikasi kiosk Windows**: nama, ikon, build, dan unduh installer. |
+| **Perangkat** | Daftarkan kiosk dan TV, tautan pemasangan, **Kode aplikasi** untuk aplikasi Windows kiosk dan TV, cabut izin, status tersambung. Panel **Aplikasi kiosk Windows**: nama, ikon, build, dan unduh installer. |
 | **Identitas & tampilan** | Nama lembaga, slogan, logo, dan warna merek (untuk lembaga selain Bank NTT) |
 | **Pengaturan** | Nama cabang, teks berjalan di TV, suara panggilan, batas panggil ulang, target lama layanan, catatan kaki dan lebar tiket (58/80 mm), zona waktu |
 
@@ -244,12 +244,13 @@ Tautan hanya tampil sekali. Bila hilang, tekan **Tautan baru** (tautan lama lang
 - Panggilan dibacakan dalam bahasa Indonesia ("Nomor antrian B007, silakan menuju loket Teller 2") memakai rekaman suara di `public/audio`. Panggilan yang datang berdekatan dibacakan berurutan.
 - Browser butuh satu ketukan untuk mengizinkan suara, kecuali Chrome dijalankan dengan `--autoplay-policy=no-user-gesture-required`.
 - Teks berjalan dan nama cabang diatur di Admin → Pengaturan.
+- PC TV ber-Windows bisa memakai aplikasi **BANK NTT TV**: Admin → Perangkat → daftarkan TV → **Kode aplikasi**, lalu isi alamat server dan kode 6 karakter (berlaku 30 menit, sekali pakai) di aplikasi.
 
 ---
 
 ## 7. Aplikasi kiosk Windows (BANK NTT Ticket)
 
-Pengganti Chrome untuk **PC kiosk ber-Windows (10/11, 64-bit)**. TV dan kiosk non-Windows tetap memakai tautan. Kode aplikasinya ada di `apps/kiosk-desktop` (Electron).
+Pengganti Chrome untuk **PC kiosk ber-Windows (10/11, 64-bit)**. Kiosk non-Windows tetap memakai tautan. TV memakai tautan atau aplikasi Windows **BANK NTT TV**, yang dipasangkan dengan **Kode aplikasi** yang sama. Kode aplikasinya ada di `apps/kiosk-desktop` (Electron).
 
 **Kelebihannya dibanding browser:**
 - Layar penuh terkunci: Alt+F4, F5, F11, F12, Esc, klik kanan, pindah situs, dan jendela baru diblokir; jendela yang tertutup dibuka lagi.
@@ -431,7 +432,7 @@ Versi Docker ada di [README.md](../README.md#backup-database).
 │   │   ├── admin/                Panel admin (dasbor, laporan, loket, layanan, petugas, perangkat, …)
 │   │   ├── login/, account/      Masuk dan ganti kata sandi
 │   │   ├── print/                Cetak ulang tiket dari laporan
-│   │   └── api/                  API: tiket, loket, admin, laporan, stream realtime, pairing kiosk
+│   │   └── api/                  API: tiket, loket, admin, laporan, stream realtime, pairing kiosk dan TV
 │   ├── lib/                      Logika inti (tanpa tampilan)
 │   │   ├── queue/                Ambil nomor, panggil, selesai, tidak hadir, tutup hari, aturan status
 │   │   ├── realtime/             Sinyal langsung: LISTEN/NOTIFY PostgreSQL → SSE ke layar

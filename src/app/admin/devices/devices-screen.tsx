@@ -24,6 +24,9 @@ const KINDS: { kind: DeviceKind; label: string; icon: "touch" | "tv"; path: stri
 
 type InstallerInfo = KioskAppOverview["installer"];
 
+/** Nama aplikasi Windows untuk TV. Dibangun terpisah dari aplikasi kiosk, jadi namanya tetap. */
+const TV_APP_NAME = "BANK NTT TV";
+
 /** Dianggap tersambung bila perangkat meminta data dalam 3 menit terakhir. */
 const ONLINE_MS = 3 * 60 * 1000;
 
@@ -187,7 +190,7 @@ export function DevicesScreen({
                         onRename={() => setRenaming(device)}
                         onRotate={() => void rotate(device)}
                         onRevoke={() => setRevoking(device)}
-                        onPairCode={device.kind === "kiosk" ? () => void issueCode(device) : undefined}
+                        onPairCode={() => void issueCode(device)}
                       />
                     ))}
                   </ul>
@@ -212,7 +215,7 @@ export function DevicesScreen({
                     onRotate={() => void rotate(device)}
                     onRevoke={() => undefined}
                     onDelete={() => void remove(device)}
-                    onPairCode={device.kind === "kiosk" ? () => void issueCode(device) : undefined}
+                    onPairCode={() => void issueCode(device)}
                   />
                 ))}
               </ul>
@@ -276,8 +279,9 @@ export function DevicesScreen({
         <IssuedModal
           issued={issued}
           serverHosts={serverHosts}
+          kioskAppName={kioskApp.settings.name}
           onClose={() => setIssued(null)}
-          onPairCode={issued.device.kind === "kiosk" ? () => void issueCode(issued.device) : undefined}
+          onPairCode={() => void issueCode(issued.device)}
         />
       ) : null}
       {pairCode ? (
@@ -285,6 +289,7 @@ export function DevicesScreen({
           pairCode={pairCode}
           serverHosts={serverHosts}
           installer={installer}
+          kioskAppName={kioskApp.settings.name}
           onRenew={() => void issueCode(pairCode.device)}
           onClose={() => setPairCode(null)}
         />
@@ -432,11 +437,13 @@ function DeviceRow({
 function IssuedModal({
   issued,
   serverHosts,
+  kioskAppName,
   onClose,
   onPairCode,
 }: {
   issued: IssuedDevice;
   serverHosts: string[];
+  kioskAppName: string;
   onClose: () => void;
   onPairCode?: () => void;
 }) {
@@ -522,7 +529,9 @@ function IssuedModal({
         {onPairCode ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-4 py-3">
             <p className="min-w-0 flex-1 text-sm">
-              <span className="font-bold">Memakai aplikasi kiosk Windows?</span>{" "}
+              <span className="font-bold">
+                Memakai aplikasi {issued.device.kind === "kiosk" ? kioskAppName : TV_APP_NAME} di Windows?
+              </span>{" "}
               <span className="text-ink-muted">Pasangkan dengan kode pendek, tanpa menyalin tautan.</span>
             </p>
             <BrandButton size="sm" variant="outline" onClick={onPairCode}>
@@ -542,17 +551,22 @@ function IssuedModal({
   );
 }
 
-/** Kode pendek untuk aplikasi kiosk Windows, ditampilkan besar supaya mudah dibaca dan diketik di PC kiosk. */
+/**
+ * Kode pendek untuk aplikasi Windows kiosk atau TV, ditampilkan besar supaya mudah dibaca dan diketik
+ * di PC perangkat itu. Installer hanya tersedia di server untuk aplikasi kiosk.
+ */
 function PairCodeModal({
   pairCode,
   serverHosts,
   installer,
+  kioskAppName,
   onRenew,
   onClose,
 }: {
   pairCode: PairCode;
   serverHosts: string[];
   installer: InstallerInfo;
+  kioskAppName: string;
   onRenew: () => void;
   onClose: () => void;
 }) {
@@ -560,6 +574,7 @@ function PairCodeModal({
   const [origin, setOrigin] = useState(() => serverHosts[0] ?? (typeof window === "undefined" ? "" : window.location.host));
   const left = now === 0 ? null : Math.max(0, Math.floor((Date.parse(pairCode.expiresAt) - now) / 1000));
   const expired = left === 0;
+  const kiosk = pairCode.device.kind === "kiosk";
 
   return (
     <Modal wide title={`Kode aplikasi ${pairCode.device.name}`} onClose={onClose}>
@@ -575,8 +590,8 @@ function PairCodeModal({
             />
             <p className="mt-1 text-xs text-ink-muted">
               {serverHosts.length > 0
-                ? "IP server di jaringan, diisi otomatis. Kiosk harus berada di jaringan yang sama."
-                : "Alamat yang diketik di PC kiosk. Bisa diganti bila perlu."}
+                ? `IP server di jaringan, diisi otomatis. ${kiosk ? "Kiosk" : "TV"} harus berada di jaringan yang sama.`
+                : `Alamat yang diketik di PC ${kiosk ? "kiosk" : "TV"}. Bisa diganti bila perlu.`}
             </p>
             <HostChoices hosts={serverHosts} current={origin} onPick={setOrigin} />
           </div>
@@ -593,19 +608,30 @@ function PairCodeModal({
             </p>
           </div>
         </div>
-        <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
-          <li>
-            Pasang <span className="font-bold text-ink">{installer?.fileName ?? "installer aplikasi kiosk"}</span> di PC kiosk
-            {installer ? null : " (installer belum dibuat di server ini)"}.
-          </li>
-          <li>Isi alamat server dan kode di atas, pilih printer thermal, lalu buat PIN admin.</li>
-          <li>Kiosk terbuka layar penuh dan terkunci. Status di halaman ini berubah menjadi Tersambung.</li>
-        </ol>
+        {kiosk ? (
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
+            <li>
+              Pasang <span className="font-bold text-ink">{installer?.fileName ?? `installer aplikasi ${kioskAppName}`}</span> di PC kiosk
+              {installer ? null : " (installer belum dibuat di server ini)"}.
+            </li>
+            <li>Isi alamat server dan kode di atas, pilih printer thermal, lalu buat PIN admin.</li>
+            <li>Kiosk terbuka layar penuh dan terkunci. Status di halaman ini berubah menjadi Tersambung.</li>
+          </ol>
+        ) : (
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
+            <li>
+              Pasang aplikasi <span className="font-bold text-ink">{TV_APP_NAME}</span> di PC yang tersambung ke TV.
+            </li>
+            <li>Isi alamat server dan kode di atas.</li>
+            <li>Layar TV terbuka layar penuh. Status di halaman ini berubah menjadi Tersambung.</li>
+          </ol>
+        )}
         <p className="text-xs text-ink-muted">
-          Tautan lama perangkat ini tetap berlaku sampai kode dipakai. Setelah itu hanya aplikasi yang dipasangkan yang bisa membuka kiosk.
+          Tautan lama perangkat ini tetap berlaku sampai kode dipakai. Setelah itu hanya aplikasi yang dipasangkan yang bisa membuka{" "}
+          {kiosk ? "kiosk" : "layar TV"}.
         </p>
         <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
-          {installer ? (
+          {kiosk && installer ? (
             <BrandButton variant="ghost" href={INSTALLER_URL}>
               <Icon name="download" className="size-4" />
               Unduh installer
