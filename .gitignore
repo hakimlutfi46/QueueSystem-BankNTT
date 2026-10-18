@@ -61,3 +61,6 @@ next-env.d.ts
 
 # cadangan database (npm run db:backup)
 /backups/
+
+# build Next.js untuk bundle server Windows (npm run server:bundle)
+/.next-bundle/
