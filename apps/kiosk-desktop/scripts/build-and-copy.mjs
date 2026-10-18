@@ -144,11 +144,12 @@ if (platform === 'mac') {
 
   const built = path.join(appDir, 'dist', `${artifactBase}.dmg`);
   if (!existsSync(built)) fail(`Installer tidak ditemukan: ${built}`);
-  mkdirSync(outDir, { recursive: true });
-  const target = path.join(outDir, `${artifactBase}.dmg`);
+  const macOutDir = path.join(outDir, 'mac');
+  mkdirSync(macOutDir, { recursive: true });
+  const target = path.join(macOutDir, `${artifactBase}.dmg`);
   copyFileSync(built, `${target}.tmp`);
   renameSync(`${target}.tmp`, target);
-  copyFileSync(target, path.join(outDir, `${artifactBase}-mac-arm64.dmg`));
+  copyFileSync(target, path.join(macOutDir, `${artifactBase}-mac-arm64.dmg`));
 
   rmSync(path.join(appDir, 'dist', 'mac-arm64'), { recursive: true, force: true });
 
@@ -157,7 +158,7 @@ if (platform === 'mac') {
     manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   } catch {}
   const size = statSync(target).size;
-  manifest.macFile = path.basename(target);
+  manifest.macFile = `mac/${path.basename(target)}`;
   manifest.macSize = size;
   manifest.name = name;
   manifest.version = pkg.version;
@@ -197,8 +198,9 @@ try {
 
 const built = path.join(appDir, 'dist', `${artifactBase}.exe`);
 if (!existsSync(built)) fail(`Installer tidak ditemukan: ${built}`);
-mkdirSync(outDir, { recursive: true });
-const target = path.join(outDir, `${artifactBase}.exe`);
+const winOutDir = path.join(outDir, 'windows');
+mkdirSync(winOutDir, { recursive: true });
+const target = path.join(winOutDir, `${artifactBase}.exe`);
 copyFileSync(built, `${target}.tmp`);
 renameSync(`${target}.tmp`, target);
 
@@ -211,7 +213,7 @@ if (withServer) {
 // Remove the previous installer when the name (and so the file name) changed.
 try {
   const previous = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  if (previous.file && previous.file !== path.basename(target)) rmSync(path.join(outDir, path.basename(previous.file)), { force: true });
+  if (previous.file && previous.file !== `windows/${path.basename(target)}`) rmSync(path.join(outDir, previous.file), { force: true });
 } catch {
   // first build
 }
@@ -220,7 +222,7 @@ let manifest = {};
 try {
   manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 } catch {}
-manifest.file = path.basename(target);
+manifest.file = `windows/${path.basename(target)}`;
 manifest.name = name;
 manifest.version = pkg.version;
 manifest.size = size;

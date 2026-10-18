@@ -32,10 +32,20 @@ export async function findKioskInstaller(
 
   const manifest = await readManifest(platform);
   if (manifest) {
-    const found = await describe(path.join(downloadsDir(), manifest.file), manifest.name);
-    if (found) return { ...found, platform };
+    const candidates = [
+      path.join(downloadsDir(), manifest.file),
+      path.join(downloadsDir(), platform === "mac" ? "mac" : "windows", path.basename(manifest.file)),
+      path.join(downloadsDir(), path.basename(manifest.file)),
+    ];
+    for (const cand of candidates) {
+      const found = await describe(cand, manifest.name);
+      if (found) return { ...found, platform };
+    }
   }
-  return describe(path.join(downloadsDir(), LEGACY_INSTALLER_NAME), null);
+  return (
+    (await describe(path.join(downloadsDir(), "windows", LEGACY_INSTALLER_NAME), null)) ??
+    (await describe(path.join(downloadsDir(), LEGACY_INSTALLER_NAME), null))
+  );
 }
 
 async function readManifest(platform: "win" | "mac" = "win"): Promise<{ file: string; name: string | null } | null> {
@@ -50,7 +60,7 @@ async function readManifest(platform: "win" | "mac" = "win"): Promise<{ file: st
         ? (typeof raw.macFile === "string" ? raw.macFile : null)
         : (typeof raw.file === "string" ? raw.file : null);
     const chosen = target ?? (typeof raw.file === "string" ? raw.file : (typeof raw.macFile === "string" ? raw.macFile : null));
-    if (!chosen || chosen !== path.basename(chosen) || (!chosen.endsWith(".exe") && !chosen.endsWith(".dmg"))) return null;
+    if (!chosen || (!chosen.endsWith(".exe") && !chosen.endsWith(".dmg"))) return null;
     return { file: chosen, name: typeof raw.name === "string" ? raw.name : null };
   } catch {
     return null;

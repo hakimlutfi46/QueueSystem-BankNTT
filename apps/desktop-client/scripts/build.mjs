@@ -166,11 +166,12 @@ async function buildRole(role) {
 
     const built = path.join(roleOut, `${artifactBase}.dmg`);
     if (!existsSync(built)) fail(`Installer tidak ditemukan: ${built}`);
-    mkdirSync(outDir, { recursive: true });
-    const target = path.join(outDir, `${artifactBase}.dmg`);
+    const macOutDir = path.join(outDir, 'mac');
+    mkdirSync(macOutDir, { recursive: true });
+    const target = path.join(macOutDir, `${artifactBase}.dmg`);
     copyFileSync(built, `${target}.tmp`);
     renameSync(`${target}.tmp`, target);
-    copyFileSync(target, path.join(outDir, `${artifactBase}-mac-arm64.dmg`));
+    copyFileSync(target, path.join(macOutDir, `${artifactBase}-mac-arm64.dmg`));
 
     rmSync(path.join(roleOut, 'mac-arm64'), { recursive: true, force: true });
 
@@ -178,7 +179,7 @@ async function buildRole(role) {
     const size = statSync(target).size;
     manifest.apps[role.id] = {
       ...manifest.apps[role.id],
-      macFile: path.basename(target),
+      macFile: `mac/${path.basename(target)}`,
       name,
       appId: role.appId,
       version: pkg.version,
@@ -218,19 +219,20 @@ async function buildRole(role) {
 
   const built = path.join(roleOut, `${artifactBase}.exe`);
   if (!existsSync(built)) fail(`Installer tidak ditemukan: ${built}`);
-  mkdirSync(outDir, { recursive: true });
-  const target = path.join(outDir, `${artifactBase}.exe`);
+  const winOutDir = path.join(outDir, 'windows');
+  mkdirSync(winOutDir, { recursive: true });
+  const target = path.join(winOutDir, `${artifactBase}.exe`);
   copyFileSync(built, `${target}.tmp`);
   renameSync(`${target}.tmp`, target);
 
   const manifest = readManifest();
   const previous = manifest.apps[role.id];
   // Remove the previous installer of this app when the name (and so the file name) changed.
-  if (previous?.file && previous.file !== path.basename(target)) rmSync(path.join(outDir, path.basename(previous.file)), { force: true });
+  if (previous?.file && previous.file !== `windows/${path.basename(target)}`) rmSync(path.join(outDir, previous.file), { force: true });
   const size = statSync(target).size;
   manifest.apps[role.id] = {
     ...manifest.apps[role.id],
-    file: path.basename(target),
+    file: `windows/${path.basename(target)}`,
     name,
     appId: role.appId,
     version: pkg.version,
