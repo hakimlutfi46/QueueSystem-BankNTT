@@ -36,7 +36,7 @@ const DEFAULTS: AdminSettings = {
   targetServiceMinutes: 10,
   ticketFooter: "",
   ticketWidthMm: 80,
-  timeZone: "Asia/Makassar",
+  timeZone: "Asia/Jakarta",
 };
 
 export async function readSettings(db: PrismaClient): Promise<AdminSettings> {

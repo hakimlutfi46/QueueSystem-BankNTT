@@ -24,7 +24,7 @@
     Nama lembaga/cabang untuk data awal. Kosong berarti "Bank NTT".
 
 .PARAMETER TimeZone
-    Zona waktu bawaan: Asia/Jakarta (WIB), Asia/Makassar (WITA) atau Asia/Jayapura (WIT).
+    Zona waktu awal (bawaan Asia/Jakarta, WIB): Asia/Jakarta, Asia/Makassar (WITA) atau Asia/Jayapura (WIT).
 
 .EXAMPLE
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\BANK NTT Ticket\resources\server\install-server.ps1"
@@ -32,7 +32,7 @@
 param(
     [string]$AdminPassword = 'Password123',
     [string]$BranchName = '',
-    [string]$TimeZone = 'Asia/Makassar'
+    [string]$TimeZone = 'Asia/Jakarta'
 )
 
 $ErrorActionPreference = 'Stop'

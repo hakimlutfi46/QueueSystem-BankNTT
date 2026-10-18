@@ -13,14 +13,14 @@ describe("appTimezone", () => {
     }
   });
 
-  it("defaults to Asia/Makassar", () => {
+  it("defaults to Asia/Jakarta (WIB)", () => {
     delete process.env.APP_TIMEZONE;
-    expect(appTimezone()).toBe("Asia/Makassar");
+    expect(appTimezone()).toBe("Asia/Jakarta");
   });
 
   it("reads APP_TIMEZONE when it is set", () => {
-    process.env.APP_TIMEZONE = "Asia/Jakarta";
-    expect(appTimezone()).toBe("Asia/Jakarta");
+    process.env.APP_TIMEZONE = "Asia/Makassar";
+    expect(appTimezone()).toBe("Asia/Makassar");
   });
 
   it("prefers the zone chosen in Admin and ignores anything outside Indonesia", () => {

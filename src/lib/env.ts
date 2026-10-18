@@ -1,4 +1,4 @@
-const DEFAULT_TIMEZONE = "Asia/Makassar";
+const DEFAULT_TIMEZONE = "Asia/Jakarta";
 
 /** Tiga zona waktu Indonesia yang bisa dipilih Admin. */
 export const INDONESIA_TIME_ZONES = [
@@ -17,7 +17,7 @@ const globalForZone = globalThis as typeof globalThis & { queueTimeZoneOverride?
 
 /**
  * Zona waktu cabang untuk tanggal antrian, jam di layar, tiket, dan laporan. Pilihan di
- * Admin → Pengaturan menang; bila kosong dipakai APP_TIMEZONE, lalu Asia/Makassar.
+ * Admin → Pengaturan menang; bila kosong dipakai APP_TIMEZONE, lalu Asia/Jakarta (WIB).
  */
 export function appTimezone(): string {
   return globalForZone.queueTimeZoneOverride || envTimezone();

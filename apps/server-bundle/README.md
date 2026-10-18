@@ -76,7 +76,7 @@ Semua skrip dijalankan elevated, dengan PowerShell 64-bit (skrip menjalankan ula
 di 64-bit bila dipanggil dari stub NSIS 32-bit):
 
 ```
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<server>\install-server.ps1" [-AdminPassword <sandi>] [-BranchName <nama>] [-TimeZone Asia/Makassar]
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<server>\install-server.ps1" [-AdminPassword <sandi>] [-BranchName <nama>] [-TimeZone Asia/Jakarta]
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<server>\stop-server.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<server>\uninstall-server.ps1" [-RemoveData]
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<server>\status-server.ps1"

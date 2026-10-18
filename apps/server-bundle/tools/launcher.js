@@ -127,7 +127,7 @@ async function main() {
 
   process.env.NODE_ENV = "production";
   process.env.NEXT_TELEMETRY_DISABLED = "1";
-  process.env.APP_TIMEZONE = process.env.APP_TIMEZONE || "Asia/Makassar";
+  process.env.APP_TIMEZONE = process.env.APP_TIMEZONE || "Asia/Jakarta";
   process.env.BACKUP_DIR = process.env.BACKUP_DIR || paths.backupsDir;
   // Never create staff accounts on a branch server; admins add their own officers.
   delete process.env.SEED_STAFF_PASSWORD;

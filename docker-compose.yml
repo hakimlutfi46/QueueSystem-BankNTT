@@ -24,7 +24,7 @@ services:
       target: migrator
     environment:
       DATABASE_URL: postgresql://queue:queue@db:5432/queue
-      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Jakarta}
       # Wajib diisi di .env; Compose berhenti dengan pesan bila kosong.
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Isi SEED_ADMIN_PASSWORD di .env}
       # Opsional; kosong berarti tidak ada akun petugas awal.
@@ -41,7 +41,7 @@ services:
       target: runner
     environment:
       DATABASE_URL: postgresql://queue:queue@db:5432/queue
-      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Jakarta}
       AUTH_SECRET: ${AUTH_SECRET:?Isi AUTH_SECRET di .env dengan string acak yang panjang}
       # Opsional. Kiosk dan TV didaftarkan dari Admin → Perangkat; kosong berarti tidak ada token cadangan.
       KIOSK_TOKEN: ${KIOSK_TOKEN:-}
