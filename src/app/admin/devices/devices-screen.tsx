@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { requestAdmin, submitAdmin } from "@/app/admin/submit";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge } from "@/components/ui/badge";
-import { Field, inputClass } from "@/components/ui/field";
+import { Field, inputClass, Switch } from "@/components/ui/field";
 import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
@@ -32,11 +32,14 @@ const ONLINE_MS = 3 * 60 * 1000;
 
 export function DevicesScreen({
   devices,
+  autoApprove: initialAutoApprove,
   envFallback,
   kioskApp: initialKioskApp,
   serverHosts,
 }: {
   devices: AdminDevice[];
+  /** "Terima perangkat baru otomatis": perangkat yang mendaftar sendiri langsung disetujui. */
+  autoApprove: boolean;
   envFallback: { kiosk: boolean; display: boolean };
   kioskApp: KioskAppOverview;
   /** IP jaringan server, diisi bila Admin dibuka lewat localhost. */
@@ -58,6 +61,7 @@ export function DevicesScreen({
   const [kind, setKind] = useState<DeviceKind>("kiosk");
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
+  const [autoApprove, setAutoApprove] = useState(initialAutoApprove);
 
   // Waktu "terakhir aktif" dicatat server; muat ulang sesekali supaya status tersambung tetap segar.
   useEffect(() => {
@@ -116,6 +120,29 @@ export function DevicesScreen({
     }
   }
 
+  async function approve(device: AdminDevice) {
+    const message = await submitAdmin(`/api/admin/devices/${device.id}/approve`, "POST", {});
+    done(message, `${device.name} disetujui. Layarnya terbuka dalam beberapa detik.`);
+  }
+
+  async function toggleAutoApprove(enabled: boolean) {
+    if (enabled) {
+      const ok = await confirm({
+        title: "Terima perangkat baru otomatis?",
+        message:
+          "Setiap kiosk atau TV baru di jaringan cabang langsung bisa dipakai tanpa persetujuan, sampai pilihan ini dimatikan lagi. Nyalakan hanya bila Wi-Fi cabang tidak dipakai nasabah atau tamu.",
+        confirmLabel: "Nyalakan",
+        tone: "primary",
+        icon: "check",
+      });
+      if (!ok) return;
+    }
+    const message = await submitAdmin("/api/admin/devices/auto-approve", "PUT", { enabled });
+    if (done(message, enabled ? "Perangkat baru diterima otomatis." : "Perangkat baru kembali menunggu persetujuan.")) {
+      setAutoApprove(enabled);
+    }
+  }
+
   async function remove(device: AdminDevice) {
     const ok = await confirm({
       title: `Hapus ${device.name}?`,
@@ -129,7 +156,8 @@ export function DevicesScreen({
     done(message, `${device.name} dihapus.`);
   }
 
-  const active = devices.filter((device) => !device.revokedAt);
+  const waiting = devices.filter((device) => !device.revokedAt && !device.approvedAt);
+  const active = devices.filter((device) => !device.revokedAt && device.approvedAt);
   const revoked = devices.filter((device) => device.revokedAt);
 
   return (
@@ -143,6 +171,29 @@ export function DevicesScreen({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-6">
+          {waiting.length > 0 ? (
+            <Panel
+              title="Menunggu persetujuan"
+              description="Perangkat ini mendaftar sendiri dari jaringan cabang. Setujui yang memang milik cabang; tolak yang tidak dikenal."
+              actions={<Badge tone="orange">{waiting.length} menunggu</Badge>}
+              bodyClassName="p-0"
+            >
+              <ul className="divide-y divide-line">
+                {waiting.map((device) => (
+                  <DeviceRow
+                    key={device.id}
+                    device={device}
+                    icon={device.kind === "kiosk" ? "touch" : "tv"}
+                    onRename={() => setRenaming(device)}
+                    onRotate={() => void rotate(device)}
+                    onRevoke={() => setRevoking(device)}
+                    onApprove={() => void approve(device)}
+                  />
+                ))}
+              </ul>
+            </Panel>
+          ) : null}
+
           {KINDS.map((item) => {
             const list = active.filter((device) => device.kind === item.kind);
             return (
@@ -224,6 +275,20 @@ export function DevicesScreen({
         </div>
 
         <div className="flex flex-col gap-4 xl:sticky xl:top-6 xl:self-start">
+          <Panel title="Perangkat baru">
+            <Switch
+              name="autoApprove"
+              label="Terima perangkat baru otomatis"
+              description={
+                autoApprove
+                  ? "Menyala sampai dimatikan. Kiosk dan TV baru langsung bisa dipakai."
+                  : "Mati: kiosk dan TV yang tersambung sendiri menunggu Setujui di halaman ini."
+              }
+              checked={autoApprove}
+              onChange={(checked) => void toggleAutoApprove(checked)}
+            />
+          </Panel>
+
           <Panel title="Daftarkan perangkat">
             <form
               className="flex flex-col gap-4"
@@ -355,6 +420,7 @@ function DeviceRow({
   onRevoke,
   onPairCode,
   onDelete,
+  onApprove,
 }: {
   device: AdminDevice;
   icon: "touch" | "tv";
@@ -363,6 +429,8 @@ function DeviceRow({
   onRevoke: () => void;
   onPairCode?: () => void;
   onDelete?: () => void;
+  /** Hanya untuk perangkat yang menunggu persetujuan. */
+  onApprove?: () => void;
 }) {
   const now = useNow();
   const seen = device.lastSeenAt ? Date.parse(device.lastSeenAt) : null;
@@ -394,6 +462,8 @@ function DeviceRow({
       </div>
       {device.revokedAt ? (
         <Badge tone="danger" dot>Dicabut</Badge>
+      ) : !device.approvedAt ? (
+        <Badge tone="orange" dot>Menunggu persetujuan</Badge>
       ) : online ? (
         <Badge tone="success" dot>Tersambung</Badge>
       ) : seen == null ? (
@@ -402,20 +472,28 @@ function DeviceRow({
         <Badge tone="muted" dot>Tidak aktif</Badge>
       )}
       <div className="flex flex-wrap gap-2">
+        {onApprove ? (
+          <BrandButton size="sm" onClick={onApprove} ariaLabel={`Setujui ${device.name}`}>
+            <Icon name="check" className="size-4" />
+            Setujui
+          </BrandButton>
+        ) : null}
         <BrandButton size="sm" variant="ghost" onClick={onRename} ariaLabel={`Ganti nama ${device.name}`}>
           <Icon name="edit" className="size-4" />
           Ganti nama
         </BrandButton>
-        {onPairCode ? (
+        {onPairCode && !onApprove ? (
           <BrandButton size="sm" variant="outline" onClick={onPairCode} ariaLabel={`Kode aplikasi Windows untuk ${device.name}`}>
             <Icon name="lock" className="size-4" />
             Kode aplikasi
           </BrandButton>
         ) : null}
-        <BrandButton size="sm" variant="outline" onClick={onRotate} ariaLabel={`Buat tautan baru untuk ${device.name}`}>
-          <Icon name="repeat" className="size-4" />
-          {device.revokedAt ? "Aktifkan lagi" : "Tautan baru"}
-        </BrandButton>
+        {onApprove ? null : (
+          <BrandButton size="sm" variant="outline" onClick={onRotate} ariaLabel={`Buat tautan baru untuk ${device.name}`}>
+            <Icon name="repeat" className="size-4" />
+            {device.revokedAt ? "Aktifkan lagi" : "Tautan baru"}
+          </BrandButton>
+        )}
         {device.revokedAt && onDelete ? (
           <BrandButton size="sm" variant="danger" onClick={onDelete} ariaLabel={`Hapus ${device.name}`}>
             <Icon name="close" className="size-4" />
@@ -423,9 +501,9 @@ function DeviceRow({
           </BrandButton>
         ) : null}
         {device.revokedAt ? null : (
-          <BrandButton size="sm" variant="danger" onClick={onRevoke} ariaLabel={`Cabut ${device.name}`}>
+          <BrandButton size="sm" variant="danger" onClick={onRevoke} ariaLabel={`${onApprove ? "Tolak" : "Cabut"} ${device.name}`}>
             <Icon name="power" className="size-4" />
-            Cabut
+            {onApprove ? "Tolak" : "Cabut"}
           </BrandButton>
         )}
       </div>

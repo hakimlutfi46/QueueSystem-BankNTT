@@ -2,17 +2,21 @@ import "dotenv/config";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
+  approveDevice,
   autoRegisterDevice,
   createDevice,
   deleteDevice,
   deviceMatcher,
+  deviceTokenStatus,
   hashDeviceToken,
   issuePairCode,
   listDevices,
   redeemPairCode,
   renameDevice,
   revokeDevice,
+  MAX_PENDING_DEVICES,
   rotateDevice,
+  setAutoApprove,
   verifyDeviceToken,
 } from "@/lib/auth/devices";
 import { createTestPrisma, ensureTestDatabase } from "./database";
@@ -156,20 +160,64 @@ describe("devices", () => {
     await expect(deleteDevice(prisma, device.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
-  it("auto-registers a device dynamically without pairing code", async () => {
+  it("makes a self-registered device wait for admin approval before it opens the kiosk", async () => {
     const first = await autoRegisterDevice(prisma, "kiosk");
-    expect(first).toMatchObject({ kind: "kiosk", name: "Kiosk Tiket" });
-    await expect(verifyDeviceToken(prisma, "kiosk", first.token)).resolves.toBe(true);
+    expect(first).toMatchObject({ kind: "kiosk", name: "Kiosk Tiket", approved: false });
+    await expect(verifyDeviceToken(prisma, "kiosk", first.token)).resolves.toBe(false);
+    await expect(deviceTokenStatus(prisma, "kiosk", first.token)).resolves.toBe("pending");
 
-    const second = await autoRegisterDevice(prisma, "kiosk");
-    expect(second).toMatchObject({ kind: "kiosk", name: "Kiosk Tiket 2" });
-    await expect(verifyDeviceToken(prisma, "kiosk", second.token)).resolves.toBe(true);
+    const [listed] = await listDevices(prisma);
+    expect(listed).toMatchObject({ name: "Kiosk Tiket", approvedAt: null, revokedAt: null });
+    await approveDevice(prisma, listed!.id);
+    await expect(verifyDeviceToken(prisma, "kiosk", first.token)).resolves.toBe(true);
+    await expect(deviceTokenStatus(prisma, "kiosk", first.token)).resolves.toBe("active");
 
     const tv = await autoRegisterDevice(prisma, "display");
-    expect(tv).toMatchObject({ kind: "display", name: "Layar TV" });
-    await expect(verifyDeviceToken(prisma, "display", tv.token)).resolves.toBe(true);
+    expect(tv).toMatchObject({ kind: "display", name: "Layar TV", approved: false });
+    await expect(deviceTokenStatus(prisma, "display", "not-a-token")).resolves.toBe("unknown");
+  });
 
-    const list = await listDevices(prisma);
-    expect(list).toHaveLength(3);
+  it("keeps one device per installation and never brings a revoked one back by itself", async () => {
+    const installId = "3f2b8c1e-0d4a-4c55-9a77-1b2c3d4e5f60";
+    const first = await autoRegisterDevice(prisma, "kiosk", "Kiosk Lobi", installId);
+    const [device] = await listDevices(prisma);
+    await approveDevice(prisma, device!.id);
+
+    // Reinstall on the same PC: same row, new token, still approved, old token stops working.
+    const again = await autoRegisterDevice(prisma, "kiosk", "Kiosk Lobi", installId);
+    expect(again.approved).toBe(true);
+    expect(again.token).not.toBe(first.token);
+    await expect(listDevices(prisma)).resolves.toHaveLength(1);
+    await expect(verifyDeviceToken(prisma, "kiosk", first.token)).resolves.toBe(false);
+    await expect(verifyDeviceToken(prisma, "kiosk", again.token)).resolves.toBe(true);
+
+    await revokeDevice(prisma, device!.id);
+    await expect(deviceTokenStatus(prisma, "kiosk", again.token)).resolves.toBe("revoked");
+    await expect(autoRegisterDevice(prisma, "kiosk", "Kiosk Lobi", installId)).rejects.toMatchObject({ code: "DEVICE_REVOKED" });
+    await expect(approveDevice(prisma, device!.id)).rejects.toMatchObject({ code: "DEVICE_REVOKED" });
+    await expect(listDevices(prisma)).resolves.toHaveLength(1);
+  });
+
+  it("approves new devices at once while auto-approve is on, and caps devices waiting for approval", async () => {
+    await setAutoApprove(prisma, true);
+    const kiosk = await autoRegisterDevice(prisma, "kiosk");
+    expect(kiosk.approved).toBe(true);
+    await expect(verifyDeviceToken(prisma, "kiosk", kiosk.token)).resolves.toBe(true);
+
+    await setAutoApprove(prisma, false);
+    for (let index = 1; index < MAX_PENDING_DEVICES + 1; index += 1) await autoRegisterDevice(prisma, "display");
+    await expect(autoRegisterDevice(prisma, "display")).rejects.toMatchObject({ code: "TOO_MANY_PENDING" });
+  });
+
+  it("approves devices created or paired by the admin without a separate step", async () => {
+    const created = await createDevice(prisma, { kind: "display", name: "TV Lobi" });
+    expect(created.device.approvedAt).not.toBeNull();
+    const pending = await autoRegisterDevice(prisma, "kiosk", "Kiosk Baru", "a1b2c3d4-0000-4000-8000-000000000001");
+    expect(pending.approved).toBe(false);
+    const [waiting] = (await listDevices(prisma)).filter((device) => !device.approvedAt);
+    const code = await issuePairCode(prisma, waiting!.id);
+    const paired = await redeemPairCode(prisma, code.code, "a1b2c3d4-0000-4000-8000-000000000001");
+    expect(paired.approved).toBe(true);
+    await expect(verifyDeviceToken(prisma, "kiosk", paired.token)).resolves.toBe(true);
   });
 });

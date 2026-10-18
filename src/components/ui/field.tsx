@@ -29,11 +29,18 @@ export function Switch({
   label,
   description,
   defaultChecked,
+  checked,
+  onChange,
+  disabled,
 }: {
   name: string;
   label: string;
   description?: string;
   defaultChecked?: boolean;
+  /** Bentuk terkendali: dipakai bila perubahan langsung disimpan, tanpa tombol Simpan. */
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-line bg-brand-white p-4 hover:border-brand-grey">
@@ -45,7 +52,10 @@ export function Switch({
         <input
           type="checkbox"
           name={name}
-          defaultChecked={defaultChecked}
+          defaultChecked={checked === undefined ? defaultChecked : undefined}
+          checked={checked}
+          disabled={disabled}
+          onChange={onChange ? (event) => onChange(event.target.checked) : undefined}
           className="peer absolute inset-0 z-10 cursor-pointer appearance-none opacity-0"
         />
         <span className="h-7 w-12 rounded-full bg-line transition-colors peer-checked:bg-brand-navy peer-focus-visible:ring-4 peer-focus-visible:ring-sky-soft" />

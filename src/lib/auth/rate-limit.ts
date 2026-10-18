@@ -71,6 +71,16 @@ export const pairRateLimit = {
 };
 
 /**
+ * Perangkat yang mendaftar sendiri tanpa kode (aplikasi kiosk/TV atau browser di /kiosk dan /display).
+ * Setiap pendaftaran dihitung: 10 per IP dan 60 untuk semua IP per 10 menit. Perangkat baru tetap
+ * menunggu persetujuan admin; batas ini hanya menahan banjir baris di Admin → Perangkat.
+ */
+export const autoRegisterRateLimit = {
+  perAddress: createRateLimit(10, 10 * MINUTE),
+  overall: createRateLimit(60, 10 * MINUTE),
+};
+
+/**
  * Masuk: 5 kata sandi salah per IP dan nama pengguna dalam 15 menit. Batas 20 per nama pengguna dari
  * IP mana pun menahan tebakan beruntun yang memalsukan IP, tanpa mudah mengunci akun dari luar.
  * 50 per IP untuk semua nama pengguna menahan penjelajahan banyak akun dari satu komputer.

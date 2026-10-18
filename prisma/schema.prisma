@@ -55,14 +55,14 @@ model Service {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  name         String
-  passwordHash String   @map("password_hash")
-  role         UserRole @default(STAFF)
-  isActive     Boolean  @default(true) @map("is_active")
+  id                 Int      @id @default(autoincrement())
+  username           String   @unique
+  name               String
+  passwordHash       String   @map("password_hash")
+  role               UserRole @default(STAFF)
+  isActive           Boolean  @default(true) @map("is_active")
   /// Kata sandi bawaan, lemah, atau sementara dari admin: wajib diganti sebelum membuka loket atau admin.
-  mustChangePassword Boolean @default(false) @map("must_change_password")
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
 
   currentCounters Counter[]     @relation("CounterCurrentUser")
   servedTickets   Ticket[]      @relation("TicketServedBy")
@@ -72,14 +72,14 @@ model User {
 }
 
 model Counter {
-  id             Int           @id @default(autoincrement())
-  name           String
-  displayNumber  Int           @map("display_number")
-  status         CounterStatus @default(CLOSED)
-  currentUserId  Int?          @map("current_user_id")
-  isActive       Boolean       @default(true) @map("is_active")
+  id            Int           @id @default(autoincrement())
+  name          String
+  displayNumber Int           @map("display_number")
+  status        CounterStatus @default(CLOSED)
+  currentUserId Int?          @map("current_user_id")
+  isActive      Boolean       @default(true) @map("is_active")
 
-  currentUser     User?           @relation("CounterCurrentUser", fields: [currentUserId], references: [id], onDelete: Restrict)
+  currentUser     User?            @relation("CounterCurrentUser", fields: [currentUserId], references: [id], onDelete: Restrict)
   counterServices CounterService[]
   tickets         Ticket[]
   ticketEvents    TicketEvent[]
@@ -131,8 +131,8 @@ model Ticket {
   ticketEvents TicketEvent[]
 
   @@unique([serviceId, serviceDate, seq])
-  @@index([serviceDate, serviceId, createdAt, id], map: "tickets_waiting_idx", where: raw("status = 'WAITING'"))
   @@unique([counterId], map: "tickets_one_active_per_counter", where: raw("status = 'SERVING'"))
+  @@index([serviceDate, serviceId, createdAt, id], map: "tickets_waiting_idx", where: raw("status = 'WAITING'"))
   @@index([serviceDate, status], map: "tickets_report_idx")
   @@map("tickets")
 }
@@ -165,6 +165,10 @@ model Device {
   /// Kode pemasangan aplikasi kiosk Windows (hash SHA-256), sekali pakai dan berlaku 30 menit.
   pairCodeHash      String?    @unique @map("pair_code_hash")
   pairCodeExpiresAt DateTime?  @map("pair_code_expires_at") @db.Timestamptz(6)
+  /// Kosong: perangkat mendaftar sendiri dan menunggu persetujuan di Admin → Perangkat.
+  approvedAt        DateTime?  @map("approved_at") @db.Timestamptz(6)
+  /// ID instalasi aplikasi kiosk/TV; pemasangan ulang di PC yang sama memakai baris yang sama.
+  installId         String?    @unique @map("install_id")
 
   @@map("devices")
 }

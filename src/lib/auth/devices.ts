@@ -18,6 +18,8 @@ export type AdminDevice = {
   createdAt: string;
   lastSeenAt: string | null;
   revokedAt: string | null;
+  /** Kosong: perangkat mendaftar sendiri dan menunggu persetujuan admin. */
+  approvedAt: string | null;
 };
 
 export type IssuedDevice = { device: AdminDevice; token: string };
@@ -25,7 +27,16 @@ export type IssuedDevice = { device: AdminDevice; token: string };
 /** Kode pemasangan untuk aplikasi Windows kiosk atau TV. `code` ditampilkan sekali, misalnya "4K7-Q2M". */
 export type PairCode = { device: AdminDevice; code: string; expiresAt: string };
 
-export type PairedDevice = { token: string; kind: DeviceKind; name: string };
+export type PairedDevice = { token: string; kind: DeviceKind; name: string; approved: boolean };
+
+/** Keadaan token perangkat: boleh dipakai, menunggu persetujuan, dicabut, atau tidak dikenal. */
+export type DeviceTokenStatus = "active" | "pending" | "revoked" | "unknown";
+
+/** Pengaturan "Terima perangkat baru otomatis" di Admin → Perangkat. */
+export const AUTO_APPROVE_SETTING = "auto_approve_devices";
+
+/** Paling banyak perangkat yang menunggu persetujuan sekaligus, supaya daftar tidak dibanjiri. */
+export const MAX_PENDING_DEVICES = 20;
 
 /** Tanpa 0/O, 1/I, dan huruf mirip lain, supaya kode mudah dibaca dan diketik di PC kiosk atau TV. */
 export const PAIR_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -52,6 +63,7 @@ type DeviceRow = {
   created_at: Date;
   last_seen_at: Date | null;
   revoked_at: Date | null;
+  approved_at: Date | null;
 };
 
 export function generateDeviceToken(): string {
@@ -64,9 +76,9 @@ export function hashDeviceToken(token: string): string {
 
 export async function listDevices(db: PrismaClient): Promise<AdminDevice[]> {
   const rows = await db.$queryRaw<DeviceRow[]>`
-    SELECT id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+    SELECT id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
     FROM devices
-    ORDER BY revoked_at IS NOT NULL, kind, name, id
+    ORDER BY revoked_at IS NOT NULL, approved_at IS NOT NULL, kind, name, id
   `;
   return rows.map(mapDevice);
 }
@@ -76,14 +88,15 @@ export async function createDevice(db: PrismaClient, body: unknown): Promise<Iss
   if (!parsed.success) throw validationError(parsed.error);
   const token = generateDeviceToken();
   const rows = await db.$queryRaw<DeviceRow[]>`
-    INSERT INTO devices (kind, name, token_hash, token_hint)
+    INSERT INTO devices (kind, name, token_hash, token_hint, approved_at)
     VALUES (
       ${parsed.data.kind === "kiosk" ? "KIOSK" : "DISPLAY"}::device_kind,
       ${parsed.data.name},
       ${hashDeviceToken(token)},
-      ${token.slice(-4)}
+      ${token.slice(-4)},
+      now()
     )
-    RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+    RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
   `;
   const row = rows[0];
   if (!row) throw new AdminError("NOT_FOUND", "Perangkat gagal dibuat.");
@@ -95,7 +108,7 @@ export async function renameDevice(db: PrismaClient, id: number, body: unknown):
   if (!parsed.success) throw validationError(parsed.error);
   const rows = await db.$queryRaw<DeviceRow[]>`
     UPDATE devices SET name = ${parsed.data.name} WHERE id = ${id}
-    RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+    RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
   `;
   const row = rows[0];
   if (!row) throw new AdminError("NOT_FOUND", "Perangkat tidak ditemukan.");
@@ -109,9 +122,9 @@ export async function rotateDevice(db: PrismaClient, id: number): Promise<Issued
     const rows = await tx.$queryRaw<DeviceRow[]>`
       UPDATE devices
       SET token_hash = ${hashDeviceToken(token)}, token_hint = ${token.slice(-4)},
-        revoked_at = NULL, last_seen_at = NULL
+        revoked_at = NULL, last_seen_at = NULL, approved_at = COALESCE(approved_at, now())
       WHERE id = ${id}
-      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
     `;
     const row = rows[0];
     if (!row) throw new AdminError("NOT_FOUND", "Perangkat tidak ditemukan.");
@@ -127,7 +140,7 @@ export async function revokeDevice(db: PrismaClient, id: number): Promise<AdminD
       UPDATE devices
       SET revoked_at = COALESCE(revoked_at, now()), pair_code_hash = NULL, pair_code_expires_at = NULL
       WHERE id = ${id}
-      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
     `;
     const row = rows[0];
     if (!row) throw new AdminError("NOT_FOUND", "Perangkat tidak ditemukan.");
@@ -174,7 +187,7 @@ export async function issuePairCode(db: PrismaClient, id: number): Promise<PairC
       SET pair_code_hash = ${hash},
         pair_code_expires_at = now() + make_interval(mins => ${PAIR_CODE_TTL_MINUTES})
       WHERE id = ${id}
-      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, pair_code_expires_at
+      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at, pair_code_expires_at
     `;
     const row = rows[0];
     if (!row) throw new AdminError("NOT_FOUND", "Perangkat tidak ditemukan.");
@@ -187,7 +200,8 @@ export async function issuePairCode(db: PrismaClient, id: number): Promise<PairC
  * Tukar kode pemasangan dengan token perangkat baru, sekali pakai. Token lama ikut tidak berlaku dan
  * perangkat yang dicabut aktif lagi, sama seperti membuat tautan baru.
  */
-export async function redeemPairCode(db: PrismaClient, input: unknown): Promise<PairedDevice> {
+export async function redeemPairCode(db: PrismaClient, input: unknown, installIdInput?: unknown): Promise<PairedDevice> {
+  const installId = normalizeInstallId(installIdInput);
   const code = normalizePairCode(input);
   if (!code) throw new AdminError("VALIDATION", "Kode pemasangan harus 6 karakter, misalnya 4K7-Q2M.");
   const hash = hashPairCode(code);
@@ -196,9 +210,10 @@ export async function redeemPairCode(db: PrismaClient, input: unknown): Promise<
     const rows = await tx.$queryRaw<DeviceRow[]>`
       UPDATE devices
       SET token_hash = ${hashDeviceToken(token)}, token_hint = ${token.slice(-4)},
-        revoked_at = NULL, last_seen_at = NULL, pair_code_hash = NULL, pair_code_expires_at = NULL
+        revoked_at = NULL, last_seen_at = NULL, pair_code_hash = NULL, pair_code_expires_at = NULL,
+        approved_at = COALESCE(approved_at, now())
       WHERE pair_code_hash = ${hash} AND pair_code_expires_at > now()
-      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
     `;
     const row = rows[0];
     if (!row) {
@@ -208,53 +223,139 @@ export async function redeemPairCode(db: PrismaClient, input: unknown): Promise<
       }
       throw new AdminError("PAIR_CODE_INVALID", "Kode pemasangan tidak dikenal. Periksa lagi kodenya atau buat kode baru.");
     }
+    if (installId) {
+      // This PC now belongs to the paired device; an earlier self-registered row of the same PC lets go.
+      await tx.$executeRaw`UPDATE devices SET install_id = NULL WHERE install_id = ${installId} AND id <> ${row.id}`;
+      await tx.$executeRaw`UPDATE devices SET install_id = ${installId} WHERE id = ${row.id}`;
+    }
     await notifyQueue(tx, { type: "CONFIG_CHANGED" });
     const device = mapDevice(row);
-    return { token, kind: device.kind, name: device.name };
+    return { token, kind: device.kind, name: device.name, approved: true };
   });
 }
 
+/** ID instalasi dari aplikasi kiosk/TV: acak, 8–100 karakter huruf, angka, atau tanda hubung. */
+export function normalizeInstallId(input: unknown): string | null {
+  if (typeof input !== "string") return null;
+  const value = input.trim();
+  return /^[A-Za-z0-9-]{8,100}$/.test(value) ? value : null;
+}
+
+export async function readAutoApprove(db: PrismaClient): Promise<boolean> {
+  const row = await db.setting.findUnique({ where: { key: AUTO_APPROVE_SETTING } });
+  return row?.value === true;
+}
+
+export async function setAutoApprove(db: PrismaClient, enabled: boolean): Promise<boolean> {
+  await db.setting.upsert({
+    where: { key: AUTO_APPROVE_SETTING },
+    create: { key: AUTO_APPROVE_SETTING, value: enabled },
+    update: { value: enabled },
+  });
+  return enabled;
+}
+
 /**
- * Pendaftaran otomatis perangkat di jaringan lokal tanpa kode pemasangan manual.
- * Mengeluarkan token perangkat aktif dan mendaftarkan perangkat baru atau menggunakan yang ada.
+ * Perangkat yang mendaftar sendiri dari jaringan lokal, tanpa kode pemasangan: aplikasi kiosk/TV, atau
+ * browser yang membuka /kiosk atau /display. Perangkat baru menunggu persetujuan di Admin → Perangkat,
+ * kecuali admin menyalakan "Terima perangkat baru otomatis".
+ *
+ * Dengan `installId`, pemasangan ulang di PC yang sama memakai baris yang sama (token baru, status tetap),
+ * jadi daftar tidak menumpuk. Perangkat yang dicabut tetap dicabut: pendaftaran ulangnya ditolak.
  */
 export async function autoRegisterDevice(
   db: PrismaClient,
   kindInput: unknown,
   nameInput?: unknown,
+  installIdInput?: unknown,
 ): Promise<PairedDevice> {
   const kind: DeviceKind = kindInput === "display" || kindInput === "DISPLAY" ? "display" : "kiosk";
+  const dbKind = kind === "kiosk" ? "KIOSK" : "DISPLAY";
+  const installId = normalizeInstallId(installIdInput);
   const token = generateDeviceToken();
+  const autoApprove = await readAutoApprove(db);
 
   return db.$transaction(async (tx) => {
+    if (installId) {
+      const existing = await tx.$queryRaw<DeviceRow[]>`
+        SELECT id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
+        FROM devices WHERE install_id = ${installId} AND kind = ${dbKind}::device_kind
+        FOR UPDATE
+      `;
+      const found = existing[0];
+      if (found?.revoked_at) {
+        throw new AdminError("DEVICE_REVOKED", "Perangkat ini sudah dicabut admin. Minta admin mengaktifkannya lagi di Admin → Perangkat.");
+      }
+      if (found) {
+        const rows = await tx.$queryRaw<DeviceRow[]>`
+          UPDATE devices
+          SET token_hash = ${hashDeviceToken(token)}, token_hint = ${token.slice(-4)},
+            approved_at = CASE WHEN ${autoApprove} THEN COALESCE(approved_at, now()) ELSE approved_at END
+          WHERE id = ${found.id}
+          RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
+        `;
+        const device = mapDevice(rows[0]!);
+        await notifyQueue(tx, { type: "CONFIG_CHANGED" });
+        return { token, kind: device.kind, name: device.name, approved: device.approvedAt !== null };
+      }
+    }
+
+    if (!autoApprove) {
+      const pending = await tx.$queryRaw<{ count: bigint }[]>`
+        SELECT COUNT(*) AS count FROM devices WHERE approved_at IS NULL AND revoked_at IS NULL
+      `;
+      if (Number(pending[0]?.count ?? 0) >= MAX_PENDING_DEVICES) {
+        throw new AdminError(
+          "TOO_MANY_PENDING",
+          "Terlalu banyak perangkat menunggu persetujuan. Setujui atau cabut perangkat di Admin → Perangkat dulu.",
+        );
+      }
+    }
+
     const existing = await tx.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*) as count
-      FROM devices
-      WHERE kind = ${kind === "kiosk" ? "KIOSK" : "DISPLAY"}::device_kind AND revoked_at IS NULL
+      SELECT COUNT(*) AS count FROM devices WHERE kind = ${dbKind}::device_kind AND revoked_at IS NULL
     `;
     const count = Number(existing[0]?.count ?? 0);
-    const defaultName = kind === "kiosk"
-      ? (count === 0 ? "Kiosk Tiket" : `Kiosk Tiket ${count + 1}`)
-      : (count === 0 ? "Layar TV" : `Layar TV ${count + 1}`);
-
+    const base = kind === "kiosk" ? "Kiosk Tiket" : "Layar TV";
+    const defaultName = count === 0 ? base : `${base} ${count + 1}`;
     const name = typeof nameInput === "string" && nameInput.trim() ? nameInput.trim().slice(0, 60) : defaultName;
 
     const created = await tx.$queryRaw<DeviceRow[]>`
-      INSERT INTO devices (kind, name, token_hash, token_hint, last_seen_at)
+      INSERT INTO devices (kind, name, token_hash, token_hint, install_id, approved_at)
       VALUES (
-        ${kind === "kiosk" ? "KIOSK" : "DISPLAY"}::device_kind,
+        ${dbKind}::device_kind,
         ${name},
         ${hashDeviceToken(token)},
         ${token.slice(-4)},
-        now()
+        ${installId},
+        ${autoApprove ? new Date() : null}
       )
-      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at
+      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
     `;
     const row = created[0];
     if (!row) throw new AdminError("NOT_FOUND", "Perangkat gagal didaftarkan.");
     await notifyQueue(tx, { type: "CONFIG_CHANGED" });
     const device = mapDevice(row);
-    return { token, kind: device.kind, name: device.name };
+    return { token, kind: device.kind, name: device.name, approved: device.approvedAt !== null };
+  });
+}
+
+/** Setujui perangkat yang mendaftar sendiri. Layar yang sedang menunggu langsung terbuka. */
+export async function approveDevice(db: PrismaClient, id: number): Promise<AdminDevice> {
+  return db.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<DeviceRow[]>`
+      UPDATE devices SET approved_at = COALESCE(approved_at, now())
+      WHERE id = ${id} AND revoked_at IS NULL
+      RETURNING id, kind::text AS kind, name, token_hint, created_at, last_seen_at, revoked_at, approved_at
+    `;
+    const row = rows[0];
+    if (!row) {
+      const exists = await tx.$queryRaw<{ id: number }[]>`SELECT id FROM devices WHERE id = ${id}`;
+      if (exists.length > 0) throw new AdminError("DEVICE_REVOKED", "Perangkat yang dicabut tidak bisa disetujui. Pakai Aktifkan lagi.");
+      throw new AdminError("NOT_FOUND", "Perangkat tidak ditemukan.");
+    }
+    await notifyQueue(tx, { type: "CONFIG_CHANGED" });
+    return mapDevice(row);
   });
 }
 
@@ -284,6 +385,7 @@ export async function verifyDeviceToken(db: PrismaClient, kind: DeviceKind, toke
     WHERE token_hash = ${hashDeviceToken(token)}
       AND kind = ${kind === "kiosk" ? "KIOSK" : "DISPLAY"}::device_kind
       AND revoked_at IS NULL
+      AND approved_at IS NOT NULL
     LIMIT 1
   `;
   const device = rows[0];
@@ -292,6 +394,21 @@ export async function verifyDeviceToken(db: PrismaClient, kind: DeviceKind, toke
     await db.$executeRaw`UPDATE devices SET last_seen_at = now() WHERE id = ${device.id}`;
   }
   return true;
+}
+
+/** Kenapa token tidak bisa dipakai, untuk halaman perangkat: menunggu persetujuan, dicabut, atau tidak dikenal. */
+export async function deviceTokenStatus(db: PrismaClient, kind: DeviceKind, token: string): Promise<DeviceTokenStatus> {
+  if (!token || token.length > 200) return "unknown";
+  const rows = await db.$queryRaw<{ revoked: boolean; approved: boolean }[]>`
+    SELECT revoked_at IS NOT NULL AS revoked, approved_at IS NOT NULL AS approved
+    FROM devices
+    WHERE token_hash = ${hashDeviceToken(token)} AND kind = ${kind === "kiosk" ? "KIOSK" : "DISPLAY"}::device_kind
+    LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) return "unknown";
+  if (row.revoked) return "revoked";
+  return row.approved ? "active" : "pending";
 }
 
 function mapDevice(row: DeviceRow): AdminDevice {
@@ -303,6 +420,7 @@ function mapDevice(row: DeviceRow): AdminDevice {
     createdAt: row.created_at.toISOString(),
     lastSeenAt: row.last_seen_at ? row.last_seen_at.toISOString() : null,
     revokedAt: row.revoked_at ? row.revoked_at.toISOString() : null,
+    approvedAt: row.approved_at ? row.approved_at.toISOString() : null,
   };
 }
 

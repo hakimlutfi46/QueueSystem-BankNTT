@@ -28,6 +28,8 @@ const clientErrors: Record<string, { status: number; message: string | null }> =
   DEVICE_ACTIVE: { status: 409, message: null },
   BUILD_UNAVAILABLE: { status: 409, message: null },
   RATE_LIMITED: { status: 429, message: null },
+  DEVICE_REVOKED: { status: 403, message: null },
+  TOO_MANY_PENDING: { status: 429, message: null },
 };
 
 export function adminErrorResponse(error: unknown): Response | null {
