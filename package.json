@@ -22,6 +22,8 @@
     "kiosk:build:mac": "node apps/kiosk-desktop/scripts/build-and-copy.mjs --platform mac",
     "kiosk:build:linux": "node apps/kiosk-desktop/scripts/build-and-copy.mjs --platform linux",
     "apps:build": "node apps/desktop-client/scripts/build.mjs --app all",
+    "apps:build:mac": "node apps/desktop-client/scripts/build.mjs --app all --platform mac",
+    "apps:build:linux": "node apps/desktop-client/scripts/build.mjs --app all --platform linux",
     "server:bundle": "node apps/server-bundle/build.mjs",
     "discovery": "node scripts/discovery.mjs",
     "sim": "node scripts/sim.mjs"

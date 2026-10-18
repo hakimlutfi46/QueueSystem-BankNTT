@@ -54,6 +54,99 @@ npm run check                                        # node --check untuk semua 
 `BANKNTT_USER_DATA=/tmp/uji` memakai folder pengaturan lain. Kode pemasangan server tiruan:
 `ABC234` (TV), `KSK234` (kiosk, harus ditolak), `EXP234` (kedaluwarsa).
 
+## Installer simulasi (Mac dan Ubuntu)
+
+Untuk mensimulasikan satu cabang tanpa perangkat asli, Admin, Loket, dan TV juga bisa dibuat untuk
+**MacBook Apple Silicon (macOS arm64)** dan **Ubuntu 24.04 LTS x64**. Ini hanya untuk pengembang;
+cabang tetap memakai installer Windows di atas (yang tidak berubah sama sekali).
+
+### Membuat
+
+Dari root repo, di Mac:
+
+```bash
+npm run apps:build:mac      # .dmg arm64 untuk Admin, Loket, TV
+npm run apps:build:linux    # AppImage + deb x64 untuk Admin, Loket, TV
+node apps/desktop-client/scripts/build.mjs --app tv --platform linux   # satu aplikasi saja
+node apps/desktop-client/scripts/build.mjs --app all --platform mac --offline
+```
+
+Hasilnya di `downloads/simulasi/` beserta `downloads/simulasi/desktop-apps.json` (daftar file,
+ukuran, appId, waktu build per platform/aplikasi). `downloads/desktop-apps.json` dan installer
+Windows tidak disentuh.
+
+| Aplikasi | macOS | Ubuntu |
+| --- | --- | --- |
+| BANK NTT Admin (Simulasi) | `BANK-NTT-Admin-Simulasi-mac-arm64.dmg` | `BANK-NTT-Admin-Simulasi-linux-x86_64.AppImage`, `BANK-NTT-Admin-Simulasi-linux-amd64.deb` |
+| BANK NTT Loket (Simulasi) | `BANK-NTT-Loket-Simulasi-mac-arm64.dmg` | `BANK-NTT-Loket-Simulasi-linux-x86_64.AppImage`, `BANK-NTT-Loket-Simulasi-linux-amd64.deb` |
+| BANK NTT TV (Simulasi) | `BANK-NTT-TV-Simulasi-mac-arm64.dmg` | `BANK-NTT-TV-Simulasi-linux-x86_64.AppImage`, `BANK-NTT-TV-Simulasi-linux-amd64.deb` |
+
+Bedanya dengan aplikasi Windows:
+
+- Nama berakhiran **(Simulasi)**, juga di judul setiap jendela. appId `….sim`
+  (`id.bankntt.antrian.tv.sim`), nama paket `bankntt-admin-sim` / `bankntt-loket-sim` /
+  `bankntt-tv-sim` (juga nama paket deb dan perintahnya di Ubuntu).
+- Folder pengaturan sendiri: `~/Library/Application Support/bankntt-<peran>-sim/` (macOS) atau
+  `~/.config/bankntt-<peran>-sim/` (Ubuntu), berisi `config.json` dan `logs/`.
+- TV **tidak** diatur berjalan otomatis saat login, supaya laptop tidak diambil alih. Layar penuh
+  tetap terkunci; keluar dengan **Ctrl+Shift+Alt+K** (di Mac juga **Cmd+Shift+Option+K**) lalu PIN.
+- Di Mac, Admin dan Loket punya menu aplikasi biasa (Tentang, Ganti server… Cmd+Shift+S,
+  Sembunyikan, Keluar Cmd+Q) serta menu Edit, sehingga Cmd+C / Cmd+V berfungsi.
+- Build Mac tidak ditandatangani dengan sertifikat Apple (`identity: null`, tanpa hardened
+  runtime). Setelah *fuse* Electron diubah, aplikasi ditandatangani ulang secara **ad-hoc**
+  (`codesign --sign -`, `electronFuses.resetAdHocDarwinSignature`); tanpa itu macOS Apple Silicon
+  langsung menghentikan aplikasi ("Code Signature Invalid").
+- Build Linux memakai toolset AppImage `1.0.3` electron-builder (runtime statis, alat bawaan untuk
+  Mac arm64) dan dibuat di Mac. Unduhan alat build hanya dari rilis resmi Electron dan
+  electron-builder-binaries di GitHub (dengan checksum). `--offline` memakai zip Electron
+  `darwin-arm64` / `linux-x64` dari cache, sama seperti untuk Windows.
+
+### Memasang di Mac
+
+Buka file `.dmg`, seret aplikasinya ke **Applications**. Karena belum ditandatangani Apple,
+Gatekeeper menolak saat dibuka pertama kali:
+
+- Klik kanan aplikasi di Applications → **Open** → **Open** (di macOS terbaru: buka sekali, lalu
+  **System Settings → Privacy & Security → Open Anyway**), atau
+- lewat Terminal: `xattr -cr "/Applications/BANK NTT Admin (Simulasi).app"`.
+
+macOS bisa bertanya apakah aplikasi boleh **menemukan perangkat di jaringan lokal**; pilih
+**Allow**, kalau tidak pencarian server di LAN gagal (server di laptop yang sama tetap ditemukan).
+
+### Memasang di Ubuntu 24.04
+
+```bash
+sudo apt install ./BANK-NTT-Admin-Simulasi-linux-amd64.deb     # muncul di menu aplikasi (kategori Office)
+bankntt-admin-sim                                                # atau jalankan dari terminal
+sudo apt remove bankntt-admin-sim                                # menghapus
+```
+
+Atau tanpa memasang, pakai AppImage:
+
+```bash
+chmod +x BANK-NTT-TV-Simulasi-linux-x86_64.AppImage
+./BANK-NTT-TV-Simulasi-linux-x86_64.AppImage
+```
+
+AppImage butuh FUSE. Bila muncul galat FUSE / `libfuse.so.2`, pasang `sudo apt install libfuse2t64`
+(nama paketnya di 24.04), atau jalankan dengan `--appimage-extract-and-run`.
+
+### Server untuk simulasi
+
+Server antrian dijalankan dari repo di laptop pengembang:
+
+```bash
+npm run dev          # server Next.js di port 3000
+npm run discovery    # penjawab UDP 41234 supaya aplikasi menemukan server (kontrak yang sama dengan server cabang)
+```
+
+Aplikasi di laptop yang sama menemukan server lewat `127.0.0.1`; aplikasi di Ubuntu (jaringan yang
+sama) lewat siaran LAN. Firewall Mac/Ubuntu harus mengizinkan UDP 41234 dan TCP 3000 masuk. Bila
+server tidak ditemukan, ketik alamatnya manual, misalnya `192.168.1.52:3000`, lalu **Periksa**.
+
+Mencoba tanpa installer: `npm run dev:admin -- --simulation` (atau `BANKNTT_SIMULATION=1`) dari
+`apps/desktop-client` menjalankan mode simulasi langsung dari kode.
+
 ## Memasang
 
 1. Unduh installer dari panel admin web (atau salin dari folder `downloads/` di PC server lewat
