@@ -92,8 +92,8 @@ Bedanya dengan aplikasi Windows:
 - Folder pengaturan sendiri: `~/Library/Application Support/bankntt-<peran>-sim/` (macOS) atau
   `~/.config/bankntt-<peran>-sim/` (Ubuntu), berisi `config.json` dan `logs/`.
 - TV **tidak** diatur berjalan otomatis saat login, supaya laptop tidak diambil alih. Layar penuh
-  tetap terkunci; keluar dengan **Ctrl+Shift+Alt+K** (di Mac juga **Cmd+Shift+Option+K**) lalu PIN
-  bila dipasang. Khusus simulasi, Cmd+Q / Ctrl+Q / Alt+F4 dan Dock → Keluar langsung menutup TV.
+  tetap terkunci; **Ctrl+Shift+Alt+K** (di Mac juga **Cmd+Shift+Option+K**) membuka pengaturan
+  dengan tombol **Keluar aplikasi**. Khusus simulasi, Cmd+Q / Ctrl+Q / Alt+F4 dan Dock → Keluar langsung menutup TV.
 - Di Mac, Admin dan Loket punya menu aplikasi biasa (Tentang, Ganti server… Cmd+Shift+S,
   Sembunyikan, Keluar Cmd+Q) serta menu Edit, sehingga Cmd+C / Cmd+V berfungsi.
 - Build Mac tidak ditandatangani dengan sertifikat Apple (`identity: null`, tanpa hardened
@@ -189,15 +189,13 @@ Bila server tidak dapat dihubungi, muncul layar "Menyambung ke server…":
 
 Pemasangan kini otomatis, tanpa kode:
 
-1. Di jendela "Sambungkan BANK NTT TV" server dipilih otomatis (atau ketik alamatnya). Disarankan
-   isi **PIN admin** (minimal 4 angka) dua kali sebelum menyambung.
+1. Di jendela "Sambungkan BANK NTT TV" server dipilih otomatis dan TV langsung menyambung (atau ketik
+   alamatnya lalu tekan **Simpan & sambungkan**).
 2. TV mendaftar sendiri ke server dengan ID instalasi acak yang dibuat sekali dan disimpan di
    `config.json` (`installId`); menyambung ulang tidak pernah membuat perangkat ganda.
 3. Layar TV menampilkan "menunggu persetujuan" sampai admin menyetujuinya di panel admin web →
    **Perangkat** (atau menyalakan **Terima perangkat baru otomatis**). Halaman memeriksa sendiri tiap
    5 detik lalu membuka layar TV. Aplikasi diatur berjalan otomatis saat login.
-4. **Kode pemasangan (opsional)**: bila admin memberi kode 6 karakter (Admin → Perangkat → **Kode
-   aplikasi**), isi di kolom itu (boleh `abc-234`). Hanya kode untuk perangkat TV yang diterima.
 
 Status perangkat dari server: **menunggu persetujuan** dan **dibatasi** — aplikasi diam, halaman
 memeriksa sendiri; **dicabut** — aplikasi diam dan tidak memasangkan ulang otomatis; **tidak dikenal**
@@ -213,13 +211,10 @@ sering sekali per menit) lalu memuat ulang layar TV.
 | Admin, Loket | Ctrl+= / Ctrl+- / Ctrl+0 | Perbesar / perkecil / ukuran normal |
 | Admin, Loket | F11 | Layar penuh |
 | Admin, Loket | Alt+F4 (menu Aplikasi → Keluar) | Keluar |
-| TV | **Ctrl+Shift+Alt+K** lalu PIN | **Keluar aplikasi** atau **Ubah pengaturan** (server, pemasangan ulang, PIN) |
-| TV tanpa PIN | **Ctrl+Shift+Alt+K** | Pengaturan langsung terbuka (ada tombol **Keluar aplikasi**) |
+| TV | **Ctrl+Shift+Alt+K** | Pengaturan terbuka (server, tombol **Keluar aplikasi**) |
 
 Di TV terpasang, Alt+F4, Ctrl+Q / Cmd+Q, menutup jendela, F5, F11, F12, Esc, Ctrl+W/R, zoom, dan menu
-diblokir; TV hanya tertutup lewat **Keluar aplikasi** atau shutdown / log off. Tanpa PIN, siapa pun
-yang memegang keyboard bisa membuka pengaturan, jadi PIN sangat disarankan. Setelah 5 kali PIN salah,
-prompt dikunci 60 detik. DevTools tidak tersedia di aplikasi terpasang.
+diblokir; TV hanya tertutup lewat **Keluar aplikasi** atau shutdown / log off. DevTools tidak tersedia di aplikasi terpasang.
 
 Admin: unduhan hanya diterima dari server antrian; dialog simpan dibuka di folder **Downloads**.
 Tautan "Cetak ulang" tiket dibuka di jendela kecil yang sama terkuncinya. Situs lain selalu diblokir.
@@ -232,12 +227,8 @@ Tautan "Cetak ulang" tiket dibuka di jendela kecil yang sama terkuncinya. Situs 
 | Loket | `%APPDATA%\bankntt-loket\config.json` | `%APPDATA%\bankntt-loket\logs\loket.log` |
 | TV | `%APPDATA%\bankntt-tv\config.json` | `%APPDATA%\bankntt-tv\logs\tv.log` |
 
-`config.json` berisi alamat server, nama server, dan untuk TV: token perangkat, hash scrypt PIN,
-nama perangkat, serta `installId`. Log dirotasi ±1 MB; token, PIN, dan `installId` lengkap tidak
-pernah dicatat.
-
-Lupa PIN TV? Tutup aplikasi lewat Task Manager, hapus `%APPDATA%\bankntt-tv\config.json`, lalu
-jalankan lagi untuk memasangkan ulang.
+`config.json` berisi alamat server, nama server, dan untuk TV: token perangkat, nama perangkat, serta
+`installId`. Log dirotasi ±1 MB; token dan `installId` lengkap tidak pernah dicatat.
 
 ## Pemecahan masalah
 

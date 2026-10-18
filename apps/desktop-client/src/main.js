@@ -614,52 +614,6 @@ function pinLockSeconds() {
   return Math.max(0, Math.ceil((state.pinLockedUntil - Date.now()) / 1000));
 }
 
-function openPin() {
-  if (alive(state.pinWin)) {
-    state.pinWin.focus();
-    return;
-  }
-  const parent = alive(state.mainWin) ? state.mainWin : undefined;
-  const win = new BrowserWindow({
-    parent,
-    modal: Boolean(parent),
-    show: false,
-    width: 480,
-    height: 600,
-    frame: false,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    backgroundColor: '#ffffff',
-    title: `Admin ${APP_NAME}`,
-    icon: windowIcon(),
-    webPreferences: baseWebPreferences('pin.js'),
-  });
-  win.setMenu(null);
-  win.setAlwaysOnTop(true, 'screen-saver');
-  state.pinWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true, onQuit: handleQuitShortcut });
-  win.on('session-end', () => {
-    state.quitting = true;
-  });
-  win.webContents.on('will-navigate', (e) => e.preventDefault());
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  win.once('ready-to-show', () => {
-    win.center();
-    win.show();
-    win.focus();
-  });
-  win.on('closed', () => {
-    if (state.pinWin === win) state.pinWin = null;
-  });
-  win.loadFile(rendererFile('pin.html'));
-  log.info('admin: prompt PIN dibuka');
-}
-
 function closePin() {
   const win = state.pinWin;
   state.pinWin = null;
@@ -682,10 +636,9 @@ function handleQuitShortcut() {
   log.info('tv: pintasan keluar diblokir (pakai Ctrl+Shift+Alt+K)');
 }
 
-/** TV Ctrl+Shift+Alt+K: the PIN prompt when a PIN is set, else the settings window directly. */
+/** TV Ctrl+Shift+Alt+K: the settings window (server, Keluar aplikasi). The admin PIN is no longer used. */
 function openAdminMenu() {
-  if (state.config.pinHash) openPin();
-  else openSettingsFromTv();
+  openSettingsFromTv();
 }
 
 function openSettingsFromTv() {

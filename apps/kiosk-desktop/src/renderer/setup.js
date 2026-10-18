@@ -62,9 +62,6 @@
     printerSelect.value = wanted || printers[0].name;
   }
 
-  function normaliseCodeInput(value) {
-    return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  }
 
   function originOf(value) {
     let v = String(value || '').trim();
@@ -151,8 +148,8 @@
       scanText.textContent = `${servers.size} server ditemukan: ${best.name}.`;
       if (!touched && (!serverInput.value || serverInput.value === 'http://127.0.0.1:3000')) {
         select(best.url, { byUser: false });
-        // Connect right away on first run, unless staff already started typing a code or PIN.
-        if (mode === 'first' && !$('code').value && !$('pin').value && !$('pinConfirm').value) {
+        // Connect right away on first run.
+        if (mode === 'first') {
           showAlert('info', `Server "${best.name}" ditemukan. Menyambung otomatis…`);
           form.requestSubmit();
         }
@@ -163,21 +160,15 @@
   function formValues() {
     return {
       server: $('server').value.trim(),
-      code: $('code').value.trim(),
+      code: '',
       printerName: printerSelect.value,
-      pin: $('pin').value,
-      pinConfirm: $('pinConfirm').value,
+      pin: '',
+      pinConfirm: '',
     };
   }
 
   function validateLocally(v) {
     if (!v.server) return ['server', 'Alamat server wajib diisi.'];
-    const code = normaliseCodeInput(v.code);
-    if (code && code.length !== 6) return ['code', 'Kode pemasangan harus 6 karakter.'];
-    if (v.pin || v.pinConfirm) {
-      if (!/^\d{4,12}$/.test(v.pin)) return ['pin', 'PIN admin minimal 4 angka (hanya angka).'];
-      if (v.pin !== v.pinConfirm) return ['pinConfirm', 'Konfirmasi PIN tidak sama.'];
-    }
     return null;
   }
 
@@ -214,15 +205,6 @@
     }
   });
 
-  $('code').addEventListener('input', (e) => {
-    const raw = normaliseCodeInput(e.target.value).slice(0, 6);
-    e.target.value = raw.length > 3 ? `${raw.slice(0, 3)}-${raw.slice(3)}` : raw;
-  });
-  for (const id of ['pin', 'pinConfirm']) {
-    $(id).addEventListener('input', (e) => {
-      e.target.value = e.target.value.replace(/\D/g, '');
-    });
-  }
   form.addEventListener('input', (e) => {
     const field = e.target.closest('.field');
     if (field) field.classList.remove('invalid');
@@ -289,16 +271,11 @@
       $('subtitle').textContent =
         'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi. Setujui kiosk ini lewat Buka panel admin → Perangkat.';
     }
-    if (init.hasPin) {
-      $('pin-hint').textContent = 'PIN sudah dipasang. Kosongkan untuk tetap memakai PIN lama, atau isi untuk menggantinya.';
-      $('pin').placeholder = 'Tidak diubah';
-    }
     if (mode === 'edit') {
       $('title').textContent = 'Pengaturan Kiosk';
       $('subtitle').textContent = init.deviceName
-        ? `Perangkat ini terdaftar sebagai "${init.deviceName}". Kosongkan kode dan PIN jika tidak ingin mengubahnya.`
-        : 'Pengaturan server, printer, dan PIN admin.';
-      $('code-hint').textContent = 'Isi hanya untuk memasangkan ulang dengan kode dari admin. Tanpa kode, kiosk tersambung otomatis.';
+        ? `Perangkat ini terdaftar sebagai "${init.deviceName}".`
+        : 'Pengaturan server dan printer.';
       $('cancel').hidden = false;
       $('exit').hidden = false;
       submitBtn.textContent = 'Simpan';

@@ -588,52 +588,6 @@ function adminLockSeconds() {
   return Math.max(0, Math.ceil((state.adminLockedUntil - Date.now()) / 1000));
 }
 
-function openAdmin() {
-  if (state.adminWin && !state.adminWin.isDestroyed()) {
-    state.adminWin.focus();
-    return;
-  }
-  const parent = state.kioskWin && !state.kioskWin.isDestroyed() ? state.kioskWin : undefined;
-  const win = new BrowserWindow({
-    parent,
-    modal: Boolean(parent),
-    show: false,
-    width: 480,
-    height: 600,
-    frame: false,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    backgroundColor: '#ffffff',
-    title: 'Admin Kiosk',
-    icon: windowIcon(),
-    webPreferences: baseWebPreferences('admin.js'),
-  });
-  win.setMenu(null);
-  win.setAlwaysOnTop(true, 'screen-saver');
-  state.adminWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true, onQuit: handleQuitShortcut });
-  win.on('session-end', () => {
-    state.quitting = true;
-  });
-  win.webContents.on('will-navigate', (e) => e.preventDefault());
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  win.once('ready-to-show', () => {
-    win.center();
-    win.show();
-    win.focus();
-  });
-  win.on('closed', () => {
-    if (state.adminWin === win) state.adminWin = null;
-  });
-  win.loadFile(rendererFile('admin.html'));
-  log.info('admin: prompt PIN dibuka');
-}
-
 function closeAdmin() {
   const win = state.adminWin;
   state.adminWin = null;
@@ -656,10 +610,9 @@ function handleQuitShortcut() {
   log.info('kiosk: pintasan keluar diblokir (pakai Ctrl+Shift+Alt+K)');
 }
 
-/** Ctrl+Shift+Alt+K: the PIN prompt when a PIN is set, else the settings window directly. */
+/** Ctrl+Shift+Alt+K: the settings window (server, printer, Keluar aplikasi). The admin PIN is no longer used. */
 function openAdminMenu() {
-  if (state.config.pinHash) openAdmin();
-  else openSettingsFromKiosk();
+  openSettingsFromKiosk();
 }
 
 function openSettingsFromKiosk() {

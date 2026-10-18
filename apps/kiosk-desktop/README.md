@@ -7,9 +7,8 @@ Aplikasi Electron untuk PC kiosk pengambilan nomor antrian. Aplikasi membuka hal
 - Halaman web kiosk mendeteksi aplikasi lewat `window.kioskApp` dan memanggil
   `printTicket()` alih-alih `window.print()`.
 - Pengaturan tersimpan di `%APPDATA%\kiosk-antrian\config.json`
-  (alamat server, token perangkat, printer, hash PIN, nama perangkat). PIN hanya disimpan
-  sebagai hash scrypt bergaram.
-- Log ada di `%APPDATA%\kiosk-antrian\logs\kiosk.log` (dirotasi ±1 MB, token dan PIN tidak pernah dicatat).
+  (alamat server, token perangkat, printer, nama perangkat, `installId`).
+- Log ada di `%APPDATA%\kiosk-antrian\logs\kiosk.log` (dirotasi ±1 MB, token tidak pernah dicatat).
 
 ## Membuat installer
 
@@ -85,8 +84,8 @@ Bedanya dengan aplikasi Windows:
 - Tidak berjalan otomatis saat login.
 - Pengaturan dan log terpisah dari kiosk sungguhan: `~/Library/Application Support/kiosk-antrian-sim`
   (Mac) atau `~/.config/kiosk-antrian-sim` (Ubuntu), log di `logs/kiosk.log`.
-- Keluar: **Ctrl + Shift + Alt + K** (di Mac **Cmd + Shift + Option + K** juga bisa), lalu PIN bila
-  dipasang, seperti di Windows. Khusus simulasi (dan `npm run dev`), **Cmd + Q** (Mac), **Ctrl + Q**
+- Keluar: **Ctrl + Shift + Alt + K** (di Mac **Cmd + Shift + Option + K** juga bisa) membuka
+  pengaturan, seperti di Windows. Khusus simulasi (dan `npm run dev`), **Cmd + Q** (Mac), **Ctrl + Q**
   (Ubuntu), menutup jendela, dan Dock → Keluar langsung menutup aplikasi, supaya laptop pengembang
   tidak terkunci. Di kiosk Windows terpasang, Alt+F4, Ctrl+Q, dan menutup jendela diblokir.
   `KIOSK_LOCKDOWN=1 npm run dev` mencoba penguncian produksi saat pengembangan.
@@ -165,8 +164,8 @@ npm run kiosk:build -- --with-server           # -> downloads/BANK-NTT-Ticket-Se
 Pemasangan kini otomatis, tanpa kode:
 
 1. Di jendela "Pemasangan BANK NTT Ticket", server di jaringan dicari dan dipilih otomatis (atau
-   ketik **Alamat server**, misalnya `10.70.10.67:3000`). Pilih **Printer tiket** (tekan **Cetak uji**
-   untuk mencoba) dan, disarankan, isi **PIN admin** (minimal 4 angka) dua kali.
+   ketik **Alamat server**, misalnya `192.168.1.10:3000`). Pilih **Printer tiket** (tekan **Cetak uji**
+   untuk mencoba).
 2. Tekan **Simpan & sambungkan**. Kiosk mendaftar sendiri ke server dengan ID instalasi acak yang
    dibuat sekali dan disimpan di `config.json` (`installId`), jadi memasang ulang atau menyambung
    ulang tidak pernah membuat perangkat ganda.
@@ -174,9 +173,6 @@ Pemasangan kini otomatis, tanpa kode:
    **Perangkat** (atau admin menyalakan **Terima perangkat baru otomatis**). Halaman itu memeriksa
    sendiri tiap 5 detik dan langsung membuka kiosk begitu disetujui. Aplikasi diatur agar berjalan
    otomatis saat Windows login.
-
-**Kode pemasangan (opsional)**: cara lama tetap bisa. Bila admin memberi kode 6 karakter dari
-Admin → Perangkat → **Kode aplikasi**, isi di kolom **Kode pemasangan** (boleh `4k7-q2m`).
 
 Status perangkat yang ditampilkan server dan reaksi aplikasi:
 
@@ -189,19 +185,10 @@ Status perangkat yang ditampilkan server dan reaksi aplikasi:
 
 ## Keluar / mengubah pengaturan
 
-Tekan **Ctrl + Shift + Alt + K** di kiosk:
-
-- **Dengan PIN admin**: masukkan PIN, lalu pilih **Keluar aplikasi**, **Ubah pengaturan**, atau
-  **Batal**. Setelah 5 kali PIN salah, prompt dikunci 60 detik.
-- **Tanpa PIN**: jendela pengaturan langsung terbuka. Artinya siapa pun yang memegang keyboard bisa
-  membuka pengaturan, jadi PIN sangat disarankan.
-
-Di jendela pengaturan, kosongkan kode dan PIN bila tidak ingin mengubahnya. Tombol **Keluar aplikasi**
-di pengaturan menutup kiosk. Di kiosk Windows terpasang, Alt+F4, Ctrl+Q, dan menutup jendela tidak
+Tekan **Ctrl + Shift + Alt + K** di kiosk: jendela pengaturan terbuka (server dan printer). Tombol
+**Keluar aplikasi** di pengaturan menutup kiosk. Mesin tiket umumnya hanya layar sentuh tanpa keyboard,
+jadi nasabah tidak bisa membuka pengaturan. Di kiosk Windows terpasang, Alt+F4, Ctrl+Q, dan menutup jendela tidak
 pernah menutup aplikasi; hanya **Keluar aplikasi** atau Windows shutdown / log off.
-
-Lupa PIN? Tutup aplikasi lewat Task Manager (atau login sebagai admin Windows), hapus
-`%APPDATA%\kiosk-antrian\config.json`, lalu jalankan aplikasi untuk memasangkan ulang.
 
 ## Penguncian penuh Windows (disarankan)
 
