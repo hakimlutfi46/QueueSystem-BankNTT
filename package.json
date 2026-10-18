@@ -18,7 +18,8 @@
     "db:seed": "prisma db seed",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:backup": "node scripts/backup-db.mjs",
-    "kiosk:build": "node apps/kiosk-desktop/scripts/build-and-copy.mjs"
+    "kiosk:build": "node apps/kiosk-desktop/scripts/build-and-copy.mjs",
+    "apps:build": "node apps/desktop-client/scripts/build.mjs --app all"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

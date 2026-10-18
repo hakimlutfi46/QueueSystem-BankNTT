@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'">
+  <title>Menyambung ke server</title>
+  <link rel="stylesheet" href="common.css">
+  <link rel="stylesheet" href="offline.css">
+</head>
+<body>
+  <main>
+    <div class="spinner" aria-hidden="true"></div>
+    <h1>Menyambung ke server…</h1>
+    <p id="lead">Aplikasi sedang mencoba terhubung ke server antrian. Mohon tunggu sebentar.</p>
+    <p class="server">Server: <strong id="server">-</strong></p>
+    <p class="muted" id="countdown" aria-live="polite"></p>
+    <p class="muted" id="status" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" class="btn btn-secondary" id="rescan">Cari ulang server</button>
+    </div>
+    <p class="muted small" id="hint">Jika berlangsung lama, pastikan PC server menyala dan terhubung ke jaringan yang sama.</p>
+  </main>
+  <script src="offline.js"></script>
+</body>
+</html>

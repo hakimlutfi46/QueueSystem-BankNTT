@@ -55,5 +55,9 @@ next-env.d.ts
 /apps/kiosk-desktop/dist/
 /downloads/
 
+# aplikasi Admin/Loket/TV (Electron): dependensi dan hasil build
+/apps/desktop-client/node_modules/
+/apps/desktop-client/dist/
+
 # cadangan database (npm run db:backup)
 /backups/
