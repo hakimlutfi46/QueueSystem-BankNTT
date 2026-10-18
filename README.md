@@ -62,6 +62,20 @@ Semua tiket, perangkat terdaftar, dan pengaturan ikut terhapus. Daftarkan ulang 
 
 **Bila halaman dev dimuat ulang terus-menerus** dan log berisi "Compiled in 0ms" berulang, cache dev di folder `.next` rusak. Matikan `npm run dev`, hapus folder `.next`, lalu nyalakan lagi.
 
+### Cara Cepat Mencoba: Server Simulasi (`npm run sim`)
+
+Untuk mencoba seluruh aplikasi desktop (Admin, Loket, TV, Kiosk) di Mac atau Ubuntu tanpa menyentuh database utama:
+
+```bash
+npm run sim
+```
+
+Perintah ini otomatis:
+- Menyiapkan database uji terisolasi dengan data contoh lengkap (layanan, loket CS & Teller, akun petugas, riwayat).
+- Menjalankan server antrian di `http://127.0.0.1:3000`.
+- Menyalakan penjawab pencarian server UDP (port 41234) sehingga seluruh aplikasi desktop langsung mendeteksi server ini.
+- Tekan **Ctrl+C** untuk menghentikan server dan membersihkan database simulasi.
+
 ## Server cabang: yang perlu disiapkan
 
 - Komputer server di jaringan cabang, dengan [Docker](https://docs.docker.com/get-docker/) dan Docker Compose.
@@ -142,28 +156,54 @@ Nasabah memilih layanan. Satu sentuhan menghasilkan satu nomor dan satu cetakan.
 
 Belum punya printer? Isi `TICKET_OUTPUT=pdf` di `.env`: setiap tiket diunduh sebagai PDF seukuran kertas thermal, dan tombol **Ulang** di laporan harian membuka PDF-nya. Bila kosong, `npm run dev` memakai PDF dan build produksi langsung mencetak ke printer. Isi `TICKET_OUTPUT=printer` untuk memaksa cetak ke printer.
 
-## Kiosk dengan aplikasi Windows (disarankan)
+## Aplikasi Desktop Mandiri (Windows & Simulasi Mac/Ubuntu)
 
-PC kiosk yang memakai Windows bisa memakai aplikasi **BANK NTT Ticket** sebagai pengganti Chrome. Aplikasi ini membuka kiosk layar penuh yang terkunci (Alt+F4, F11, Esc, dan pindah ke situs lain diblokir), menyala otomatis saat Windows login, dan mencetak tiket langsung ke printer thermal pilihan tanpa dialog. Bila printer mati, offline, atau kertas habis, kiosk menampilkan "Mohon hubungi petugas" dan tidak membuat nomor. TV memakai tautan atau aplikasi **BANK NTT TV** (lihat bagian TV).
+Selain melalui browser, sistem antrian menyediakan empat aplikasi desktop khusus per peran. Setiap aplikasi berdiri sendiri tanpa pemilih mode saat runtime:
 
-1. **Buat installer sekali di server cabang** (sekitar 100 MB, tidak masuk git). Di **Admin → Perangkat → Aplikasi kiosk Windows**, tekan **Build installer**, atau dari terminal:
+| Aplikasi | Folder Sumber | Fungsi Utama | Karakteristik Layar & Akses |
+| :--- | :--- | :--- | :--- |
+| **BANK NTT Ticket** | `apps/kiosk-desktop` | Kiosk ambil nomor tiket nasabah | Layar penuh terkunci, cetak langsung ke printer thermal tanpa dialog (atau simpan PDF bila simulasi) |
+| **BANK NTT TV** | `apps/desktop-client` | TV display ruang tunggu | Layar penuh terkunci, suara panggilan otomatis, pairing dengan kode dari Admin |
+| **BANK NTT Loket** | `apps/desktop-client` | Layar kerja petugas CS & Teller | Jendela kerja maksimal, tombol Spasi untuk panggil berikutnya, login petugas |
+| **BANK NTT Admin** | `apps/desktop-client` | Pengaturan cabang & laporan | Akses menu admin, pendaftaran perangkat, unduh laporan Excel |
 
+### Penemuan Server Otomatis (LAN UDP Discovery Port 41234)
+
+Seluruh aplikasi desktop dilengkapi pendeteksi server otomatis:
+- Saat dibuka, aplikasi memindai jaringan lokal lewat siaran UDP port **41234**.
+- Server antrian yang menjawab dan lolos verifikasi kesehatan (`/api/health`) otomatis muncul di daftar "Server di jaringan" dan langsung terpilih jika hanya ada satu server.
+- **Tahan Perubahan IP**: Jika IP server cabang berubah (misalnya akibat DHCP router), aplikasi secara otomatis mendeteksi alamat baru server tersebut di latar belakang dan berpindah tanpa perlu konfigurasi ulang manual.
+
+### Mesin Tiket Sekaligus Server Cabang (`Ticket + Server`)
+
+Untuk kantor cabang offline tanpa komputer server tersendiri, PC mesin tiket utama dapat difungsikan sebagai server cabang sekaligus kiosk:
+1. Buat paket server offline Windows: `npm run server:bundle`.
+2. Buat installer gabungan Ticket + Server:
    ```bash
-   npm run kiosk:build
+   npm run kiosk:build -- --with-server
    ```
+   Hasilnya adalah `downloads/BANK-NTT-Ticket-Server-Setup.exe`. Saat dipasang di mesin tiket cabang, installer ini otomatis mendaftarkan database PostgreSQL dan server antrian sebagai Windows Service yang berjalan mandiri di latar belakang sejak komputer menyala, tanpa membutuhkan koneksi internet.
 
-   Hasilnya `downloads/BANK-NTT-Ticket-Setup.exe`. Server menyajikannya dari **Unduh installer (.exe)** di halaman yang sama, jadi bisa diunduh dari PC kiosk lewat jaringan lokal tanpa internet. Bila berkasnya disimpan di tempat lain, isi `KIOSK_INSTALLER_PATH` di `.env`.
+### Membuat Installer Desktop (Windows & Simulasi)
 
-   Nama aplikasi bawaannya **BANK NTT Ticket** dengan ikon simbol logo Bank NTT. Keduanya bisa diganti lewat tombol **Ubah** di panel itu (unggah gambar apa saja, dibuat persegi otomatis), lalu **Simpan & build ulang**. Build memakan sekitar setengah sampai tiga menit; build pertama perlu internet untuk mengunduh Electron. Tombol build hanya ada bila server berjalan dari folder proyek lengkap (`npm run start`); image Docker tidak memuat `apps/kiosk-desktop`, jadi di sana build dilakukan di komputer lain lalu isi `downloads/` disalin ke server.
-2. Di PC kiosk, unduh dan jalankan installer. Installer belum ditandatangani, jadi Windows SmartScreen bisa menampilkan "Windows protected your PC": klik **More info → Run anyway**.
-3. Di Admin → Perangkat, daftarkan kiosk lalu tekan **Kode aplikasi** (tombol ini ada untuk kiosk dan TV). Dialog menampilkan alamat server dan kode 6 karakter, misalnya `4K7-Q2M`, yang berlaku 30 menit dan sekali pakai.
-4. Di aplikasi, isi alamat server (misalnya `10.70.10.67:3000`) dan kode itu, pilih printer thermal, tekan **Cetak uji**, lalu buat PIN admin. Kiosk langsung terbuka dan status di Admin berubah menjadi Tersambung.
+Dari root repository:
+```bash
+# Windows Produksi (NSIS x64):
+npm run kiosk:build                      # Kiosk tiket -> downloads/BANK-NTT-Ticket-Setup.exe
+npm run apps:build                       # Admin, Loket, TV -> downloads/BANK-NTT-*-Setup.exe
 
-Untuk keluar atau mengubah pengaturan, tekan **Ctrl + Shift + Alt + K** di kiosk dan masukkan PIN admin. Tombol Windows dan Ctrl+Alt+Del tidak bisa diblokir aplikasi apa pun; untuk penguncian penuh pakai akun Windows khusus dengan auto-login dan Shell Launcher. Langkahnya ada di [`apps/kiosk-desktop/README.md`](apps/kiosk-desktop/README.md).
+# Simulasi Pengembang (macOS Apple Silicon .dmg):
+npm run kiosk:build:mac                  # Kiosk tiket -> downloads/simulasi/BANK-NTT-Ticket-Simulasi-mac-arm64.dmg
+npm run apps:build:mac                   # Admin, Loket, TV -> downloads/simulasi/BANK-NTT-*-Simulasi-mac-arm64.dmg
 
-Tautan lama perangkat tetap berlaku sampai kode dipakai. Setelah itu hanya aplikasi yang dipasangkan yang bisa membuka kiosk atau TV itu. Kode yang salah dibatasi 10 kali per 10 menit per alamat IP.
+# Simulasi Pengembang (Ubuntu / Linux x64 .AppImage dan .deb):
+npm run kiosk:build:linux                # Kiosk tiket -> downloads/simulasi/BANK-NTT-Ticket-Simulasi-linux-*
+npm run apps:build:linux                 # Admin, Loket, TV -> downloads/simulasi/BANK-NTT-*-Simulasi-linux-*
+```
 
-## TV
+Mode simulasi menyimpan tiket dalam bentuk berkas PDF di folder `Downloads/kiosk-tiket-pdf` (tanpa butuh printer thermal fisik), tidak mengunci mode autostart/login laptop, dan menyimpan pengaturannya di folder terpisah (`*-sim`).
+
+## TV (Layar Ruang Tunggu)
 
 Perintah untuk TV dari dialog Perangkat:
 

@@ -113,9 +113,17 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+const clipCache = new Map<string, HTMLAudioElement>();
+
 function playClip(src: string): Promise<void> {
   return new Promise((resolve) => {
-    const audio = new Audio(src);
+    let audio = clipCache.get(src);
+    if (!audio) {
+      audio = new Audio(src);
+      audio.preload = "auto";
+      clipCache.set(src, audio);
+    }
+    audio.currentTime = 0;
     audio.onended = () => resolve();
     audio.onerror = () => resolve();
     void audio.play().catch(() => resolve());

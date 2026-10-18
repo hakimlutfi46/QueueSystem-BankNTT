@@ -110,9 +110,14 @@ Bedanya dengan aplikasi Windows:
 
 ### Server dan pemasangan
 
-Jalankan server dari repo di laptop itu (`npm run dev`, alamat `127.0.0.1:3000`) atau di PC lain di
-jaringan yang sama (alamat IP PC itu). Pairing sama dengan di cabang: Admin → Perangkat → daftarkan
-kiosk → **Kode aplikasi**, lalu isi alamat server, kode, dan PIN di layar pemasangan.
+Jalankan server dari repo di laptop itu (`npm run sim` atau `npm run dev`, alamat `127.0.0.1:3000`)
+atau di PC lain di jaringan yang sama.
+
+Layar pemasangan **otomatis memindai jaringan lokal lewat UDP 41234** untuk menemukan server antrian.
+Server yang menjawab akan langsung muncul di daftar "Server di jaringan" dan terpilih otomatis bila
+hanya ada satu server. Pairing sama dengan di cabang: Admin → Perangkat → daftarkan kiosk →
+**Kode aplikasi**, lalu isi kode (6 karakter) dan PIN di layar pemasangan. Bila IP server cabang berubah
+karena DHCP, aplikasi akan mendeteksi dan memperbarui alamatnya secara otomatis.
 
 ## Installer Ticket + Server (mesin tiket utama)
 

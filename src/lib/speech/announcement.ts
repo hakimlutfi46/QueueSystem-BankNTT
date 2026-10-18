@@ -31,7 +31,17 @@ export function announcementScript(
 }
 
 function speakCounter(name: string, displayNumber: number): string {
-  const words = name
+  let cleaned = name.trim();
+  // "Customer Service 1" -> "CS 1" (sejalan dengan klip cs.wav yang ada)
+  if (/^customer\s+service\b/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^customer\s+service\b/i, "CS");
+  }
+  // Bila nama loket berawalan "Loket", hilangkan kata "Loket" agar tidak terdengar
+  // ganda setelah kalimat "Silakan menuju loket..."
+  if (/^loket\b/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^loket\b/i, "").trim();
+  }
+  const words = cleaned
     .replace(/\d+/g, " ")
     .split(/\s+/)
     .map((word) => word.trim())

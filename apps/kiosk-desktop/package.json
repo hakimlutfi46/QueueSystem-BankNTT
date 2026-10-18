@@ -12,6 +12,7 @@
     "dev": "electron . --dev",
     "dev:no-printer": "electron . --dev --no-printer",
     "check": "node scripts/check.mjs",
+    "test": "node --test test/**/*.test.js",
     "mock-server": "node scripts/mock-server.mjs",
     "dist:win": "node scripts/build-and-copy.mjs",
     "build-and-copy": "node scripts/build-and-copy.mjs"

@@ -9,8 +9,16 @@
   const testBtn = $('test-print');
   const testResult = $('test-result');
   const printerSelect = $('printer');
+  const serverInput = $('server');
+  const list = $('server-list');
+  const scanBox = $('scan-status');
+  const scanText = $('scan-text');
+  const rescanBtn = $('rescan');
   let mode = 'first';
   let defaultPrinter = null;
+  let touched = false;
+  let busy = false;
+  const servers = new Map();
 
   function showAlert(kind, text) {
     alertBox.className = `alert show ${kind}`;
@@ -56,6 +64,95 @@
 
   function normaliseCodeInput(value) {
     return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  function originOf(value) {
+    let v = String(value || '').trim();
+    if (!v) return '';
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) v = `http://${v}`;
+    try {
+      return new URL(v).origin;
+    } catch {
+      return '';
+    }
+  }
+
+  function markSelected() {
+    const current = originOf(serverInput.value);
+    for (const button of list.querySelectorAll('.server-item')) {
+      button.setAttribute('aria-pressed', String(button.dataset.url === current));
+    }
+  }
+
+  function select(url, { byUser = true } = {}) {
+    serverInput.value = url;
+    if (byUser) touched = true;
+    serverInput.closest('.field').classList.remove('invalid');
+    markSelected();
+  }
+
+  function addServer(server) {
+    if (!server || servers.has(server.url)) return;
+    servers.set(server.url, server);
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'server-item';
+    button.dataset.url = server.url;
+    button.setAttribute('aria-pressed', 'false');
+    const text = document.createElement('span');
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = server.name;
+    const addr = document.createElement('span');
+    addr.className = 'addr';
+    addr.textContent = `${server.url}${server.version ? ` · v${server.version}` : ''}`;
+    text.append(name, document.createElement('br'), addr);
+    button.append(text);
+    if (server.local) {
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = 'PC ini';
+      button.append(tag);
+    }
+    button.addEventListener('click', () => {
+      select(server.url);
+      $('code').focus();
+    });
+    li.append(button);
+    if (server.local) list.append(li);
+    else {
+      const firstLocal = [...list.children].find((n) => n.querySelector('.tag'));
+      list.insertBefore(li, firstLocal || null);
+    }
+    markSelected();
+  }
+
+  async function scan() {
+    if (busy) return;
+    rescanBtn.disabled = true;
+    scanBox.classList.add('scanning');
+    scanText.textContent = 'Mencari server antrian di jaringan…';
+    let found = [];
+    try {
+      found = await api.scan();
+      found.forEach(addServer);
+    } catch {
+      found = [];
+    }
+    scanBox.classList.remove('scanning');
+    rescanBtn.disabled = false;
+    if (servers.size === 0) {
+      scanText.textContent = 'Tidak ada server ditemukan. Ketik alamat manual di bawah atau tekan Cari ulang.';
+    } else if (servers.size === 1) {
+      const only = [...servers.values()][0];
+      scanText.textContent = `1 server ditemukan: ${only.name}.`;
+      if (!touched && (!serverInput.value || serverInput.value === 'http://127.0.0.1:3000')) {
+        select(only.url, { byUser: false });
+      }
+    } else {
+      scanText.textContent = `${servers.size} server ditemukan. Pilih salah satu di bawah:`;
+    }
   }
 
   function formValues() {
@@ -187,6 +284,33 @@
       $('cancel').hidden = false;
       submitBtn.textContent = 'Simpan';
     }
+    if (init.server) markSelected();
     $(mode === 'edit' ? 'server' : init.server ? 'code' : 'server').focus();
+    scan();
+  });
+
+  rescanBtn.addEventListener('click', () => scan());
+  api.onFound((server) => addServer(server));
+  serverInput.addEventListener('input', () => {
+    touched = true;
+    markSelected();
+  });
+
+  $('check').addEventListener('click', async () => {
+    const input = serverInput.value.trim();
+    if (!input) return;
+    $('check').disabled = true;
+    try {
+      const res = await api.check(input);
+      if (res.ok) {
+        serverInput.value = res.server;
+        markSelected();
+        showAlert('ok', `Server ${res.server} aktif dan dapat dihubungi.`);
+      } else {
+        setError('server', res.message);
+      }
+    } finally {
+      $('check').disabled = false;
+    }
   });
 })();

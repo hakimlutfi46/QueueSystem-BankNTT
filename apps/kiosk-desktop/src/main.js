@@ -13,6 +13,10 @@ const { normaliseServer, normaliseCode, isValidCode, sameOrigin, isValidTicketId
 const { lockKeyboard } = require('./keys');
 const { createPrintQueue, createPdfPrinterStatus } = require('./printing');
 const { createPrinterStatus } = require('./printer-status');
+const discovery = require('./discovery');
+
+const DISCOVERY_PORT =
+  !app.isPackaged && Number(process.env.BANKNTT_DISCOVERY_PORT) > 0 ? Number(process.env.BANKNTT_DISCOVERY_PORT) : discovery.DISCOVERY_PORT;
 
 // --dev (or KIOSK_DEV=1): windowed instead of kiosk/fullscreen, DevTools allowed.
 const DEV = process.argv.includes('--dev') || process.env.KIOSK_DEV === '1';
@@ -92,6 +96,9 @@ const state = {
   allowKioskClose: false, // switching to settings
   offline: false,
   retryTimer: null,
+  relocateTimer: null,
+  scanJob: null,
+  knownServers: new Map(), // url -> { name, url, ... } from discovery replies
   unresponsiveTimer: null,
   adminFailures: 0,
   adminLockedUntil: 0,
@@ -147,11 +154,80 @@ function kioskUrl() {
   return `${state.config.server}/kiosk?token=${encodeURIComponent(state.config.token)}`;
 }
 
+/* ---------------------------------------------------------------- discovery */
+
+function hostOf(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+function runScan(onFound) {
+  if (!state.scanJob) {
+    const job = { found: [], listeners: new Set() };
+    job.promise = discovery
+      .scan({
+        port: DISCOVERY_PORT,
+        log,
+        onFound: (server) => {
+          state.knownServers.set(server.url, server);
+          job.found.push(server);
+          for (const fn of job.listeners) fn(server);
+        },
+      })
+      .finally(() => {
+        if (state.scanJob === job) state.scanJob = null;
+      });
+    state.scanJob = job;
+    log.info(`discovery: memindai jaringan (port ${DISCOVERY_PORT})`);
+  }
+  const job = state.scanJob;
+  if (onFound) {
+    job.found.forEach(onFound);
+    job.listeners.add(onFound);
+  }
+  return job.promise;
+}
+
+async function learnServerName(url) {
+  const known = state.knownServers.get(url);
+  if (known) return known.name;
+  const host = hostOf(url);
+  if (discovery.ipv4ToInt(host) === null) return '';
+  const replies = await discovery.scan({ port: DISCOVERY_PORT, targets: [host], durationMs: 1_500, intervalMs: 500, healthCheck: false });
+  const match = replies.find((s) => s.url === url);
+  return match ? match.name : '';
+}
+
+async function relocate() {
+  if (!state.config) return false;
+  const { server, serverName } = state.config;
+  const servers = await runScan();
+  if (!state.offline) return true;
+  if (servers.some((s) => s.url === server)) {
+    log.info('discovery: server tersimpan menjawab lagi', server);
+    loadKiosk();
+    return true;
+  }
+  const moved = serverName ? servers.find((s) => s.name === serverName && s.url !== server) : null;
+  if (moved) {
+    log.info(`discovery: server "${serverName}" pindah alamat ${server} -> ${moved.url}`);
+    state.config = config.save({ ...state.config, server: moved.url });
+    loadKiosk();
+    return true;
+  }
+  return false;
+}
+
 /* ------------------------------------------------------------- kiosk window */
 
 function stopRetry() {
   if (state.retryTimer) clearInterval(state.retryTimer);
+  if (state.relocateTimer) clearInterval(state.relocateTimer);
   state.retryTimer = null;
+  state.relocateTimer = null;
 }
 
 function loadKiosk() {
@@ -202,6 +278,12 @@ function showOffline(reason) {
         busy = false;
       }
     }, RETRY_MS);
+  }
+  if (!state.relocateTimer) {
+    setTimeout(() => { if (state.offline) relocate().catch(() => {}); }, 1_000);
+    state.relocateTimer = setInterval(() => {
+      if (state.offline) relocate().catch(() => {});
+    }, 30_000);
   }
 }
 
@@ -369,6 +451,7 @@ function openSetup(mode) {
     if (!state.quitting && config.isComplete(state.config) && !state.kioskWin) openKiosk();
   });
   win.loadFile(rendererFile('setup.html'));
+  runScan().catch(() => {});
 }
 
 function closeSetup() {
@@ -517,6 +600,7 @@ function registerIpc() {
       appName: APP_NAME,
       icon: brandIconDataUrl(),
       server: cfg.server || (BUNDLED_SERVER ? LOCAL_SERVER : ''),
+      serverName: cfg.serverName,
       bundledServer: BUNDLED_SERVER,
       simulation: SIMULATION ? { note: SIMULATION_NOTE, pdfDir: PDF_DIR } : null,
       printerName: cfg.printerName,
@@ -525,6 +609,24 @@ function registerIpc() {
       defaultPrinter,
       logFile: log.file,
     };
+  });
+
+  ipcMain.handle('setup:scan', async (event) => {
+    if (!fromSetup(event)) throw new Error('forbidden');
+    const sender = event.sender;
+    const toPlain = (s) => ({ name: s.name, url: s.url, address: s.address, version: s.version, local: discovery.isLoopback(s.address) });
+    const servers = await runScan((s) => {
+      if (!sender.isDestroyed()) sender.send('setup:found', toPlain(s));
+    });
+    return servers.map(toPlain);
+  });
+
+  ipcMain.handle('setup:check', async (event, input) => {
+    if (!fromSetup(event)) throw new Error('forbidden');
+    const server = normaliseServer(input) || (BUNDLED_SERVER ? LOCAL_SERVER : null);
+    if (!server) return { ok: false, message: 'Alamat server tidak valid. Contoh: 10.70.10.67:3000' };
+    const ok = await discovery.checkHealth(server);
+    return ok ? { ok: true, server } : { ok: false, server, message: `Server ${server} tidak menjawab. Periksa alamat dan jaringan.` };
   });
 
   ipcMain.handle('setup:printers', async (event) => {
@@ -602,10 +704,13 @@ function registerIpc() {
     }
 
     const pinHash = !edit || pinGiven ? await hashPin(form.pin) : cfg.pinHash;
-    state.config = config.save({ ...cfg, server, token, printerName: form.printerName, pinHash, deviceName });
+    const serverName = (await learnServerName(server)) || cfg.serverName || '';
+    state.config = config.save({ ...cfg, server, serverName, token, printerName: form.printerName, pinHash, deviceName });
     printers.invalidate();
     printers.start();
-    log.info(`setup: pengaturan disimpan server=${server} printer="${form.printerName || '(default)'}" perangkat="${deviceName || '-'}"`);
+    log.info(
+      `setup: pengaturan disimpan server=${server} namaServer="${serverName || '-'}" printer="${form.printerName || '(default)'}" perangkat="${deviceName || '-'}"`,
+    );
     enableAutoStart();
 
     // Open the kiosk first so the app never has zero windows.

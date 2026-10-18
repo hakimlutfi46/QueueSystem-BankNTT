@@ -8,6 +8,7 @@ const log = require('./logger');
  * Persisted shape (userData/config.json):
  * {
  *   server:      "http://10.70.10.67:3000",
+ *   serverName:  "<name announced by discovery>",
  *   token:       "<device token from /api/devices/pair>",
  *   printerName: "<OS printer name, '' = system default>",
  *   pinHash:     "scrypt$N$r$p$salt$hash",
@@ -15,7 +16,7 @@ const log = require('./logger');
  *   usePrinterDefaultPageSize: false   // optional escape hatch, see printing.js
  * }
  */
-const EMPTY = Object.freeze({ server: '', token: '', printerName: '', pinHash: '', deviceName: '' });
+const EMPTY = Object.freeze({ server: '', serverName: '', token: '', printerName: '', pinHash: '', deviceName: '' });
 
 let configPath = null;
 

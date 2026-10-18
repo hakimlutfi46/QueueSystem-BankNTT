@@ -22,10 +22,22 @@
     <div id="alert" class="alert" role="alert"></div>
 
     <form id="form" novalidate autocomplete="off">
+      <section class="servers" aria-labelledby="servers-title">
+        <div class="servers-head">
+          <h2 id="servers-title">Server di jaringan</h2>
+          <button type="button" class="btn btn-ghost small-btn" id="rescan">Cari ulang</button>
+        </div>
+        <p class="scan-status" id="scan-status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="scan-text">Mencari server antrian di jaringan…</span></p>
+        <ul class="server-list" id="server-list"></ul>
+      </section>
+
       <div class="field" data-field="server">
         <label for="server">Alamat server</label>
-        <input id="server" name="server" type="text" inputmode="url" spellcheck="false" placeholder="10.70.10.67:3000" required>
-        <span class="hint">Contoh: 10.70.10.67:3000 atau http://antrian.lokal</span>
+        <div class="row">
+          <input id="server" name="server" type="text" inputmode="url" spellcheck="false" placeholder="10.70.10.67:3000" required>
+          <button type="button" class="btn btn-secondary" id="check">Periksa</button>
+        </div>
+        <span class="hint" id="server-hint">Terisi otomatis saat server dipilih. Contoh: 10.70.10.67:3000.</span>
         <span class="error"></span>
       </div>
 

@@ -40,6 +40,31 @@ describe("announcementScript", () => {
         "/audio/satu.wav",
       ],
     });
+
+    // "Customer Service" dinormalkan ke "CS" agar klip cs.wav dapat dipakai offline
+    expect(announcementScript("A001", "Customer Service 2", 2)).toEqual({
+      text: "Nomor antrian A, satu. Silakan menuju loket CS dua.",
+      clips: [
+        "/audio/nomor-antrian.wav",
+        "/audio/a.wav",
+        "/audio/satu.wav",
+        "/audio/silakan-menuju-loket.wav",
+        "/audio/cs.wav",
+        "/audio/dua.wav",
+      ],
+    });
+
+    // "Loket 3" tidak mengulang kata "loket" ("Silakan menuju loket tiga")
+    expect(announcementScript("B005", "Loket 3", 3)).toEqual({
+      text: "Nomor antrian B, lima. Silakan menuju loket tiga.",
+      clips: [
+        "/audio/nomor-antrian.wav",
+        "/audio/b.wav",
+        "/audio/lima.wav",
+        "/audio/silakan-menuju-loket.wav",
+        "/audio/tiga.wav",
+      ],
+    });
   });
 });
 
