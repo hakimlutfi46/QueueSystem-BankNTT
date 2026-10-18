@@ -3,11 +3,18 @@
 // backend or database. NOT used in production. Never use port 3000 (the real dev server).
 //
 //   node scripts/mock-server.mjs [httpPort] [--udp-port 41234] [--name "Cabang Uji"] [--host 127.0.0.1]
+//                                [--approve-after 10] [--revoked]
 //
 // HTTP: /api/health, /admin (download + reprint + external links), /counter, /display (token ->
 // cookie like the real proxy), /print/:id, /api/reports/export, POST /api/devices/pair,
 // /__requests (log). Pairing codes: ABC234 -> display, KSK234 -> kiosk, EXP234 -> 410, else 404.
+// Without a code: { kind, name, installId } -> one device per installId (re-pairing returns a fresh
+// token for the same device), approved after --approve-after seconds (0 = right away); --revoked
+// answers 403 DEVICE_REVOKED. /display?token= -> cookie, or
+// /device-required?kind=display&state=pending|revoked|unknown. Helpers: /__revoke, /__approve,
+// /__forget (forget all tokens, like a database reset -> "unknown").
 // UDP: answers {"type":"bankntt-discover","v":1} with {"type":"bankntt-server",...}.
+import crypto from 'node:crypto';
 import dgram from 'node:dgram';
 import http from 'node:http';
 
@@ -26,9 +33,28 @@ if (port === 3000) {
   process.exit(1);
 }
 
-const TOKEN = 'mock-display-token-123';
+const APPROVE_AFTER_MS = Number(option('--approve-after', 10)) * 1000;
+const REVOKE_ALL = process.argv.includes('--revoked');
 const COOKIE = 'display_session';
 const requests = [];
+const devices = new Map(); // installId -> { kind, name, createdAt, approved, revoked }
+const tokens = new Map(); // token -> installId
+
+function deviceState(token) {
+  const id = token ? tokens.get(token) : null;
+  const device = id ? devices.get(id) : null;
+  if (!device || device.kind !== 'display') return 'unknown';
+  if (device.revoked) return 'revoked';
+  if (!device.approved && Date.now() - device.createdAt >= APPROVE_AFTER_MS) device.approved = true;
+  return device.approved ? 'ok' : 'pending';
+}
+
+function issueToken(installId) {
+  const token = `mock-${crypto.randomUUID()}`;
+  for (const [t, id] of tokens) if (id === installId) tokens.delete(t);
+  tokens.set(token, installId);
+  return token;
+}
 
 const html = (title, body) =>
   `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>`;
@@ -68,20 +94,43 @@ const server = http.createServer((req, res) => {
     let raw = '';
     req.on('data', (c) => (raw += c));
     req.on('end', () => {
-      let code = '';
+      let body = {};
       try {
-        code = JSON.parse(raw).code;
+        body = JSON.parse(raw) || {};
       } catch {}
+      const { code, installId } = body;
       requests.at(-1).code = code;
-      if (code === 'ABC234') return json(res, 200, { token: TOKEN, kind: 'display', name: 'TV Ruang Tunggu' });
-      if (code === 'KSK234') return json(res, 200, { token: 'kiosk-token', kind: 'kiosk', name: 'Kiosk Lobi' });
-      if (code === 'EXP234') return json(res, 410, { error: { code: 'code_expired', message: 'Kode pemasangan sudah kedaluwarsa.' } });
-      return json(res, 404, { error: { code: 'code_not_found', message: 'Kode pemasangan tidak ditemukan.' } });
+      requests.at(-1).installId = installId ? `${String(installId).slice(0, 8)}…` : null;
+      if (!installId) return json(res, 400, { error: { code: 'VALIDATION', message: 'installId wajib diisi.' } });
+      if (REVOKE_ALL || devices.get(installId)?.revoked) {
+        return json(res, 403, { error: { code: 'DEVICE_REVOKED', message: 'Perangkat ini dicabut oleh admin.' } });
+      }
+      if (code) {
+        if (code === 'EXP234') return json(res, 410, { error: { code: 'code_expired', message: 'Kode pemasangan sudah kedaluwarsa.' } });
+        if (code === 'ABC234') devices.set(installId, { kind: 'display', name: 'TV Ruang Tunggu', createdAt: Date.now(), approved: true, revoked: false });
+        else if (code === 'KSK234') devices.set(installId, { kind: 'kiosk', name: 'Kiosk Lobi', createdAt: Date.now(), approved: true, revoked: false });
+        else return json(res, 404, { error: { code: 'code_not_found', message: 'Kode pemasangan tidak ditemukan.' } });
+      } else if (!devices.has(installId)) {
+        const kind = body.kind === 'kiosk' ? 'kiosk' : 'display';
+        devices.set(installId, { kind, name: body.name || 'Layar TV', createdAt: Date.now(), approved: APPROVE_AFTER_MS <= 0, revoked: false });
+      }
+      const device = devices.get(installId);
+      const token = issueToken(installId);
+      const approved = device.kind === 'display' ? deviceState(token) === 'ok' : true;
+      return json(res, 200, { token, kind: device.kind, name: device.name, approved });
     });
     return;
   }
 
   if (url.pathname === '/__requests') return json(res, 200, requests);
+  if (url.pathname === '/__revoke' || url.pathname === '/__approve' || url.pathname === '/__forget') {
+    if (url.pathname === '/__forget') tokens.clear();
+    for (const device of devices.values()) {
+      if (url.pathname === '/__revoke') device.revoked = true;
+      if (url.pathname === '/__approve') device.approved = true;
+    }
+    return send(res, 200, html('Mock', `<h1>${url.pathname} ok</h1>`));
+  }
 
   if (url.pathname === '/admin') {
     return send(
@@ -113,10 +162,14 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/display') {
     const token = url.searchParams.get('token');
     if (token) {
-      if (token !== TOKEN) return send(res, 401, html('Token', '<h1>Token tidak valid</h1>'));
-      return send(res, 302, '', { location: '/display', 'set-cookie': `${COOKIE}=s1; HttpOnly; Path=/; SameSite=Lax` });
+      const cookie = { 'set-cookie': `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax` };
+      const st = deviceState(token);
+      if (st === 'unknown') return send(res, 302, '', { location: '/device-required?kind=display&state=unknown' });
+      if (st !== 'ok') return send(res, 302, '', { location: `/device-required?kind=display&state=${st}`, ...cookie });
+      return send(res, 302, '', { location: '/display', ...cookie });
     }
-    if (!session) return send(res, 302, '', { location: '/device-required' });
+    const st = deviceState(session && decodeURIComponent(session));
+    if (st !== 'ok') return send(res, 302, '', { location: `/device-required?kind=display&state=${st}` });
     return send(
       res,
       200,
@@ -131,7 +184,17 @@ const server = http.createServer((req, res) => {
     );
   }
 
-  if (url.pathname === '/device-required') return send(res, 200, html('Perangkat', '<h1>Perangkat belum terdaftar</h1>'));
+  if (url.pathname === '/device-required') {
+    const st = url.searchParams.get('state') || 'unknown';
+    const texts = {
+      pending: 'Menunggu persetujuan admin di Admin → Perangkat…',
+      revoked: 'Perangkat ini dicabut oleh admin.',
+      unknown: 'Perangkat belum dikenal server.',
+      limited: 'Terlalu banyak percobaan. Mencoba lagi…',
+    };
+    const recheck = st === 'pending' || st === 'limited' ? `<script>setTimeout(() => location.replace('/display'), 5000)</script>` : '';
+    return send(res, 200, html('Perangkat', `<h1 id="state">${st}</h1><p>${texts[st] || ''}</p>${recheck}`));
+  }
   send(res, 404, html('404', '<h1>404</h1>'));
 });
 

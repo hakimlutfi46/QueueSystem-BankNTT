@@ -12,7 +12,8 @@ const { resolveRole } = require('./roles');
 const { hashPin, verifyPin, isValidPin } = require('./pin');
 const { pair } = require('./pairing');
 const { normaliseServer, normaliseCode, isValidCode, sameOrigin, hostOf } = require('./server-url');
-const { lockKeyboard } = require('./keys');
+const { lockKeyboard, isLockdown, quitShortcutAction } = require('./keys');
+const { parseDeviceRequired, deviceRequiredAction, repairAllowed, repairDelay, deviceRequiredUrl } = require('./device-required');
 const { resolveSimulation, simulationName, simulationTitle, simulationIdentity } = require('./simulation');
 
 // --dev (or BANKNTT_DEV=1): TV runs windowed instead of kiosk, DevTools allowed.
@@ -36,6 +37,11 @@ if (!ROLE) {
 // Simulation build (macOS / Ubuntu developer laptop, see src/simulation.js); `--simulation` in dev.
 const SIMULATION = resolveSimulation({ packaged: app.isPackaged, argv: process.argv, env: process.env, pkg });
 const IS_MAC = process.platform === 'darwin';
+// TV production lockdown (packaged, non-simulation): window close, Alt+F4 and Ctrl+Q / Cmd+Q never
+// quit; only "Keluar aplikasi" (PIN prompt or settings) or OS shutdown does. BANKNTT_LOCKDOWN=1
+// tries the production behaviour in development. Admin and Loket are normal windows.
+const LOCKDOWN =
+  ROLE.kiosk && isLockdown({ packaged: app.isPackaged, simulation: SIMULATION, lockdownEnv: process.env.BANKNTT_LOCKDOWN });
 
 // Discovery port: fixed in packaged builds; overridable in development to test against a mock.
 const DISCOVERY_PORT =
@@ -95,6 +101,11 @@ const state = {
   pinFailures: 0,
   pinLockedUntil: 0,
   blockerId: null,
+  lastRepairAt: 0, // TV: last automatic pairing attempt (ms), at most one per minute
+  repairing: null, // TV: pending automatic pairing promise
+  repairTimer: null,
+  pairBlocked: false, // TV: server answered DEVICE_REVOKED, no automatic pairing until settings are saved
+  lastDeviceState: '',
 };
 
 process.on('uncaughtException', (err) => log.error('uncaughtException:', err));
@@ -140,7 +151,7 @@ function enableAutoStart() {
 
 function targetUrl() {
   const base = `${state.config.server}${ROLE.path}`;
-  return ROLE.pairing ? `${base}?token=${encodeURIComponent(state.config.token)}` : base;
+  return ROLE.pairing && state.config.token ? `${base}?token=${encodeURIComponent(state.config.token)}` : base;
 }
 
 /* ---------------------------------------------------------------- discovery */
@@ -190,10 +201,95 @@ async function learnServerName(url) {
 /* -------------------------------------------------------------- main window */
 
 function stopRetry() {
+  clearRepairTimer();
   if (state.retryTimer) clearInterval(state.retryTimer);
   if (state.relocateTimer) clearInterval(state.relocateTimer);
   state.retryTimer = null;
   state.relocateTimer = null;
+}
+
+/**
+ * TV automatic pairing without a code: { kind, name, installId }. The server reuses the device row
+ * of this installId, so this never creates duplicates. Callers respect the once-per-minute limit.
+ */
+function autoPair(reason) {
+  if (state.repairing) return state.repairing;
+  state.lastRepairAt = Date.now();
+  const server = state.config.server;
+  log.info(`${ROLE.id}: pemasangan otomatis (${reason}) installId=${config.maskInstallId(state.config.installId)}`);
+  state.repairing = pair(server, '', { expectedKind: ROLE.expectedKind, installId: state.config.installId })
+    .then((res) => {
+      if (res.ok && state.config.server === server) {
+        state.pairBlocked = false;
+        state.config = config.save({ ...state.config, token: res.token, deviceName: res.name || state.config.deviceName });
+        if (!res.approved) log.info(`${ROLE.id}: menunggu persetujuan admin di Admin → Perangkat`);
+      } else if (res.code === 'DEVICE_REVOKED') {
+        state.pairBlocked = true;
+        log.warn(`${ROLE.id}: instalasi ini dicabut admin, tidak ada pemasangan ulang otomatis`);
+      }
+      return res;
+    })
+    .finally(() => {
+      state.repairing = null;
+    });
+  return state.repairing;
+}
+
+function clearRepairTimer() {
+  if (state.repairTimer) clearTimeout(state.repairTimer);
+  state.repairTimer = null;
+}
+
+/** Reload the page once the next automatic pairing is allowed (the reload re-checks the token). */
+function scheduleRepair() {
+  if (state.repairTimer) return;
+  const ms = Math.max(repairDelay(state.lastRepairAt), 1_000);
+  log.info(`${ROLE.id}: pemasangan ulang otomatis dicoba lagi dalam ${Math.ceil(ms / 1000)} detik`);
+  state.repairTimer = setTimeout(() => {
+    state.repairTimer = null;
+    if (!state.offline) loadMain();
+  }, ms);
+}
+
+/** TV without a token: pair first. Returns a /device-required state to show instead, or null. */
+async function pairWithoutToken() {
+  if (state.pairBlocked) return 'revoked';
+  if (!repairAllowed(state.lastRepairAt)) return null; // the server answers "unknown"; retried later
+  const res = await autoPair('belum ada token');
+  if (res.ok) return null;
+  if (res.code === 'DEVICE_REVOKED') return 'revoked';
+  if (res.code === 'RATE_LIMITED') return 'limited';
+  return null; // unreachable server: loading fails and the offline page takes over
+}
+
+/**
+ * The server shows /device-required?state=pending|revoked|unknown|limited when this TV may not
+ * open /display. Only "unknown" (token unknown, e.g. database reset) re-pairs, at most once a
+ * minute; pending and limited pages re-check by themselves, revoked stays as it is.
+ */
+async function handleDeviceRequired(url) {
+  if (!ROLE.pairing) return;
+  const info = parseDeviceRequired(url, state.config.server);
+  if (!info) {
+    state.lastDeviceState = '';
+    return;
+  }
+  const action = deviceRequiredAction(url, {
+    server: state.config.server,
+    lastRepairAt: state.lastRepairAt,
+    blocked: state.pairBlocked,
+  });
+  if (state.lastDeviceState !== info.state) {
+    state.lastDeviceState = info.state;
+    log.info(`${ROLE.id}: server menampilkan status perangkat "${info.state || '-'}" -> ${action}`);
+  }
+  if (action === 'repair') {
+    const res = await autoPair('token tidak dikenal server');
+    if (res.ok) loadMain();
+    else if (res.code !== 'DEVICE_REVOKED') scheduleRepair();
+  } else if (action === 'wait' && info.state === 'unknown') {
+    scheduleRepair();
+  }
 }
 
 async function loadMain() {
@@ -202,10 +298,12 @@ async function loadMain() {
   stopRetry();
   state.offline = false;
   if (ROLE.pairing && !state.config.token) {
-    log.info('tv: belum memiliki token, auto-pairing ke server', state.config.server);
-    const res = await pair(state.config.server, '', { expectedKind: ROLE.expectedKind });
-    if (res.ok) {
-      state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
+    const blocked = await pairWithoutToken();
+    if (!alive(win)) return;
+    if (blocked) {
+      log.info(`${ROLE.id}: menampilkan status perangkat "${blocked}" dari server`);
+      win.loadURL(deviceRequiredUrl(state.config.server, ROLE.expectedKind, blocked)).catch(() => {});
+      return;
     }
   }
   log.info(`${ROLE.id}: memuat`, targetUrl());
@@ -346,7 +444,7 @@ function createMainWindow() {
   state.mainWin = win;
   const wc = win.webContents;
 
-  if (ROLE.kiosk) lockKeyboard(wc, { onAdmin: openSettingsFromTv, onQuit: exitTv });
+  if (ROLE.kiosk) lockKeyboard(wc, { onAdmin: openAdminMenu, onQuit: handleQuitShortcut });
 
   win.once('ready-to-show', () => {
     if (!ROLE.kiosk) win.maximize();
@@ -356,10 +454,14 @@ function createMainWindow() {
 
   if (ROLE.kiosk) {
     win.on('close', (event) => {
-      if (!state.quitting && !state.allowMainClose) {
-        state.quitting = true;
-        app.quit();
+      if (state.quitting || state.allowMainClose) return;
+      if (LOCKDOWN) {
+        event.preventDefault();
+        log.info('tv: penutupan jendela diblokir');
+        return;
       }
+      state.quitting = true;
+      app.quit();
     });
     win.on('leave-full-screen', () => {
       if (!DEV && !state.quitting) setTimeout(() => alive(win) && win.setKiosk(true), 100);
@@ -389,18 +491,15 @@ function createMainWindow() {
     if (String(validatedURL).startsWith('file:')) return;
     showOffline(`${errorCode} ${errorDescription} (${validatedURL})`);
   });
-  wc.on('did-navigate', async (_e, url, httpResponseCode) => {
+  wc.on('did-navigate', (_e, url, httpResponseCode) => {
     if (httpResponseCode >= 502 && httpResponseCode <= 504 && sameOrigin(url, state.config.server)) {
       showOffline(`HTTP ${httpResponseCode}`);
+      return;
     }
-    if (ROLE.pairing && String(url).includes('/device-required') && sameOrigin(url, state.config.server)) {
-      log.warn('tv: token perangkat ditolak server, mencoba auto-pairing ulang...');
-      const res = await pair(state.config.server, '', { expectedKind: ROLE.expectedKind });
-      if (res.ok) {
-        state.config = config.save({ ...state.config, token: res.token, deviceName: res.name });
-        loadMain();
-      }
-    }
+    handleDeviceRequired(url).catch((err) => log.warn(`${ROLE.id}: status perangkat:`, err.message));
+  });
+  wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
+    if (isMainFrame) handleDeviceRequired(url).catch((err) => log.warn(`${ROLE.id}: status perangkat:`, err.message));
   });
   if (ROLE.kiosk) {
     wc.on('did-finish-load', () => {
@@ -477,7 +576,12 @@ function openSetup(mode) {
   });
   win.setMenu(null);
   state.setupWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true });
+  lockKeyboard(win.webContents, { allowEscape: true, onQuit: ROLE.kiosk ? handleQuitShortcut : undefined });
+  if (ROLE.kiosk) {
+    win.on('session-end', () => {
+      state.quitting = true;
+    });
+  }
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.once('ready-to-show', () => {
@@ -533,7 +637,10 @@ function openPin() {
   win.setMenu(null);
   win.setAlwaysOnTop(true, 'screen-saver');
   state.pinWin = win;
-  lockKeyboard(win.webContents, { allowEscape: true });
+  lockKeyboard(win.webContents, { allowEscape: true, onQuit: handleQuitShortcut });
+  win.on('session-end', () => {
+    state.quitting = true;
+  });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.once('ready-to-show', () => {
@@ -554,11 +661,26 @@ function closePin() {
   if (alive(win)) win.destroy();
 }
 
-function exitTv() {
-  log.info('tv: keluar aplikasi');
+function authorisedExit(reason = 'PIN benar') {
+  log.info(`admin: keluar aplikasi (${reason})`);
   state.quitting = true;
   closePin();
   app.quit();
+}
+
+/** TV Ctrl+Q / Cmd+Q / Alt+F4: quick quit in simulation and development, blocked in production. */
+function handleQuitShortcut() {
+  if (quitShortcutAction(LOCKDOWN) === 'quit') {
+    authorisedExit('pintasan keluar, bukan mode produksi');
+    return;
+  }
+  log.info('tv: pintasan keluar diblokir (pakai Ctrl+Shift+Alt+K)');
+}
+
+/** TV Ctrl+Shift+Alt+K: the PIN prompt when a PIN is set, else the settings window directly. */
+function openAdminMenu() {
+  if (state.config.pinHash) openPin();
+  else openSettingsFromTv();
 }
 
 function openSettingsFromTv() {
@@ -764,6 +886,8 @@ function registerIpc() {
       server: cfg.server,
       serverName: cfg.serverName,
       deviceName: cfg.deviceName,
+      hasPin: Boolean(cfg.pinHash),
+      lockdown: LOCKDOWN,
       logFile: log.file,
     };
   });
@@ -795,17 +919,31 @@ function registerIpc() {
     return { ok: true };
   });
 
+  // TV "Keluar aplikasi" in the settings window: reaching edit-mode settings already needed the
+  // PIN (when one is set), so this is an authorised exit.
+  ipcMain.handle('setup:exit', async (event) => {
+    if (!fromSetup(event)) throw new Error('forbidden');
+    if (!ROLE.kiosk || state.setupMode !== 'edit' || !isComplete()) return { ok: false };
+    setImmediate(() => authorisedExit('dari pengaturan'));
+    return { ok: true };
+  });
+
   ipcMain.handle('setup:submit', async (event, form) => {
     if (!fromSetup(event)) throw new Error('forbidden');
     const cfg = state.config;
-    const edit = state.setupMode === 'edit' && isComplete();
 
     const server = normaliseServer(form.server);
     if (!server) return { ok: false, field: 'server', message: 'Alamat server tidak valid. Contoh: 192.168.1.53:3000' };
 
-    let code = normaliseCode(form.code || '');
+    const code = ROLE.pairing ? normaliseCode(form.code || '') : '';
     if (code && !isValidCode(code)) {
       return { ok: false, field: 'code', message: 'Kode pemasangan harus 6 karakter (huruf dan angka).' };
+    }
+    // TV: the PIN stays optional (recommended); when typed it must be valid and confirmed.
+    const pinGiven = ROLE.pairing && (form.pin !== '' || form.pinConfirm !== '');
+    if (pinGiven) {
+      if (!isValidPin(form.pin)) return { ok: false, field: 'pin', message: 'PIN admin minimal 4 angka (hanya angka).' };
+      if (form.pin !== form.pinConfirm) return { ok: false, field: 'pinConfirm', message: 'Konfirmasi PIN tidak sama.' };
     }
 
     if (!(await discovery.checkHealth(server))) {
@@ -814,25 +952,23 @@ function registerIpc() {
     const serverName = await learnServerName(server).catch(() => '');
 
     let { token, deviceName } = cfg;
+    let approved = true;
     if (ROLE.pairing) {
       // The same server at a new address (same announced name) keeps its device token.
       const sameServer = server === cfg.server || Boolean(serverName && serverName === cfg.serverName);
-      if (code) {
-        log.info('setup: memasangkan perangkat ke', server);
-        const result = await pair(server, code, { expectedKind: ROLE.expectedKind });
+      if (code || !token || !sameServer) {
+        log.info(`setup: ${code ? 'memasangkan perangkat dengan kode' : 'menyambungkan TV otomatis'} ke`, server);
+        const result = await pair(server, code, { expectedKind: ROLE.expectedKind, installId: cfg.installId });
         if (!result.ok) return { ok: false, field: result.field, message: result.message };
         token = result.token;
-        deviceName = result.name;
-      } else if (!token || !sameServer) {
-        log.info('setup: auto-pairing TV ke server', server);
-        const result = await pair(server, '', { expectedKind: ROLE.expectedKind });
-        if (!result.ok) return { ok: false, field: result.field, message: result.message };
-        token = result.token;
-        deviceName = result.name;
+        deviceName = result.name || deviceName;
+        approved = result.approved;
+        state.pairBlocked = false;
+        state.lastRepairAt = Date.now();
       }
     }
 
-    const pinHash = cfg.pinHash || '';
+    const pinHash = pinGiven ? await hashPin(form.pin) : cfg.pinHash || '';
     const changed = server !== cfg.server || token !== cfg.token;
     state.config = config.save({ ...cfg, server, serverName, token, pinHash, deviceName });
     log.info(`setup: pengaturan disimpan server=${server} nama="${serverName || '-'}" perangkat="${deviceName || '-'}"`);
@@ -845,7 +981,7 @@ function registerIpc() {
       openMain();
     }
     closeSetup();
-    return { ok: true, deviceName, serverName };
+    return { ok: true, deviceName, serverName, approved };
   });
 
   ipcMain.handle('pin:state', async (event) => {
@@ -934,9 +1070,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
-  // TV: only an authorised exit (or OS shutdown) may quit while the display is up.
-  if (ROLE.kiosk && state.mainWin && !state.quitting) {
+  // Production TV: once set up, only an authorised exit or OS shutdown / session end may quit.
+  // Simulation / development TV and Admin/Loket quit normally.
+  if (LOCKDOWN && !state.quitting && isComplete()) {
     event.preventDefault();
+    log.info('aplikasi: permintaan keluar diblokir');
     return;
   }
   state.quitting = true;
@@ -951,7 +1089,7 @@ app.whenReady().then(() => {
   config.init(app.getPath('userData'));
   if (process.platform === 'win32') app.setAppUserModelId(ROLE.appId);
   log.info(
-    `aplikasi: mulai ${APP_NAME} (${ROLE.id}) versi ${app.getVersion()} ${DEV ? '(dev)' : ''}${SIMULATION ? ' (simulasi)' : ''} userData=${app.getPath('userData')}`,
+    `aplikasi: mulai ${APP_NAME} (${ROLE.id}) versi ${app.getVersion()} ${DEV ? '(dev)' : ''}${SIMULATION ? ' (simulasi)' : ''}${LOCKDOWN ? ' (terkunci)' : ''} userData=${app.getPath('userData')}`,
   );
 
   powerMonitor.on('shutdown', () => {
@@ -961,7 +1099,7 @@ app.whenReady().then(() => {
 
   hardenSessions();
   registerIpc();
-  state.config = config.load();
+  state.config = ROLE.pairing ? config.ensureInstallId(config.load()) : config.load();
 
   if (ROLE.kiosk) {
     state.blockerId = powerSaveBlocker.start('prevent-display-sleep');

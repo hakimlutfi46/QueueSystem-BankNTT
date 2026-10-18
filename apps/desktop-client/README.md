@@ -51,8 +51,11 @@ npm test                                             # node --test (discovery, p
 npm run check                                        # node --check untuk semua file JS
 ```
 
-`BANKNTT_USER_DATA=/tmp/uji` memakai folder pengaturan lain. Kode pemasangan server tiruan:
+`BANKNTT_USER_DATA=/tmp/uji` memakai folder pengaturan lain. Server tiruan menyetujui TV baru
+setelah `--approve-after` detik (bawaan 10; `--revoked` menolak semua dengan DEVICE_REVOKED;
+`/__revoke`, `/__approve`, `/__forget` mengubah status). Kode pemasangan server tiruan:
 `ABC234` (TV), `KSK234` (kiosk, harus ditolak), `EXP234` (kedaluwarsa).
+`BANKNTT_LOCKDOWN=1` mencoba penguncian TV produksi saat `npm run dev:tv`.
 
 ## Installer simulasi (Mac dan Ubuntu)
 
@@ -89,7 +92,8 @@ Bedanya dengan aplikasi Windows:
 - Folder pengaturan sendiri: `~/Library/Application Support/bankntt-<peran>-sim/` (macOS) atau
   `~/.config/bankntt-<peran>-sim/` (Ubuntu), berisi `config.json` dan `logs/`.
 - TV **tidak** diatur berjalan otomatis saat login, supaya laptop tidak diambil alih. Layar penuh
-  tetap terkunci; keluar dengan **Ctrl+Shift+Alt+K** (di Mac juga **Cmd+Shift+Option+K**) lalu PIN.
+  tetap terkunci; keluar dengan **Ctrl+Shift+Alt+K** (di Mac juga **Cmd+Shift+Option+K**) lalu PIN
+  bila dipasang. Khusus simulasi, Cmd+Q / Ctrl+Q / Alt+F4 dan Dock → Keluar langsung menutup TV.
 - Di Mac, Admin dan Loket punya menu aplikasi biasa (Tentang, Ganti server… Cmd+Shift+S,
   Sembunyikan, Keluar Cmd+Q) serta menu Edit, sehingga Cmd+C / Cmd+V berfungsi.
 - Build Mac tidak ditandatangani dengan sertifikat Apple (`identity: null`, tanpa hardened
@@ -165,7 +169,7 @@ Jendela pengaturan langsung mencari server antrian di jaringan ("Mencari server 
   dan alamatnya; alamat jaringan (LAN) di atas, "PC ini" (127.0.0.1) di bawah.
 - **Admin/Loket**: bila tepat satu server ditemukan, aplikasi langsung tersambung. Bila lebih dari
   satu, pilih salah satu.
-- **TV**: server terpilih otomatis bila hanya satu, lalu isi kode pemasangan dan PIN (lihat di bawah).
+- **TV**: server terpilih otomatis dan TV langsung mendaftar sendiri (lihat di bawah).
 - Tidak ditemukan? Ketik alamatnya, misalnya `192.168.1.53:3000`, lalu **Periksa**.
 
 Alamat dan nama server disimpan. Saat dibuka berikutnya, aplikasi langsung memakai server itu.
@@ -183,12 +187,22 @@ Bila server tidak dapat dihubungi, muncul layar "Menyambung ke server…":
 
 ## TV: pemasangan (pairing)
 
-1. Di panel admin web → **Perangkat**, daftarkan TV lalu tekan **Kode aplikasi**. Catat kode
-   pemasangan (6 karakter, sekali pakai, berlaku 30 menit).
-2. Di jendela "Pemasangan BANK NTT TV": pilih server, isi **Kode pemasangan** (boleh `abc-234`),
-   lalu **PIN admin** (minimal 4 angka) dua kali. Tekan **Simpan & pasangkan**.
-3. Hanya kode untuk perangkat TV yang diterima; kode kiosk ditolak.
-4. Setelah berhasil, layar TV terbuka penuh dan aplikasi diatur berjalan otomatis saat login.
+Pemasangan kini otomatis, tanpa kode:
+
+1. Di jendela "Sambungkan BANK NTT TV" server dipilih otomatis (atau ketik alamatnya). Disarankan
+   isi **PIN admin** (minimal 4 angka) dua kali sebelum menyambung.
+2. TV mendaftar sendiri ke server dengan ID instalasi acak yang dibuat sekali dan disimpan di
+   `config.json` (`installId`); menyambung ulang tidak pernah membuat perangkat ganda.
+3. Layar TV menampilkan "menunggu persetujuan" sampai admin menyetujuinya di panel admin web →
+   **Perangkat** (atau menyalakan **Terima perangkat baru otomatis**). Halaman memeriksa sendiri tiap
+   5 detik lalu membuka layar TV. Aplikasi diatur berjalan otomatis saat login.
+4. **Kode pemasangan (opsional)**: bila admin memberi kode 6 karakter (Admin → Perangkat → **Kode
+   aplikasi**), isi di kolom itu (boleh `abc-234`). Hanya kode untuk perangkat TV yang diterima.
+
+Status perangkat dari server: **menunggu persetujuan** dan **dibatasi** — aplikasi diam, halaman
+memeriksa sendiri; **dicabut** — aplikasi diam dan tidak memasangkan ulang otomatis; **tidak dikenal**
+(token hilang, mis. database direset) — aplikasi memasangkan ulang sekali dengan `installId` (paling
+sering sekali per menit) lalu memuat ulang layar TV.
 
 ## Pintasan
 
@@ -200,8 +214,11 @@ Bila server tidak dapat dihubungi, muncul layar "Menyambung ke server…":
 | Admin, Loket | F11 | Layar penuh |
 | Admin, Loket | Alt+F4 (menu Aplikasi → Keluar) | Keluar |
 | TV | **Ctrl+Shift+Alt+K** lalu PIN | **Keluar aplikasi** atau **Ubah pengaturan** (server, pemasangan ulang, PIN) |
+| TV tanpa PIN | **Ctrl+Shift+Alt+K** | Pengaturan langsung terbuka (ada tombol **Keluar aplikasi**) |
 
-Di TV, Alt+F4, F5, F11, F12, Esc, Ctrl+W/Q/R, zoom, dan menu diblokir. Setelah 5 kali PIN salah,
+Di TV terpasang, Alt+F4, Ctrl+Q / Cmd+Q, menutup jendela, F5, F11, F12, Esc, Ctrl+W/R, zoom, dan menu
+diblokir; TV hanya tertutup lewat **Keluar aplikasi** atau shutdown / log off. Tanpa PIN, siapa pun
+yang memegang keyboard bisa membuka pengaturan, jadi PIN sangat disarankan. Setelah 5 kali PIN salah,
 prompt dikunci 60 detik. DevTools tidak tersedia di aplikasi terpasang.
 
 Admin: unduhan hanya diterima dari server antrian; dialog simpan dibuka di folder **Downloads**.
@@ -216,7 +233,8 @@ Tautan "Cetak ulang" tiket dibuka di jendela kecil yang sama terkuncinya. Situs 
 | TV | `%APPDATA%\bankntt-tv\config.json` | `%APPDATA%\bankntt-tv\logs\tv.log` |
 
 `config.json` berisi alamat server, nama server, dan untuk TV: token perangkat, hash scrypt PIN,
-serta nama perangkat. Log dirotasi ±1 MB; token dan PIN tidak pernah dicatat.
+nama perangkat, serta `installId`. Log dirotasi ±1 MB; token, PIN, dan `installId` lengkap tidak
+pernah dicatat.
 
 Lupa PIN TV? Tutup aplikasi lewat Task Manager, hapus `%APPDATA%\bankntt-tv\config.json`, lalu
 jalankan lagi untuk memasangkan ulang.
@@ -228,7 +246,8 @@ jalankan lagi untuk memasangkan ulang.
 | "Tidak ada server ditemukan" | PC server menyala dan aplikasi server berjalan; PC ini di jaringan yang sama. **Firewall Windows di PC server harus mengizinkan UDP 41234 masuk** (installer server mengaturnya). Router/switch dengan *client isolation* (Wi-Fi tamu) memblokir siaran: ketik alamatnya manual. |
 | Server muncul tapi tidak bisa dipilih / "tidak menjawab" | Port 3000 TCP di firewall PC server, atau database server mati (`/api/health` gagal). |
 | Layar "Menyambung ke server…" terus | Server mati atau pindah jaringan. Tekan **Cari ulang server**, atau Ctrl+Shift+S (Admin/Loket) / Ctrl+Shift+Alt+K → Ubah pengaturan (TV). |
-| TV meminta pendaftaran perangkat | Token dicabut di server. Pasangkan ulang lewat Ubah pengaturan dengan kode baru. |
+| TV "menunggu persetujuan" terus | Setujui TV di Admin → Perangkat, atau nyalakan **Terima perangkat baru otomatis**. |
+| TV "dicabut" | Admin mencabut instalasi ini. Pulihkan di Admin → Perangkat, atau pasangkan dengan kode baru lewat Ubah pengaturan. |
 | "Kode ini bukan untuk perangkat TV antrian." | Kode dibuat untuk kiosk. Buat kode dari perangkat TV di Admin → Perangkat. |
 | TV tidak bersuara | Volume Windows/TV, dan pilih perangkat audio yang benar di Windows. |
 | Unduhan laporan tidak muncul | Lihat log Admin; unduhan dari alamat selain server antrian diblokir. |

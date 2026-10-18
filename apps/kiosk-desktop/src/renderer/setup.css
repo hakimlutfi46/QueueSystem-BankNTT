@@ -29,6 +29,8 @@ h2 { margin: 0; font-size: 18px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
 .actions { display: flex; justify-content: flex-end; gap: 14px; margin-top: 8px; }
 .actions .btn-primary { min-width: 260px; }
+#exit { margin-right: auto; }
+#exit[hidden] { display: none; }
 #test-result { font-weight: 600; }
 #test-result.ok { color: var(--ok); }
 #test-result.fail { color: var(--danger); }
