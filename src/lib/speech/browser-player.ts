@@ -125,8 +125,26 @@ function playClip(src: string): Promise<void> {
     }
     audio.currentTime = 0;
     audio.onended = () => resolve();
-    audio.onerror = () => resolve();
-    void audio.play().catch(() => resolve());
+    const fallbackToSpeech = () => {
+      const match = /\/audio\/(.+)\.wav$/i.exec(src);
+      const word = match?.[1]?.replace(/-/g, " ");
+      if (word && "speechSynthesis" in window) {
+        try {
+          const utter = new SpeechSynthesisUtterance(word);
+          utter.lang = "id-ID";
+          utter.onend = () => resolve();
+          utter.onerror = () => resolve();
+          window.speechSynthesis.speak(utter);
+          return;
+        } catch {
+          resolve();
+          return;
+        }
+      }
+      resolve();
+    };
+    audio.onerror = () => fallbackToSpeech();
+    void audio.play().catch(() => fallbackToSpeech());
   });
 }
 
