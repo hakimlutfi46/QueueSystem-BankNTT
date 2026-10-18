@@ -116,3 +116,20 @@ Jika ingin memeriksa apakah background service server antrian aktif di PC utama:
 2. Pastikan tipe jaringan diatur ke **Private**:
    * Buka *Settings* &rarr; *Network & Internet* &rarr; *Wi-Fi / Ethernet* &rarr; pilih **Private network**.
 3. Anda juga dapat memasukkan alamat IP server secara manual pada form pengaturan klien jika broadcast UDP diblokir oleh switch router kantor.
+
+---
+
+## 7. Reset Database Fresh Pasca-Testing (Kembali ke Kondisi Pabrik)
+
+Setelah proses uji coba dan simulasi selesai, bersihkan seluruh data tiket testing agar saat nasabah asli datang di hari operasional resmi, sistem bersih 100%:
+
+1. Buka folder proyek atau folder server di PC Windows.
+2. Double-click file:
+   👉 **`Reset-Database-Fresh-Windows.bat`**
+3. Ketik `Y` lalu tekan Enter saat muncul konfirmasi.
+4. **Hasil pembersihan:**
+   * Seluruh tiket uji coba dan event log riwayat panggilan **terhapus bersih (0 tiket)**.
+   * Nomor antrian hari ini otomatis di-reset ke nomor awal (**001**).
+   * Status seluruh loket kembali ke **CLOSED**.
+   * Akun Admin bawaan (`admin` / `Password123`) dan pengaturan cabang tetap aman dan siap pakai.
+
