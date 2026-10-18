@@ -1,21 +1,30 @@
 #!/usr/bin/env node
-// Builds the Windows x64 NSIS installer and copies it to <repo>/downloads/.
+// Builds the Windows x64 NSIS installer and copies it to <repo>/downloads/ (or, with --platform
+// mac|linux, a simulation app for a laptop without a thermal printer; see below).
 //
 //   npm run kiosk:build                                   # default name + Bank NTT icon
 //   npm run kiosk:build -- --name "BANK NTT Ticket" --icon path/to/icon.png
 //   npm run kiosk:build -- --with-server                  # kiosk + queue server for the main ticket machine
+//   npm run kiosk:build:mac                               # = --platform mac   (simulation .dmg, arm64)
+//   npm run kiosk:build:linux                             # = --platform linux (simulation AppImage + deb, x64)
 //
 // --with-server embeds apps/server-bundle/dist/server (build it first with `npm run server:bundle`)
 // and produces <Name>-Server-Setup.exe: a per-machine installer that also installs PostgreSQL and the
 // queue server as Windows services. It is copied to downloads/ but not listed in kiosk-installer.json,
 // so Admin → Perangkat keeps offering the plain kiosk installer for additional kiosks.
 //
+// --platform mac|linux builds a *simulation* app for a developer's MacBook or Ubuntu PC: productName
+// "<Name> (Simulasi)", appId "<appId>.sim", and extraMetadata.bankNttSimulation=true, which makes the
+// app save every ticket as a PDF (no thermal printer), skip autostart and use its own settings
+// folder. Simulation builds go to downloads/simulasi/ and never touch downloads/kiosk-installer.json.
+// The default (--platform win) is the production Windows installer.
+//
 // The admin panel runs this same script (Admin → Perangkat → Build ulang installer).
 // Works on macOS, Linux and Windows without wine: electron-builder edits the exe icon and
 // metadata in pure JS (resedit); only code signing is skipped (win.signExecutable=false).
 // Electron-builder is called through its API, never a shell, so the name cannot inject commands.
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +42,7 @@ const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{1,39}$/;
 
 const withServer = process.argv.includes('--with-server') || process.env.KIOSK_WITH_SERVER === '1';
 const serverDir = path.join(repoRoot, 'apps', 'server-bundle', 'dist', 'server');
+const simulationDir = path.join(outDir, 'simulasi');
 
 function option(flag) {
   const index = process.argv.indexOf(flag);
@@ -43,6 +53,12 @@ function fail(message) {
   console.error(`\nGagal: ${message}`);
   process.exit(1);
 }
+
+const platform = String(option('--platform') ?? process.env.KIOSK_PLATFORM ?? 'win').trim().toLowerCase();
+if (!['win', 'mac', 'linux'].includes(platform)) fail(`--platform harus win, mac, atau linux (bukan "${platform}").`);
+// Every non-Windows build is a simulation build.
+const simulation = platform !== 'win';
+if (simulation && withServer) fail('--with-server hanya untuk Windows: bundle server berisi PostgreSQL dan layanan Windows.');
 
 const name = (option('--name') ?? process.env.KIOSK_APP_NAME ?? DEFAULT_NAME).trim().replace(/\s+/g, ' ');
 const icon = path.resolve(option('--icon') ?? process.env.KIOSK_APP_ICON ?? DEFAULT_ICON);
@@ -75,6 +91,11 @@ if (!existsSync(builderCli)) {
 const require = createRequire(path.join(appDir, 'package.json'));
 const builder = require('electron-builder');
 const pkg = JSON.parse(readFileSync(path.join(appDir, 'package.json'), 'utf8'));
+
+if (simulation) {
+  await buildSimulation();
+  process.exit(0);
+}
 
 // The icon ships inside the app too, for the window icon and the setup screen.
 const brandDir = path.join(appDir, 'dist', 'brand');
@@ -138,3 +159,85 @@ writeFileSync(
   `${JSON.stringify({ file: path.basename(target), name, version: pkg.version, size, builtAt: new Date().toISOString() }, null, 2)}\n`,
 );
 console.log(`\nSelesai: ${path.relative(repoRoot, target)} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+
+/* ---------------------------------------------------------- simulation builds */
+
+// macOS (.dmg, arm64, ad-hoc signed) or Ubuntu (AppImage + deb, x64, unsigned). Same app code; the baked
+// bankNttSimulation flag switches it to PDF tickets (see src/main.js).
+async function buildSimulation() {
+  const productName = `${name} (Simulasi)`;
+  const slug = `${name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '')}-Simulasi`;
+  const simOut = path.join(appDir, 'dist', `simulasi-${platform}`);
+  rmSync(simOut, { recursive: true, force: true });
+
+  const brandDir = path.join(appDir, 'dist', 'brand-simulasi');
+  rmSync(brandDir, { recursive: true, force: true });
+  mkdirSync(brandDir, { recursive: true });
+  copyFileSync(icon, path.join(brandDir, 'icon.png'));
+
+  // ${arch} becomes arm64 for the dmg, x86_64 for the AppImage and amd64 for the deb.
+  const config = {
+    ...pkg.build,
+    appId: `${pkg.build.appId}.sim`,
+    productName,
+    artifactName: `${slug}-${platform}-\${arch}.\${ext}`,
+    directories: { ...pkg.build.directories, output: simOut },
+    // name -> Linux package and executable name, so it never replaces a "kiosk-antrian" package.
+    // homepage is required by the deb target; desktopName links Linux windows to the .desktop entry.
+    extraMetadata: {
+      name: 'kiosk-antrian-sim',
+      productName,
+      bankNttSimulation: true,
+      description: 'Aplikasi kiosk tiket antrian BANK NTT versi simulasi: tiket disimpan sebagai PDF, tanpa printer thermal.',
+      homepage: 'http://localhost',
+      desktopName: 'kiosk-antrian-sim.desktop',
+    },
+    extraResources: [{ from: path.join(brandDir, 'icon.png'), to: 'brand-icon.png' }],
+    mac: {
+      target: [{ target: 'dmg', arch: ['arm64'] }],
+      icon,
+      // Ad-hoc signature ("-"), no certificate. identity: null leaves the fuse-flipped Electron
+      // Framework with a broken signature, and Apple Silicon kills the app at launch.
+      identity: '-',
+      hardenedRuntime: false,
+      category: 'public.app-category.business',
+    },
+    dmg: { sign: false },
+    // The legacy AppImage toolset ships an x86_64-only mksquashfs for macOS, which cannot run on
+    // Apple Silicon without Rosetta; 1.0.3 also uses the static runtime (no libfuse2 needed).
+    toolsets: { ...pkg.build.toolsets, appimage: '1.0.3' },
+    linux: {
+      target: [
+        { target: 'AppImage', arch: ['x64'] },
+        { target: 'deb', arch: ['x64'] },
+      ],
+      icon,
+      category: 'Office',
+      executableName: 'kiosk-antrian-sim',
+      maintainer: 'Bank NTT <noreply@localhost>',
+      synopsis: 'Kiosk tiket antrian BANK NTT (simulasi, tiket PDF)',
+    },
+  };
+  const targets =
+    platform === 'mac'
+      ? builder.Platform.MAC.createTarget('dmg', builder.Arch.arm64)
+      : builder.Platform.LINUX.createTarget(['AppImage', 'deb'], builder.Arch.x64);
+  console.log(
+    `\n> electron-builder ${platform === 'mac' ? '--mac dmg --arm64' : '--linux AppImage deb --x64'}  (simulasi, nama="${productName}", ikon=${path.relative(repoRoot, icon)})`,
+  );
+  try {
+    await builder.build({ projectDir: appDir, targets, config, publish: 'never' });
+  } catch (error) {
+    fail(`electron-builder: ${error?.message ?? error}`);
+  }
+
+  const files = readdirSync(simOut).filter((f) => f.startsWith(`${slug}-${platform}-`) && /\.(dmg|AppImage|deb)$/.test(f));
+  if (!files.length) fail(`Installer simulasi tidak ditemukan di ${simOut}`);
+  mkdirSync(simulationDir, { recursive: true });
+  for (const file of files) {
+    const target = path.join(simulationDir, file);
+    copyFileSync(path.join(simOut, file), `${target}.tmp`);
+    renameSync(`${target}.tmp`, target);
+    console.log(`\nSelesai: ${path.relative(repoRoot, target)} (${(statSync(target).size / 1024 / 1024).toFixed(1)} MB)`);
+  }
+}

@@ -9,6 +9,10 @@
  * Browser* media keys. Ctrl+A/C/V/X/Z/Y stay usable for text fields.
  * Note: the Windows key, Ctrl+Alt+Del and Win+L cannot be blocked by any app;
  * use Windows Assigned Access (see README) for that.
+ *
+ * Admin shortcut: Ctrl+Shift+Alt+K everywhere; Cmd+Shift+Alt+K also works on macOS.
+ * Electron reports the physical Ctrl key as `control` on macOS too, and Option turns
+ * `key` into a symbol there, so the match also uses `code` (KeyK).
  */
 const BLOCKED_CTRL_KEYS = new Set(['w', 'q', 'r', 'n', 't', 'o', 'p', 's', 'u', 'l', 'f', 'g', 'h', 'j', 'm', '+', '-', '=', '_', '0']);
 const BLOCKED_NAMED_KEYS = new Set([
@@ -33,6 +37,18 @@ function isAdminShortcut(input) {
   );
 }
 
+/** Simulation builds only: Cmd+Q on macOS, Ctrl+Q elsewhere. */
+function isQuitShortcut(input, platform = process.platform) {
+  const mod = platform === 'darwin' ? input.meta && !input.control : input.control && !input.meta;
+  return (
+    input.type === 'keyDown' &&
+    mod &&
+    !input.shift &&
+    !input.alt &&
+    (input.code === 'KeyQ' || String(input.key).toLowerCase() === 'q')
+  );
+}
+
 function isBlocked(input, { allowEscape = false } = {}) {
   const key = String(input.key || '');
   const lower = key.toLowerCase();
@@ -49,16 +65,24 @@ function isBlocked(input, { allowEscape = false } = {}) {
   return false;
 }
 
-/** Attach to a webContents; `onAdmin` is called for Ctrl+Shift+Alt+K. */
-function lockKeyboard(webContents, { onAdmin, allowEscape = false } = {}) {
+/**
+ * Attach to a webContents; `onAdmin` is called for Ctrl+Shift+Alt+K.
+ * `onQuit` (simulation builds only) is called for Cmd+Q / Ctrl+Q instead of blocking it.
+ */
+function lockKeyboard(webContents, { onAdmin, onQuit, allowEscape = false } = {}) {
   webContents.on('before-input-event', (event, input) => {
     if (onAdmin && isAdminShortcut(input)) {
       event.preventDefault();
       onAdmin();
       return;
     }
+    if (onQuit && isQuitShortcut(input)) {
+      event.preventDefault();
+      onQuit();
+      return;
+    }
     if (isBlocked(input, { allowEscape })) event.preventDefault();
   });
 }
 
-module.exports = { lockKeyboard, isBlocked, isAdminShortcut };
+module.exports = { lockKeyboard, isBlocked, isAdminShortcut, isQuitShortcut };

@@ -167,6 +167,11 @@
       $('logo').hidden = false;
     }
     $('footer').textContent = `${appName} v${init.version}${init.logFile ? ` · Log: ${init.logFile}` : ''}`;
+    if (init.simulation) {
+      $('simulation').textContent = `${init.simulation.note} di ${init.simulation.pdfDir}. Bukan untuk kiosk cabang.`;
+      $('simulation').hidden = false;
+      $('simulation').classList.add('show');
+    }
     if (mode !== 'edit' && init.bundledServer) {
       $('subtitle').textContent =
         'Server antrian berjalan di PC ini, jadi alamatnya sudah terisi. Buka panel admin untuk membuat kode pemasangan.';
