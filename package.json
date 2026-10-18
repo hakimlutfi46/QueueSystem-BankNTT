@@ -21,7 +21,8 @@
     "kiosk:build": "node apps/kiosk-desktop/scripts/build-and-copy.mjs",
     "apps:build": "node apps/desktop-client/scripts/build.mjs --app all",
     "server:bundle": "node apps/server-bundle/build.mjs",
-    "discovery": "node scripts/discovery.mjs"
+    "discovery": "node scripts/discovery.mjs",
+    "sim": "node scripts/sim.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

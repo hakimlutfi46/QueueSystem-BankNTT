@@ -256,6 +256,52 @@ Di Chrome, ukuran layar diatur dari DevTools → Toggle device toolbar. TV dan k
 - [ ] Klik **Ulang** pada satu tiket: halaman cetak terbuka dengan tanda "CETAK ULANG".
 - [ ] **Unduh Excel** dan **Unduh CSV** terbuka dengan benar.
 
+## 5. Simulasi cabang di Mac atau Ubuntu
+
+Untuk mencoba alur cabang lengkap (mesin tiket, Admin, Loket, TV) tanpa PC Windows dan printer
+thermal. Di cabang sungguhan semuanya tetap memakai installer Windows; installer simulasi hanya untuk
+pengujian.
+
+**Server** (satu komputer, misalnya MacBook):
+
+```bash
+npm run sim                 # database queue_sim, tiket PDF, discovery aktif, next dev di port 3000
+npm run sim -- --prod       # sama, tapi build produksi (paling mirip mesin tiket)
+npm run sim -- --reset      # mulai lagi dari cabang kosong
+```
+
+`queue_sim` terpisah dari `queue_dev`, jadi data demo tidak tersentuh. Isinya seperti cabang baru:
+layanan CS dan Teller, loket CS 1–2 dan Teller 1–2, dan hanya akun `admin` (sandi dari
+`SEED_ADMIN_PASSWORD`, wajib diganti saat masuk). Matikan `npm run dev` lain lebih dulu; Next.js hanya
+mengizinkan satu `next dev` per proyek.
+
+**Aplikasi simulasi** (Mac `.dmg`, Ubuntu `.AppImage`/`.deb`), dibuat sekali:
+
+```bash
+npm run kiosk:build:mac      # BANK NTT Ticket (Simulasi)
+npm run kiosk:build:linux
+npm run apps:build:mac       # BANK NTT Admin / Loket / TV (Simulasi)
+npm run apps:build:linux
+```
+
+Hasilnya di `downloads/simulasi/`. Namanya berakhiran "(Simulasi)" dan pengaturannya terpisah dari
+aplikasi Windows. Ticket simulasi selalu menyimpan tiket sebagai PDF di `~/Downloads/kiosk-tiket-pdf`.
+Cara memasang ada di `apps/kiosk-desktop/README.md` dan `apps/desktop-client/README.md`.
+
+**Urutan uji:**
+
+- [ ] `npm run sim` menyala dan mencetak alamat jaringan.
+- [ ] Buka **Admin (Simulasi)**: server ditemukan sendiri, masuk sebagai `admin`, ganti sandi.
+- [ ] Admin → Petugas: tambah satu petugas CS. Admin → Perangkat: daftarkan kiosk dan TV.
+- [ ] **Ticket (Simulasi)**: isi alamat server dan **Kode aplikasi** kiosk, buat PIN. Ambil nomor A:
+      PDF tiket terbuka.
+- [ ] **TV (Simulasi)**: server ditemukan, isi **Kode aplikasi** TV dan PIN. Layar TV tampil penuh.
+- [ ] **Loket (Simulasi)**: masuk sebagai petugas CS, buka CS 1, panggil. Nomor muncul dan dibacakan di TV.
+- [ ] Matikan `npm run sim`: semua aplikasi menampilkan halaman offline. Nyalakan lagi: tersambung sendiri.
+- [ ] Untuk perangkat lain (misalnya Ubuntu sebagai TV), sambungkan ke Wi-Fi yang sama. Bila server tidak
+      ditemukan, cek firewall komputer server (izinkan UDP 41234 dan TCP 3000) dan pastikan Wi-Fi tidak
+      memakai isolasi klien. Alamat bisa juga diketik manual.
+
 ## Sebelum commit
 
 PLAN.md meminta setiap fase ditutup dengan lint, typecheck, dan seluruh uji. Urutan singkatnya:
