@@ -218,7 +218,7 @@ test('scan finds a fake responder on 127.0.0.1, health-checks and deduplicates i
   assert.ok(elapsed >= 1_500 && elapsed < 4_000, `elapsed ${elapsed} ms`);
 });
 
-test('scan resolves with an empty list when nobody answers', async (t) => {
+test('scan resolves with an empty list when nobody answers', async () => {
   // Bind and close to get a port with (almost certainly) no listener.
   const probe = dgram.createSocket('udp4');
   await new Promise((r) => probe.bind(0, '127.0.0.1', r));
@@ -226,4 +226,18 @@ test('scan resolves with an empty list when nobody answers', async (t) => {
   probe.close();
   const servers = await scan({ port, targets: ['127.0.0.1'], durationMs: 400, intervalMs: 200 });
   assert.deepEqual(servers, []);
+});
+
+test('remembers a macOS local-network block until a health check succeeds', async () => {
+  const d = require('../src/discovery');
+  d.noteNetworkError(Object.assign(new Error('x'), { cause: { code: 'EHOSTUNREACH' } }), 'win32');
+  assert.equal(d.localNetworkBlocked(), false, 'only macOS has the Local Network permission');
+  d.noteNetworkError(Object.assign(new Error('x'), { cause: { code: 'EHOSTUNREACH' } }), 'darwin');
+  assert.equal(d.localNetworkBlocked(), true);
+  assert.equal(d.lastNetworkError(), 'EHOSTUNREACH');
+  const ok = await d.checkHealth('http://192.0.2.1:3000', {
+    fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true }) }),
+  });
+  assert.equal(ok, true);
+  assert.equal(d.localNetworkBlocked(), false);
 });

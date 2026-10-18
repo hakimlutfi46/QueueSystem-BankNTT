@@ -227,3 +227,17 @@ test('scan resolves with an empty list when nobody answers', async () => {
   const servers = await scan({ port, targets: ['127.0.0.1'], durationMs: 400, intervalMs: 200 });
   assert.deepEqual(servers, []);
 });
+
+test('remembers a macOS local-network block until a health check succeeds', async () => {
+  const d = require('../src/discovery');
+  d.noteNetworkError(Object.assign(new Error('x'), { cause: { code: 'EHOSTUNREACH' } }), 'win32');
+  assert.equal(d.localNetworkBlocked(), false, 'only macOS has the Local Network permission');
+  d.noteNetworkError(Object.assign(new Error('x'), { cause: { code: 'EHOSTUNREACH' } }), 'darwin');
+  assert.equal(d.localNetworkBlocked(), true);
+  assert.equal(d.lastNetworkError(), 'EHOSTUNREACH');
+  const ok = await d.checkHealth('http://192.0.2.1:3000', {
+    fetchImpl: async () => ({ ok: true, json: async () => ({ ok: true }) }),
+  });
+  assert.equal(ok, true);
+  assert.equal(d.localNetworkBlocked(), false);
+});

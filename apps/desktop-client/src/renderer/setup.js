@@ -122,6 +122,10 @@
     scanText.textContent = total
       ? `${total} server ditemukan. Pilih salah satu.`
       : 'Tidak ada server ditemukan. Pastikan PC server menyala, atau ketik alamatnya di bawah.';
+    if (!total) {
+      const net = await api.network().catch(() => null);
+      if (net && net.blocked) scanText.textContent = net.message;
+    }
     if (total >= 1 && !touched) {
       const serverList = [...servers.values()];
       const best = serverList.find((s) => !s.local) || serverList[0];
@@ -206,7 +210,7 @@
     clearErrors();
     hideAlert();
     if (!serverInput.value.trim()) {
-      setError('server', 'Ketik alamat server dulu, misalnya 192.168.1.53:3000.');
+      setError('server', 'Ketik alamat server dulu, misalnya 192.168.1.10:3000.');
       return;
     }
     const btn = $('check');

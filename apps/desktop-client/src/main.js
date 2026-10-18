@@ -62,6 +62,11 @@ app.setPath(
 if (ROLE.kiosk) app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const APP_NAME = app.getName();
+
+/** Shown when macOS keeps this app off the local network (see discovery.localNetworkBlocked). */
+function localNetworkHint() {
+  return `macOS memblokir ${APP_NAME} dari jaringan lokal. Buka System Settings → Privacy & Security → Local Network, nyalakan ${APP_NAME}, lalu tekan Cari ulang.`;
+}
 const BRAND_ICON = app.isPackaged
   ? path.join(process.resourcesPath, 'brand-icon.png')
   : path.join(__dirname, '..', '..', '..', 'public', 'brand', 'kiosk-app-icon.png');
@@ -905,9 +910,19 @@ function registerIpc() {
   ipcMain.handle('setup:check', async (event, input) => {
     if (!fromSetup(event)) throw new Error('forbidden');
     const server = normaliseServer(input);
-    if (!server) return { ok: false, message: 'Alamat server tidak valid. Contoh: 192.168.1.53:3000' };
+    if (!server) return { ok: false, message: 'Alamat server tidak valid. Contoh: 192.168.1.10:3000' };
     const ok = await discovery.checkHealth(server);
-    return ok ? { ok: true, server } : { ok: false, server, message: `Server ${server} tidak menjawab. Periksa alamat dan jaringan.` };
+    if (ok) return { ok: true, server };
+    const message = discovery.localNetworkBlocked()
+      ? localNetworkHint()
+      : `Server ${server} tidak menjawab (${discovery.lastNetworkError() || 'tidak ada jawaban'}). Periksa alamat dan jaringan.`;
+    log.warn('setup: server tidak menjawab', server, discovery.lastNetworkError());
+    return { ok: false, server, message };
+  });
+
+  ipcMain.handle('setup:network', async (event) => {
+    if (!fromSetup(event)) throw new Error('forbidden');
+    return discovery.localNetworkBlocked() ? { blocked: true, message: localNetworkHint() } : { blocked: false };
   });
 
   ipcMain.handle('setup:cancel', async (event) => {
@@ -933,7 +948,7 @@ function registerIpc() {
     const cfg = state.config;
 
     const server = normaliseServer(form.server);
-    if (!server) return { ok: false, field: 'server', message: 'Alamat server tidak valid. Contoh: 192.168.1.53:3000' };
+    if (!server) return { ok: false, field: 'server', message: 'Alamat server tidak valid. Contoh: 192.168.1.10:3000' };
 
     const code = ROLE.pairing ? normaliseCode(form.code || '') : '';
     if (code && !isValidCode(code)) {

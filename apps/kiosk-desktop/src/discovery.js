@@ -121,6 +121,37 @@ function parseReply(message, rinfo) {
 }
 
 /** GET <url>/api/health -> true only for HTTP 2xx with JSON {ok:true}. */
+/*
+ * macOS "Local Network" privacy: until the user allows the app (System Settings → Privacy & Security →
+ * Local Network), connections from the app to LAN addresses fail at once with EHOSTUNREACH/EPERM, even
+ * though a browser on the same Mac reaches the server. We remember such failures so the setup screen
+ * can tell the user what to do instead of "no server found"; any successful health check clears it.
+ */
+const BLOCK_CODES = new Set(['EHOSTUNREACH', 'EPERM', 'EACCES', 'ENETUNREACH']);
+const BLOCK_MEMORY_MS = 60_000;
+let lastBlockAt = 0;
+let lastErrorCode = '';
+
+function errorCode(err) {
+  return (err && ((err.cause && err.cause.code) || err.code)) || (err && err.name) || '';
+}
+
+function noteNetworkError(err, platform = process.platform) {
+  const code = errorCode(err);
+  lastErrorCode = code;
+  if (platform === 'darwin' && BLOCK_CODES.has(code)) lastBlockAt = Date.now();
+  return code;
+}
+
+/** True when macOS most likely blocks this app from the local network (see above). */
+function localNetworkBlocked(now = Date.now()) {
+  return lastBlockAt > 0 && now - lastBlockAt < BLOCK_MEMORY_MS;
+}
+
+function lastNetworkError() {
+  return lastErrorCode;
+}
+
 async function checkHealth(url, { timeoutMs = HEALTH_TIMEOUT_MS, fetchImpl = fetch } = {}) {
   try {
     const res = await fetchImpl(`${url}/api/health`, {
@@ -131,8 +162,11 @@ async function checkHealth(url, { timeoutMs = HEALTH_TIMEOUT_MS, fetchImpl = fet
     });
     if (!res.ok) return false;
     const body = await res.json().catch(() => null);
-    return Boolean(body && body.ok === true);
-  } catch {
+    const ok = Boolean(body && body.ok === true);
+    if (ok) lastBlockAt = 0;
+    return ok;
+  } catch (err) {
+    noteNetworkError(err);
     return false;
   }
 }
@@ -196,6 +230,7 @@ function scan({
           // the directed broadcasts and 127.0.0.1 still work). Logged once per target per scan.
           if (!err || !log || failedTargets.has(target)) return;
           failedTargets.add(target);
+          noteNetworkError(err);
           log.warn(`discovery: kirim ke ${target} gagal:`, err.code || err.message);
         });
       }
@@ -228,7 +263,7 @@ function scan({
       const job = checkHealth(server.url, { timeoutMs: healthTimeoutMs, fetchImpl })
         .then((ok) => {
           if (ok) accept();
-          else if (log) log.warn('discovery: health check gagal untuk', server.url);
+          else if (log) log.warn('discovery: health check gagal untuk', server.url, lastErrorCode || '');
         })
         .finally(() => pending.delete(job));
       pending.add(job);
@@ -258,6 +293,9 @@ module.exports = {
   isLoopback,
   parseReply,
   checkHealth,
+  localNetworkBlocked,
+  lastNetworkError,
+  noteNetworkError,
   sortServers,
   scan,
 };

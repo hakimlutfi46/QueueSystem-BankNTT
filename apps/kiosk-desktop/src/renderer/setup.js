@@ -143,6 +143,8 @@
     rescanBtn.disabled = false;
     if (servers.size === 0) {
       scanText.textContent = 'Tidak ada server ditemukan. Ketik alamat manual di bawah atau tekan Cari ulang.';
+      const net = await api.network().catch(() => null);
+      if (net && net.blocked) scanText.textContent = net.message;
     } else {
       const serverList = [...servers.values()];
       const best = serverList.find((s) => !s.local) || serverList[0];

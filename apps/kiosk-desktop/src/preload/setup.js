@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld(
       ipcRenderer.on('setup:found', (_event, server) => callback(server));
     },
     check: (server) => ipcRenderer.invoke('setup:check', String(server ?? '')),
+    network: () => ipcRenderer.invoke('setup:network'),
     refreshPrinters: () => ipcRenderer.invoke('setup:printers'),
     testPrint: (printerName) => ipcRenderer.invoke('setup:test-print', String(printerName ?? '')),
     submit: (form) =>

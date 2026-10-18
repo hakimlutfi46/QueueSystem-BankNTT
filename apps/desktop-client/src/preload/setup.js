@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld(
       ipcRenderer.on('setup:found', (_event, server) => callback(server));
     },
     check: (server) => ipcRenderer.invoke('setup:check', String(server ?? '')),
+    network: () => ipcRenderer.invoke('setup:network'),
     submit: (form) =>
       ipcRenderer.invoke('setup:submit', {
         server: String(form?.server ?? ''),
