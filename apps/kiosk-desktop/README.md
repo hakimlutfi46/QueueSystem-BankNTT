@@ -47,6 +47,18 @@ npm run dev                              # isi "Alamat server" dengan 127.0.0.1:
 npm run check                            # node --check untuk semua file JS
 ```
 
+### Mencoba tanpa printer (laptop/MacBook)
+
+```bash
+npm run dev:no-printer                   # sama dengan: electron . --dev --no-printer
+```
+
+Status printer selalu siap dan setiap tiket (juga **Cetak uji**) disimpan sebagai PDF seukuran kertas
+thermal di folder `Downloads/kiosk-tiket-pdf`, lalu langsung dibuka. Halaman tiket yang dirender sama
+dengan cetak sungguhan. Bisa juga lewat `KIOSK_NO_PRINTER=1`. Mode ini hanya berlaku saat aplikasi
+dijalankan dari kode sumber; aplikasi yang terpasang dari installer mengabaikannya, jadi kiosk di cabang
+tetap tidak mengeluarkan nomor tanpa tiket tercetak.
+
 ## Memasang di PC kiosk
 
 1. Di PC kiosk, buka panel admin web → **Perangkat** → **Unduh installer (.exe)** (atau salin

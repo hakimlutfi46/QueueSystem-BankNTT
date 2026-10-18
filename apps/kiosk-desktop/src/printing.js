@@ -1,6 +1,8 @@
 'use strict';
 
-const { BrowserWindow } = require('electron');
+const fs = require('node:fs');
+const path = require('node:path');
+const { BrowserWindow, shell } = require('electron');
 const log = require('./logger');
 
 const JOB_TIMEOUT_MS = 15_000;
@@ -260,14 +262,59 @@ async function runJob({ url, printerName, label, allowedOrigin, expectPathPrefix
   return { ok: result.ok, message: result.ok ? null : result.message };
 }
 
-/** Serialises jobs so two quick tickets never race for the printer. */
-function createPrintQueue() {
+/**
+ * Development only (--no-printer): renders the same ticket page at the same paper size,
+ * but saves it as a PDF in `outDir` and opens it instead of sending it to a printer.
+ */
+async function runPdfJob({ url, label, allowedOrigin, expectPathPrefix }, outDir) {
+  const win = createHiddenWindow();
+  try {
+    const page = await preparePage(win, url, { allowedOrigin, expectPathPrefix });
+    const data = await win.webContents.printToPDF({
+      pageSize: { width: page.widthMm / 25.4, height: page.heightMm / 25.4 },
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      printBackground: false,
+    });
+    fs.mkdirSync(outDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const file = path.join(outDir, `${label.replace(/[^A-Za-z0-9_-]+/g, '-')}-${stamp}.pdf`);
+    fs.writeFileSync(file, data);
+    log.info(`print: PDF ${label} ukuran=${page.widthMm.toFixed(0)}x${page.heightMm.toFixed(0)}mm -> ${file}`);
+    shell.openPath(file).catch(() => {});
+    return { ok: true, message: null };
+  } catch (err) {
+    log.warn(`print: GAGAL PDF ${label} alasan="${err.message}"`);
+    return { ok: false, message: err.userMessage || 'Halaman tiket gagal dimuat. Periksa koneksi ke server.' };
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
+}
+
+/**
+ * Serialises jobs so two quick tickets never race for the printer.
+ * With `pdfDir` (development --no-printer), tickets are saved as PDF files there instead.
+ */
+function createPrintQueue({ pdfDir } = {}) {
   let tail = Promise.resolve();
   return function enqueue(job) {
-    const run = tail.then(() => runJob(job));
+    const run = tail.then(() => (pdfDir ? runPdfJob(job, pdfDir) : runJob(job)));
     tail = run.catch(() => {});
     return run;
   };
 }
 
-module.exports = { createPrintQueue, preparePage, createHiddenWindow, runJob };
+/** Development only (--no-printer): a single always-ready "PDF" printer. */
+function createPdfPrinterStatus() {
+  const printer = { name: '', displayName: 'PDF (mode pengembangan, tanpa printer)' };
+  return {
+    listPrinters: async () => [printer],
+    status: async () => ({ ready: true, printer: printer.displayName, message: null }),
+    exists: async (name) => !name,
+    defaultPrinterName: async () => '',
+    start() {},
+    stop() {},
+    invalidate() {},
+  };
+}
+
+module.exports = { createPrintQueue, createPdfPrinterStatus, preparePage, createHiddenWindow, runJob };

@@ -11,11 +11,16 @@ const { hashPin, verifyPin, isValidPin } = require('./pin');
 const { pair } = require('./pairing');
 const { normaliseServer, normaliseCode, isValidCode, sameOrigin, isValidTicketId } = require('./server-url');
 const { lockKeyboard } = require('./keys');
-const { createPrintQueue } = require('./printing');
+const { createPrintQueue, createPdfPrinterStatus } = require('./printing');
 const { createPrinterStatus } = require('./printer-status');
 
 // --dev (or KIOSK_DEV=1): windowed instead of kiosk/fullscreen, DevTools allowed.
 const DEV = process.argv.includes('--dev') || process.env.KIOSK_DEV === '1';
+// --no-printer (or KIOSK_NO_PRINTER=1): tickets are saved as PDF files instead of printed, for
+// trying the kiosk on a laptop without a thermal printer. Ignored in a packaged (installed) app,
+// so a branch kiosk can never hand out numbers without a printed ticket.
+const NO_PRINTER_REQUESTED = process.argv.includes('--no-printer') || process.env.KIOSK_NO_PRINTER === '1';
+const NO_PRINTER = NO_PRINTER_REQUESTED && !app.isPackaged;
 const RENDERER = path.join(__dirname, 'renderer');
 const PRELOAD = path.join(__dirname, 'preload');
 const RETRY_MS = 5_000;
@@ -69,8 +74,10 @@ const state = {
   adminLockedUntil: 0,
 };
 
-const printers = createPrinterStatus({ getPrinterName: () => state.config?.printerName || '' });
-const enqueuePrint = createPrintQueue();
+const printers = NO_PRINTER
+  ? createPdfPrinterStatus()
+  : createPrinterStatus({ getPrinterName: () => state.config?.printerName || '' });
+const enqueuePrint = createPrintQueue(NO_PRINTER ? { pdfDir: path.join(app.getPath('downloads'), 'kiosk-tiket-pdf') } : {});
 
 process.on('uncaughtException', (err) => log.error('uncaughtException:', err));
 process.on('unhandledRejection', (err) => log.error('unhandledRejection:', err));
@@ -642,6 +649,8 @@ app.whenReady().then(() => {
   config.init(app.getPath('userData'));
   if (process.platform === 'win32') app.setAppUserModelId('id.kiosk-antrian.app');
   log.info(`aplikasi: mulai versi ${app.getVersion()} ${DEV ? '(dev)' : ''} userData=${app.getPath('userData')}`);
+  if (NO_PRINTER) log.warn(`printer: mode tanpa printer, tiket disimpan sebagai PDF di ${path.join(app.getPath('downloads'), 'kiosk-tiket-pdf')}`);
+  else if (NO_PRINTER_REQUESTED) log.warn('printer: --no-printer diabaikan karena aplikasi terpasang (bukan mode pengembangan)');
 
   powerMonitor.on('shutdown', () => {
     state.quitting = true;
