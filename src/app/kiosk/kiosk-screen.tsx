@@ -264,7 +264,7 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
   );
 }
 
-const GRID_GAP = 28;
+const GRID_GAP = { x: 56, y: 28 };
 
 /**
  * Nama layanan, dan jumlah menunggu bila ada. Ukuran huruf paling besar 28 px dan dikecilkan otomatis
@@ -310,7 +310,7 @@ function ServiceGrid({ count, children }: { count: number; children: ReactNode }
       ref={box}
       className={cn(
         "min-h-0 flex-1 w-full mx-auto flex flex-col justify-center",
-        count === 1 ? "max-w-xl" : "max-w-5xl",
+        count === 1 ? "max-w-md" : count === 2 ? "max-w-4xl" : "max-w-5xl",
         grid.scroll ? "overflow-y-auto" : "overflow-hidden",
       )}
     >
@@ -320,7 +320,8 @@ function ServiceGrid({ count, children }: { count: number; children: ReactNode }
           grid.scroll ? "my-auto" : "h-full max-h-[640px]",
         )}
         style={{
-          gap: GRID_GAP,
+          columnGap: GRID_GAP.x,
+          rowGap: GRID_GAP.y,
           gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
           gridTemplateRows: grid.scroll
             ? `repeat(${grid.rows}, minmax(${MIN_BUTTON_HEIGHT}px, ${MAX_BUTTON_HEIGHT}px))`
