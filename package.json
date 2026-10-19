@@ -22,6 +22,8 @@
     "db:reset:fresh": "node scripts/reset-fresh.mjs",
     "db:backup": "node scripts/backup-db.mjs",
     "pdf:guide": "node scripts/generate-pdf-guide.mjs",
+    "pdf:testing": "node scripts/generate-pdf-testing-windows.mjs",
+    "pdf:all": "node scripts/generate-pdf-guide.mjs && node scripts/generate-pdf-testing-windows.mjs",
     "kiosk:build": "node apps/kiosk-desktop/scripts/build-and-copy.mjs",
     "kiosk:build:mac": "node apps/kiosk-desktop/scripts/build-and-copy.mjs --platform mac",
     "kiosk:build:mac:prod": "node apps/kiosk-desktop/scripts/build-and-copy.mjs --platform mac --prod",
