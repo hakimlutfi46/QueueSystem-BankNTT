@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { AdminError } from "@/lib/admin/errors";
-import { createCounter, createCounters, updateCounter } from "@/lib/admin/counters";
-import { createService } from "@/lib/admin/services";
+import { createCounter, createCounters, deleteCounter, updateCounter } from "@/lib/admin/counters";
+import { createService, deleteService } from "@/lib/admin/services";
+import { createUser, deleteUser } from "@/lib/admin/users";
 import { readSettings, refreshTimezone, saveSettings } from "@/lib/admin/settings";
 import { appTimezone, setTimezoneOverride } from "@/lib/env";
 import { serviceDate } from "@/lib/queue/sql";
@@ -155,4 +156,94 @@ describe("admin records", () => {
       setTimezoneOverride(null);
     }
   });
+
+  it("deletes a counter and disassociates related tickets and events", async () => {
+    const service = await createService(prisma, { name: "Teller", prefix: "B", sortOrder: 1 });
+    const counter = await createCounter(prisma, { name: "Teller 1", displayNumber: 1, serviceIds: [service.id] });
+
+    // Ticket with counter assigned
+    await prisma.$executeRaw`
+      INSERT INTO tickets (request_id, service_id, counter_id, service_date, seq, number, status)
+      VALUES (${randomUUID()}::uuid, ${service.id}, ${counter.id}, (now() AT TIME ZONE 'Asia/Makassar')::date, 1, 'B001', 'DONE')
+    `;
+
+    await deleteCounter(prisma, counter.id);
+
+    const checkCounter = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM counters WHERE id = ${counter.id}
+    `;
+    expect(checkCounter[0]?.count).toBe(0);
+
+    const checkTicket = await prisma.$queryRaw<{ counter_id: number | null }[]>`
+      SELECT counter_id FROM tickets WHERE number = 'B001'
+    `;
+    expect(checkTicket[0]?.counter_id).toBeNull();
+  });
+
+  it("rejects deleting a service with active tickets, but allows deleting when tickets are completed", async () => {
+    const service = await createService(prisma, { name: "Customer Service", prefix: "A", sortOrder: 1 });
+
+    // Insert active ticket
+    await prisma.$executeRaw`
+      INSERT INTO tickets (request_id, service_id, service_date, seq, number, status)
+      VALUES (${randomUUID()}::uuid, ${service.id}, (now() AT TIME ZONE 'Asia/Makassar')::date, 1, 'A001', 'WAITING')
+    `;
+
+    await expect(deleteService(prisma, service.id)).rejects.toMatchObject({
+      code: "SERVICE_BUSY",
+    });
+
+    // Mark as DONE
+    await prisma.$executeRaw`UPDATE tickets SET status = 'DONE' WHERE number = 'A001'`;
+
+    await deleteService(prisma, service.id);
+
+    const checkService = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM services WHERE id = ${service.id}
+    `;
+    expect(checkService[0]?.count).toBe(0);
+  });
+
+  it("prevents self-deletion and checks duty status before deleting a user", async () => {
+    const admin = await createUser(prisma, {
+      username: "admin1",
+      name: "Admin One",
+      role: "ADMIN",
+      password: "password123",
+      isActive: true,
+    });
+
+    const staff = await createUser(prisma, {
+      username: "staff1",
+      name: "Staff One",
+      role: "STAFF",
+      password: "password123",
+      isActive: true,
+    });
+
+    // Self deletion blocked
+    await expect(deleteUser(prisma, admin.id, admin.id)).rejects.toMatchObject({
+      code: "CANNOT_DELETE_SELF",
+    });
+
+    // Create a counter held by staff
+    const service = await createService(prisma, { name: "CS", prefix: "C", sortOrder: 1 });
+    const counter = await createCounter(prisma, { name: "CS 1", displayNumber: 1, serviceIds: [service.id] });
+    await prisma.$executeRaw`UPDATE counters SET current_user_id = ${staff.id}, status = 'OPEN' WHERE id = ${counter.id}`;
+
+    await expect(deleteUser(prisma, staff.id, admin.id)).rejects.toMatchObject({
+      code: "USER_ON_DUTY",
+    });
+
+    // Close counter
+    await prisma.$executeRaw`UPDATE counters SET current_user_id = NULL, status = 'CLOSED' WHERE id = ${counter.id}`;
+
+    await deleteUser(prisma, staff.id, admin.id);
+
+    const checkUser = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM users WHERE id = ${staff.id}
+    `;
+    expect(checkUser[0]?.count).toBe(0);
+  });
 });
+

@@ -101,3 +101,54 @@ export function ChipCheckbox({
     </label>
   );
 }
+
+/**
+ * Switcher status Aktif/Nonaktif yang seragam untuk seluruh halaman admin.
+ * Dilengkapi dengan toggle pill yang mulus dan label status "Aktif" / "Nonaktif".
+ */
+export function StatusSwitch({
+  checked,
+  onChange,
+  disabled,
+  activeLabel = "Aktif",
+  inactiveLabel = "Nonaktif",
+  className,
+}: {
+  checked: boolean;
+  onChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  activeLabel?: string;
+  inactiveLabel?: string;
+  className?: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "inline-flex cursor-pointer select-none items-center gap-2 text-sm whitespace-nowrap",
+        disabled && "cursor-not-allowed opacity-60",
+        className,
+      )}
+    >
+      <span className="relative inline-flex shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={onChange ? (event) => onChange(event.target.checked) : undefined}
+          className="peer absolute inset-0 z-10 cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+        />
+        <span className="h-6 w-11 rounded-full bg-line transition-colors peer-checked:bg-success peer-focus-visible:ring-4 peer-focus-visible:ring-sky-soft" />
+        <span className="absolute left-1 top-1 size-4 rounded-full bg-brand-white shadow-card transition-transform peer-checked:translate-x-5" />
+      </span>
+      <span
+        className={cn(
+          "font-bold transition-colors",
+          checked ? "text-success" : "text-ink-muted",
+        )}
+      >
+        {checked ? activeLabel : inactiveLabel}
+      </span>
+    </label>
+  );
+}
+

@@ -149,6 +149,22 @@ export async function updateCounter(db: PrismaClient, id: number, body: unknown)
   });
 }
 
+export async function deleteCounter(db: PrismaClient, id: number): Promise<void> {
+  const existing = (await listCounters(db)).find((counter) => counter.id === id);
+  if (!existing) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
+  if (existing.status === "OPEN" || existing.status === "PAUSED") {
+    throw new AdminError("COUNTER_BUSY", "Tutup loket terlebih dahulu sebelum menghapus.");
+  }
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`DELETE FROM counter_services WHERE counter_id = ${id}`;
+    await tx.$executeRaw`UPDATE tickets SET counter_id = NULL WHERE counter_id = ${id}`;
+    await tx.$executeRaw`UPDATE ticket_events SET counter_id = NULL WHERE counter_id = ${id}`;
+    await tx.$executeRaw`DELETE FROM counters WHERE id = ${id}`;
+    await notifyQueue(tx, { type: "COUNTER_CHANGED", counterId: id });
+  });
+}
+
+
 /** Nama loket aktif harus unik, supaya tidak ada dua "CS 1" di TV dan di layar petugas. */
 async function assertNameFree(
   tx: { $queryRaw: PrismaClient["$queryRaw"] },

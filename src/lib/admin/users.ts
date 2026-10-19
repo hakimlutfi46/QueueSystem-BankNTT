@@ -160,3 +160,32 @@ export async function updateUser(
     throw error;
   }
 }
+
+export async function deleteUser(db: PrismaClient, id: number, actorId: number): Promise<void> {
+  if (actorId === id) {
+    throw new AdminError("CANNOT_DELETE_SELF", "Anda tidak dapat menghapus akun Anda sendiri.");
+  }
+  const existing = (await listUsers(db)).find((user) => user.id === id);
+  if (!existing) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
+
+  const held = await db.$queryRaw<{ name: string }[]>`
+    SELECT name FROM counters
+    WHERE current_user_id = ${id} AND status IN ('OPEN', 'PAUSED')
+    LIMIT 1
+  `;
+  if (held[0]) {
+    throw new AdminError(
+      "USER_ON_DUTY",
+      `${existing.name} masih memegang ${held[0].name}. Tutup paksa loket itu dulu dari menu Loket.`,
+    );
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`UPDATE counters SET current_user_id = NULL WHERE current_user_id = ${id}`;
+    await tx.$executeRaw`UPDATE tickets SET served_by = NULL WHERE served_by = ${id}`;
+    await tx.$executeRaw`UPDATE ticket_events SET user_id = NULL WHERE user_id = ${id}`;
+    await tx.$executeRaw`DELETE FROM users WHERE id = ${id}`;
+    await notifyQueue(tx, { type: "CONFIG_CHANGED" });
+  });
+}
+

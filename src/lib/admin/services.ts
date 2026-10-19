@@ -99,6 +99,34 @@ export async function updateService(db: PrismaClient, id: number, body: unknown)
   }
 }
 
+export async function deleteService(db: PrismaClient, id: number): Promise<void> {
+  const current = await listServices(db);
+  const existing = current.find((service) => service.id === id);
+  if (!existing) throw new AdminError("NOT_FOUND", "Data tidak ditemukan.");
+
+  const activeTickets = await db.$queryRaw<{ count: number }[]>`
+    SELECT count(*)::int AS count
+    FROM tickets
+    WHERE service_id = ${id} AND status IN ('WAITING', 'SERVING')
+  `;
+  if ((activeTickets[0]?.count ?? 0) > 0) {
+    throw new AdminError("SERVICE_BUSY", "Layanan masih memiliki antrian aktif hari ini. Selesaikan antrian terlebih dahulu.");
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`DELETE FROM counter_services WHERE service_id = ${id}`;
+    await tx.$executeRaw`DELETE FROM daily_sequences WHERE service_id = ${id}`;
+    await tx.$executeRaw`
+      DELETE FROM ticket_events
+      WHERE ticket_id IN (SELECT id FROM tickets WHERE service_id = ${id})
+    `;
+    await tx.$executeRaw`DELETE FROM tickets WHERE service_id = ${id}`;
+    await tx.$executeRaw`DELETE FROM services WHERE id = ${id}`;
+    await notifyQueue(tx, { type: "CONFIG_CHANGED", serviceId: id });
+  });
+}
+
+
 function mapService(row: {
   id: number;
   name: string;

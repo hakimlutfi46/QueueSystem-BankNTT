@@ -6,7 +6,7 @@ import { submitAdmin } from "@/app/admin/submit";
 import { useLiveRefresh } from "@/app/admin/use-live-refresh";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge, PrefixTile } from "@/components/ui/badge";
-import { ChipCheckbox, Field, Switch, inputClass } from "@/components/ui/field";
+import { ChipCheckbox, Field, StatusSwitch, Switch, inputClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
@@ -78,6 +78,20 @@ export function ServicesScreen({
     if (!ok) return;
     const message = await submitAdmin(`/api/admin/services/${service.id}`, "PATCH", { isActive: !service.isActive });
     done(message, service.isActive ? `${service.name} disembunyikan dari kiosk.` : `${service.name} tampil lagi di kiosk.`);
+  }
+
+  async function remove(service: AdminService) {
+    const ok = await confirm({
+      title: `Hapus layanan ${service.name}?`,
+      message:
+        "Layanan ini akan dihapus permanen. Pastikan tidak ada tiket antrian yang sedang menunggu atau dilayani.",
+      confirmLabel: "Hapus Layanan",
+      tone: "danger",
+      icon: "trash",
+    });
+    if (!ok) return;
+    const message = await submitAdmin(`/api/admin/services/${service.id}`, "DELETE");
+    done(message, `${service.name} berhasil dihapus.`);
   }
 
   return (
@@ -158,28 +172,38 @@ export function ServicesScreen({
                           Belum ada loket yang melayani layanan ini.
                         </p>
                       ) : null}
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <BrandButton size="sm" variant="outline" onClick={() => setEditing(service)} ariaLabel={`Ubah ${service.name}`}>
-                          <Icon name="edit" className="size-4" />
-                          Ubah
-                        </BrandButton>
-                        <BrandButton
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAssigning(service)}
-                          ariaLabel={`Atur loket untuk ${service.name}`}
-                        >
-                          <Icon name="desk" className="size-4" />
-                          Atur loket
-                        </BrandButton>
-                        <BrandButton
-                          size="sm"
-                          variant={service.isActive ? "danger" : "outline"}
-                          onClick={() => void toggle(service)}
-                        >
-                          <Icon name="power" className="size-4" />
-                          {service.isActive ? "Nonaktifkan" : "Aktifkan"}
-                        </BrandButton>
+                      <div className="mt-auto pt-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+                          <StatusSwitch
+                            checked={service.isActive}
+                            onChange={() => void toggle(service)}
+                          />
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <BrandButton size="sm" variant="outline" onClick={() => setEditing(service)} ariaLabel={`Ubah ${service.name}`}>
+                              <Icon name="edit" className="size-4" />
+                              Ubah
+                            </BrandButton>
+                            <BrandButton
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setAssigning(service)}
+                              ariaLabel={`Atur loket untuk ${service.name}`}
+                            >
+                              <Icon name="desk" className="size-4" />
+                              Atur loket
+                            </BrandButton>
+                            <BrandButton
+                              size="sm"
+                              variant="ghost"
+                              className="text-danger hover:bg-danger-soft hover:text-danger"
+                              onClick={() => void remove(service)}
+                              ariaLabel={`Hapus ${service.name}`}
+                            >
+                              <Icon name="trash" className="size-4" />
+                              Hapus
+                            </BrandButton>
+                          </div>
+                        </div>
                       </div>
                     </article>
                   </li>

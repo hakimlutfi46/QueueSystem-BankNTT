@@ -6,7 +6,7 @@ import { submitAdmin } from "@/app/admin/submit";
 import { useLiveRefresh } from "@/app/admin/use-live-refresh";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge } from "@/components/ui/badge";
-import { Field, Switch, inputClass } from "@/components/ui/field";
+import { Field, StatusSwitch, Switch, inputClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, Modal, PageHeader, Panel } from "@/components/ui/panel";
@@ -59,9 +59,52 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
     if (done(message, `${name} ditambahkan.`)) setFormKey((key) => key + 1);
   }
 
+  async function toggle(user: AdminUser) {
+    const ok = await confirm(
+      user.isActive
+        ? {
+            title: `Nonaktifkan ${user.name}?`,
+            message:
+              "Akun yang dinonaktifkan tidak akan bisa masuk ke sistem dan sesi aktifnya akan dihentikan.",
+            confirmLabel: "Nonaktifkan",
+          }
+        : {
+            title: `Aktifkan ${user.name}?`,
+            message: "Akun ini akan aktif kembali dan bisa masuk ke sistem.",
+            confirmLabel: "Aktifkan",
+            tone: "primary",
+          },
+    );
+    if (!ok) return;
+    const message = await submitAdmin(`/api/admin/users/${user.id}`, "PATCH", { isActive: !user.isActive });
+    done(message, user.isActive ? `${user.name} dinonaktifkan.` : `${user.name} diaktifkan.`);
+  }
+
+  async function remove(user: AdminUser) {
+    const desk = deskByUser.get(user.id);
+    if (desk) {
+      setError(`Petugas ${user.name} sedang aktif di ${desk.name}. Tutup loket terlebih dahulu sebelum menghapus.`);
+      return;
+    }
+    const ok = await confirm({
+      title: `Hapus akun ${user.name}?`,
+      message:
+        "Akun petugas ini akan dihapus permanen. Data riwayat tiket yang pernah dilayani tetap tersimpan aman.",
+      confirmLabel: "Hapus Petugas",
+      tone: "danger",
+      icon: "trash",
+    });
+    if (!ok) return;
+    const message = await submitAdmin(`/api/admin/users/${user.id}`, "DELETE");
+    done(message, `${user.name} berhasil dihapus.`);
+  }
+
   return (
     <section>
-      <PageHeader title="Petugas" description="Akun untuk petugas loket dan admin cabang. Akun dinonaktifkan, bukan dihapus, supaya laporan lama tetap utuh." />
+      <PageHeader
+        title="Petugas"
+        description="Kelola akun petugas loket dan admin cabang. Atur status aktif/nonaktif atau hapus akun bila tidak digunakan lagi."
+      />
       {error ? <Alert>{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
@@ -133,9 +176,14 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
                         <Badge tone={user.role === "ADMIN" ? "navy" : "sky"}>{user.role === "ADMIN" ? "Admin" : "Petugas"}</Badge>
                       </td>
                       <td className="px-3 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {user.isActive ? <Badge tone="success" dot>Aktif</Badge> : <Badge tone="muted" dot>Nonaktif</Badge>}
-                          {user.isActive && user.mustChangePassword ? <Badge tone="orange">Wajib ganti sandi</Badge> : null}
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
+                          <StatusSwitch
+                            checked={user.isActive}
+                            onChange={() => void toggle(user)}
+                          />
+                          {user.isActive && user.mustChangePassword ? (
+                            <Badge tone="orange" className="w-fit">Wajib ganti sandi</Badge>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-3 py-3">
@@ -149,10 +197,22 @@ export function UsersScreen({ users }: { users: AdminUser[] }) {
                         )}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <BrandButton size="sm" variant="outline" onClick={() => setEditing(user)} ariaLabel={`Ubah ${user.name}`}>
-                          <Icon name="edit" className="size-4" />
-                          Ubah
-                        </BrandButton>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <BrandButton size="sm" variant="outline" onClick={() => setEditing(user)} ariaLabel={`Ubah ${user.name}`}>
+                            <Icon name="edit" className="size-4" />
+                            Ubah
+                          </BrandButton>
+                          <BrandButton
+                            size="sm"
+                            variant="ghost"
+                            className="text-danger hover:bg-danger-soft hover:text-danger"
+                            onClick={() => void remove(user)}
+                            ariaLabel={`Hapus ${user.name}`}
+                          >
+                            <Icon name="trash" className="size-4" />
+                            Hapus
+                          </BrandButton>
+                        </div>
                       </td>
                     </tr>
                   );

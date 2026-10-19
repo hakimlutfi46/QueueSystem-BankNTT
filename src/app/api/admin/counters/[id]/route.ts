@@ -1,4 +1,4 @@
-import { updateCounter } from "@/lib/admin/counters";
+import { deleteCounter, updateCounter } from "@/lib/admin/counters";
 import { AdminError } from "@/lib/admin/errors";
 import { getPrisma } from "@/lib/db";
 import { resourceId, runAdmin } from "@/app/api/admin/guard";
@@ -18,3 +18,17 @@ export async function PATCH(
     return { counter: await updateCounter(getPrisma(), counterId, body) };
   });
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const { id } = await params;
+  const counterId = resourceId(id);
+  return runAdmin(async () => {
+    if (counterId == null) throw new AdminError("VALIDATION", "Data tidak valid.");
+    await deleteCounter(getPrisma(), counterId);
+    return { ok: true };
+  });
+}
+

@@ -6,7 +6,7 @@ import { submitAdmin } from "@/app/admin/submit";
 import { useLiveRefresh } from "@/app/admin/use-live-refresh";
 import { BrandButton } from "@/components/brand/brand-button";
 import { Badge, CounterStatusBadge, PrefixTile } from "@/components/ui/badge";
-import { ChipCheckbox, Field, inputClass } from "@/components/ui/field";
+import { ChipCheckbox, Field, StatusSwitch, inputClass } from "@/components/ui/field";
 import { useConfirm } from "@/components/ui/confirm";
 import { Icon } from "@/components/ui/icon";
 import { Alert, EmptyState, Modal, PageHeader, Panel } from "@/components/ui/panel";
@@ -87,26 +87,26 @@ export function CountersScreen({
   }
 
   async function toggle(counter: AdminCounter) {
-    const ok = await confirm(
-      counter.isActive
-        ? {
-            title: `Nonaktifkan ${counter.name}?`,
-            message: "Loket ini hilang dari layar pilih loket petugas dan dari TV. Riwayat dan laporannya tetap tersimpan, dan loket bisa diaktifkan lagi kapan saja.",
-            confirmLabel: "Nonaktifkan",
-          }
-        : {
-            title: `Aktifkan ${counter.name}?`,
-            message: "Loket ini muncul lagi di layar pilih loket petugas dan di TV.",
-            confirmLabel: "Aktifkan",
-            tone: "primary",
-          },
-    );
-    if (!ok) return;
+    const nextActive = !counter.isActive;
     const message = await submitAdmin(`/api/admin/counters/${counter.id}`, "PATCH", {
-      isActive: !counter.isActive,
+      isActive: nextActive,
     });
-    done(message, counter.isActive ? `${counter.name} dinonaktifkan.` : `${counter.name} aktif kembali.`);
+    done(message, nextActive ? `${counter.name} aktif kembali.` : `${counter.name} dinonaktifkan.`);
   }
+
+  async function remove(counter: AdminCounter) {
+    const ok = await confirm({
+      title: `Hapus Loket ${counter.name}?`,
+      message: `Apakah Anda yakin ingin menghapus "${counter.name}"? Data loket ini akan dihapus secara permanen dari sistem.`,
+      confirmLabel: "Hapus Loket",
+      tone: "danger",
+      icon: "trash",
+    });
+    if (!ok) return;
+    const message = await submitAdmin(`/api/admin/counters/${counter.id}`, "DELETE");
+    done(message, `${counter.name} berhasil dihapus.`);
+  }
+
 
   return (
     <section>
@@ -197,6 +197,7 @@ export function CountersScreen({
               targetMinutes={state?.settings.targetServiceMinutes ?? 10}
               onEdit={setEditing}
               onToggle={(counter) => void toggle(counter)}
+              onDelete={(counter) => void remove(counter)}
               onForceClose={(counter, ticket, officer) => setClosing({ counter, ticket, officer })}
             />
           )}
@@ -221,6 +222,7 @@ export function CountersScreen({
                     targetMinutes={state?.settings.targetServiceMinutes ?? 10}
                     onEdit={setEditing}
                     onToggle={(counter) => void toggle(counter)}
+                    onDelete={(counter) => void remove(counter)}
                     onForceClose={(counter, ticket, officer) => setClosing({ counter, ticket, officer })}
                   />
                 </div>
@@ -316,6 +318,7 @@ function CounterGrid({
   targetMinutes,
   onEdit,
   onToggle,
+  onDelete,
   onForceClose,
 }: {
   rows: { counter: AdminCounter; live: QueueCounterState | undefined; status: string }[];
@@ -323,6 +326,7 @@ function CounterGrid({
   targetMinutes: number;
   onEdit: (counter: AdminCounter) => void;
   onToggle: (counter: AdminCounter) => void;
+  onDelete: (counter: AdminCounter) => void;
   onForceClose: (counter: AdminCounter, ticket: string | null, officer: string | null) => void;
 }) {
   return (
@@ -337,6 +341,7 @@ function CounterGrid({
             targetMinutes={targetMinutes}
             onEdit={() => onEdit(counter)}
             onToggle={() => onToggle(counter)}
+            onDelete={() => onDelete(counter)}
             onForceClose={() =>
               onForceClose(counter, live?.activeTicket?.number ?? null, live?.officerName ?? counter.officerName)
             }
@@ -381,6 +386,7 @@ function CounterCard({
   targetMinutes,
   onEdit,
   onToggle,
+  onDelete,
   onForceClose,
 }: {
   counter: AdminCounter;
@@ -390,6 +396,7 @@ function CounterCard({
   targetMinutes: number;
   onEdit: () => void;
   onToggle: () => void;
+  onDelete: () => void;
   onForceClose: () => void;
 }) {
   const busy = counter.isActive && (status === "OPEN" || status === "PAUSED");
@@ -456,27 +463,35 @@ function CounterCard({
         </div>
       </dl>
 
-      <div className="mt-4 flex flex-wrap gap-2 pt-1">
-        <BrandButton size="sm" variant="outline" onClick={onEdit} ariaLabel={`Ubah ${counter.name}`}>
-          <Icon name="edit" className="size-4" />
-          Ubah
-        </BrandButton>
-        {busy ? (
-          <BrandButton size="sm" variant="danger" onClick={onForceClose} ariaLabel={`Tutup paksa ${counter.name}`}>
-            <Icon name="lock" className="size-4" />
-            Tutup paksa
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+        <StatusSwitch
+          checked={counter.isActive}
+          onChange={onToggle}
+          disabled={busy}
+        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <BrandButton size="sm" variant="outline" onClick={onEdit} ariaLabel={`Ubah ${counter.name}`}>
+            <Icon name="edit" className="size-4" />
+            Ubah
           </BrandButton>
-        ) : (
-          <BrandButton
-            size="sm"
-            variant={counter.isActive ? "danger" : "outline"}
-            onClick={onToggle}
-            ariaLabel={`${counter.isActive ? "Nonaktifkan" : "Aktifkan"} ${counter.name}`}
-          >
-            <Icon name="power" className="size-4" />
-            {counter.isActive ? "Nonaktifkan" : "Aktifkan"}
-          </BrandButton>
-        )}
+          {busy ? (
+            <BrandButton size="sm" variant="danger" onClick={onForceClose} ariaLabel={`Tutup paksa ${counter.name}`}>
+              <Icon name="lock" className="size-4" />
+              Tutup paksa
+            </BrandButton>
+          ) : (
+            <BrandButton
+              size="sm"
+              variant="ghost"
+              className="text-danger hover:bg-danger-soft hover:text-danger"
+              onClick={onDelete}
+              ariaLabel={`Hapus ${counter.name}`}
+            >
+              <Icon name="trash" className="size-4" />
+              Hapus
+            </BrandButton>
+          )}
+        </div>
       </div>
     </article>
   );
