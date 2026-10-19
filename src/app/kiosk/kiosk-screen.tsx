@@ -9,7 +9,7 @@ import { QueueNumber } from "@/components/brand/queue-number";
 import { FullscreenButton, useFullscreenOnFirstTouch } from "@/components/ui/fullscreen";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
-import { kioskGrid, MIN_BUTTON_HEIGHT } from "@/lib/kiosk/layout";
+import { kioskGrid, MIN_BUTTON_HEIGHT, MAX_BUTTON_HEIGHT } from "@/lib/kiosk/layout";
 import { useFitText } from "@/lib/use-fit-text";
 import type { TicketOutput } from "@/lib/print/output";
 import { kioskApp, readPrinterStatus } from "@/lib/print/kiosk-app";
@@ -225,7 +225,7 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
             ) : (
               <ServiceGrid count={services.length}>
                 {services.map((service) => (
-                  <li key={service.id} className="min-h-0">
+                  <li key={service.id} className="min-h-0 flex items-stretch">
                     <button
                       type="button"
                       disabled={busy != null}
@@ -233,15 +233,23 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
                         void chooseService(service.id, service.name);
                       }}
                       className={cn(
-                        "group flex h-full w-full items-center [container-type:size] gap-[clamp(12px,5cqw,28px)] rounded-[var(--radius-card)] bg-brand-navy px-[clamp(14px,5cqw,32px)] text-left text-brand-white shadow-card transition-[background-color,transform,box-shadow] duration-150 hover:bg-brand-blue focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand-sky active:scale-[0.98] active:shadow-glow disabled:opacity-60",
-                        busy === service.id ? "shadow-glow" : null,
+                        "group relative flex h-full w-full items-center [container-type:size] gap-[clamp(14px,3cqw,28px)] rounded-[22px] border border-brand-white/10 bg-brand-navy px-[clamp(16px,3.5cqw,32px)] py-4 text-left text-brand-white shadow-card transition-[background-color,transform,box-shadow,border-color] duration-150 hover:border-brand-sky/40 hover:bg-brand-blue focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand-sky active:scale-[0.98] active:shadow-glow disabled:opacity-60",
+                        busy === service.id ? "shadow-glow ring-4 ring-brand-sky" : null,
                       )}
                     >
+                      <span
+                        className="flex size-[clamp(44px,7.5cqh,60px)] shrink-0 items-center justify-center rounded-2xl bg-brand-white/10 text-[clamp(22px,4cqh,30px)] font-black text-brand-white tabular-nums shadow-inner transition-colors group-hover:bg-brand-white/20"
+                        aria-hidden="true"
+                      >
+                        {service.prefix}
+                      </span>
                       <ServiceLabel name={service.name} waitingCount={service.waitingCount} />
                       {busy === service.id ? (
-                        <span className="size-[min(22cqh,9cqw)] shrink-0 animate-spin rounded-full border-4 border-brand-white/30 border-t-brand-white" aria-hidden="true" />
+                        <span className="size-8 shrink-0 animate-spin rounded-full border-4 border-brand-white/30 border-t-brand-white" aria-hidden="true" />
                       ) : (
-                        <Icon name="arrowRight" className="size-[min(18cqh,7cqw)] shrink-0 transition-transform group-hover:translate-x-1 @max-[340px]:hidden" />
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-white/10 text-brand-white transition-all group-hover:translate-x-1 group-hover:bg-brand-white/20 @max-[340px]:hidden">
+                          <Icon name="arrowRight" className="size-5 shrink-0" />
+                        </span>
                       )}
                     </button>
                   </li>
@@ -256,19 +264,19 @@ export function KioskScreen({ timeZone, output }: { timeZone: string; output: Ti
   );
 }
 
-const GRID_GAP = 20;
+const GRID_GAP = 28;
 
 /**
- * Nama layanan, dan jumlah menunggu bila ada. Ukuran huruf paling besar 32 px dan dikecilkan otomatis
+ * Nama layanan, dan jumlah menunggu bila ada. Ukuran huruf paling besar 28 px dan dikecilkan otomatis
  * sampai semuanya muat di tombol, jadi nama panjang seperti "Kartu ATM & Mobile Banking" tidak terpotong.
  */
 function ServiceLabel({ name, waitingCount }: { name: string; waitingCount: number }) {
-  const ref = useFitText<HTMLSpanElement>(32, 14, [name, waitingCount]);
+  const ref = useFitText<HTMLSpanElement>(28, 15, [name, waitingCount]);
   return (
-    <span ref={ref} className="flex h-full min-w-0 flex-1 flex-col justify-center gap-[0.25em] overflow-hidden py-[8cqh]">
-      <span className="font-bold leading-snug [overflow-wrap:break-word]">{name}</span>
+    <span ref={ref} className="flex h-full min-w-0 flex-1 flex-col justify-center gap-1 overflow-hidden py-1">
+      <span className="font-bold leading-tight [overflow-wrap:break-word]">{name}</span>
       {waitingCount > 0 ? (
-        <span className="flex items-center gap-2 text-[0.62em] opacity-90">
+        <span className="flex items-center gap-1.5 text-[0.65em] font-medium opacity-85">
           <Icon name="users" className="size-[1.1em] shrink-0" />
           {waitingCount} menunggu
         </span>
@@ -278,9 +286,8 @@ function ServiceLabel({ name, waitingCount }: { name: string; waitingCount: numb
 }
 
 /**
- * Grid tombol layanan yang mengisi sisa layar. Jumlah kolom dan baris dihitung dari ukuran ruang dan
- * jumlah layanan, jadi semua tombol sama besar dan muat tanpa digulir; bila layanan terlalu banyak untuk
- * ukuran jari, grid beralih ke gulir dengan tinggi tombol minimal.
+ * Grid tombol layanan yang mengisi sisa layar dengan batasan lebar dan tinggi maksimal
+ * agar kartu proporsional, berjarak nyaman, dan tetap responsif di berbagai resolusi layar.
  */
 function ServiceGrid({ count, children }: { count: number; children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
@@ -299,13 +306,25 @@ function ServiceGrid({ count, children }: { count: number; children: ReactNode }
 
   const grid = size ? kioskGrid(count, size.width, size.height, GRID_GAP) : { columns: 2, rows: Math.ceil(count / 2), scroll: false };
   return (
-    <div ref={box} className={cn("min-h-0 flex-1", grid.scroll ? "overflow-y-auto" : "overflow-hidden")}>
+    <div
+      ref={box}
+      className={cn(
+        "min-h-0 flex-1 w-full mx-auto flex flex-col justify-center",
+        count === 1 ? "max-w-xl" : "max-w-5xl",
+        grid.scroll ? "overflow-y-auto" : "overflow-hidden",
+      )}
+    >
       <ul
-        className={cn("grid", grid.scroll ? null : "h-full")}
+        className={cn(
+          "grid w-full mx-auto justify-center content-center",
+          grid.scroll ? "my-auto" : "h-full max-h-[640px]",
+        )}
         style={{
           gap: GRID_GAP,
           gridTemplateColumns: `repeat(${grid.columns}, minmax(0, 1fr))`,
-          gridTemplateRows: grid.scroll ? `repeat(${grid.rows}, ${MIN_BUTTON_HEIGHT + 24}px)` : `repeat(${grid.rows}, minmax(0, 1fr))`,
+          gridTemplateRows: grid.scroll
+            ? `repeat(${grid.rows}, minmax(${MIN_BUTTON_HEIGHT}px, ${MAX_BUTTON_HEIGHT}px))`
+            : `repeat(${grid.rows}, minmax(${MIN_BUTTON_HEIGHT}px, ${MAX_BUTTON_HEIGHT}px))`,
           visibility: size ? "visible" : "hidden",
         }}
       >
