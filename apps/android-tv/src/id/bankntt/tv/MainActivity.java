@@ -333,12 +333,14 @@ public class MainActivity extends Activity {
                         }
                     }
                     showStatus("Server " + (savedName.isEmpty() ? saved : savedName + " (" + saved + ")")
-                        + " belum dapat dihubungi.\nPastikan PC server menyala dan TV tersambung ke jaringan yang sama.\nMencoba lagi otomatis…");
+                        + " belum dapat dihubungi:\n" + ServerApi.lastError + ".\n"
+                        + "IP TV ini: " + ServerApi.localAddresses() + "\nMencoba lagi otomatis…");
                     scheduleRetry(RETRY_MS);
                     return;
                 }
                 if (found.isEmpty()) {
-                    showStatus("Server antrian belum ditemukan.\nPastikan PC server menyala dan TV tersambung ke WiFi/LAN yang sama.\nMencoba lagi otomatis…");
+                    showStatus("Server antrian belum ditemukan.\nPastikan PC server menyala dan TV tersambung ke WiFi/LAN yang sama.\n"
+                        + "IP TV ini: " + ServerApi.localAddresses() + "\nMencoba lagi otomatis…");
                     scheduleRetry(RETRY_MS);
                 } else if (found.size() == 1) {
                     useServer(found.get(0).url, found.get(0).name);
@@ -556,7 +558,8 @@ public class MainActivity extends Activity {
                     main.post(() -> {
                         if (ok) useServer(url, "");
                         else {
-                            showStatus("Server " + url + " tidak menjawab.\nPeriksa alamatnya, lalu coba lagi.");
+                            showStatus("Server " + url + " tidak menjawab:\n" + ServerApi.lastError + ".\n"
+                                + "IP TV ini: " + ServerApi.localAddresses() + "\nPeriksa alamatnya, lalu coba lagi.");
                             scheduleRetry(RETRY_MS);
                         }
                     });

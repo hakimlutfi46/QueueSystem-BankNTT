@@ -105,6 +105,24 @@ final class ServerApi {
         return healthy;
     }
 
+    /** IPv4 addresses of this TV, for the status screen. */
+    static String localAddresses() {
+        StringBuilder out = new StringBuilder();
+        try {
+            for (NetworkInterface nic : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (!nic.isUp() || nic.isLoopback()) continue;
+                for (InterfaceAddress address : nic.getInterfaceAddresses()) {
+                    if (!(address.getAddress() instanceof Inet4Address)) continue;
+                    if (out.length() > 0) out.append(", ");
+                    out.append(address.getAddress().getHostAddress()).append('/').append(address.getNetworkPrefixLength());
+                }
+            }
+        } catch (Exception ignored) {
+            // unknown
+        }
+        return out.length() == 0 ? "tidak ada jaringan" : out.toString();
+    }
+
     private static Set<InetAddress> broadcastTargets() {
         Set<InetAddress> targets = new LinkedHashSet<>();
         try {
@@ -139,14 +157,36 @@ final class ServerApi {
         }
     }
 
+    /** Why the last health check failed, in words for the status screen ("" after a success). */
+    static volatile String lastError = "";
+
     /** GET {server}/api/health -> true only for 2xx with {"ok":true}. */
     static boolean health(String server) {
         HttpURLConnection conn = null;
         try {
             conn = open(server + "/api/health", "GET");
-            if (conn.getResponseCode() / 100 != 2) return false;
-            return new JSONObject(read(conn.getInputStream())).optBoolean("ok", false);
-        } catch (Exception unreachable) {
+            int status = conn.getResponseCode();
+            if (status / 100 != 2) {
+                lastError = "alamat itu menjawab HTTP " + status + ", bukan server antrian";
+                return false;
+            }
+            boolean ok = new JSONObject(read(conn.getInputStream())).optBoolean("ok", false);
+            lastError = ok ? "" : "alamat itu bukan server antrian";
+            return ok;
+        } catch (java.net.ConnectException refused) {
+            String text = String.valueOf(refused.getMessage());
+            lastError = text.contains("EHOSTUNREACH") || text.contains("ENETUNREACH")
+                ? "alamat tidak bisa dijangkau dari jaringan TV ini"
+                : "koneksi ditolak (server mati, atau port 3000 ditutup firewall)";
+            return false;
+        } catch (java.net.NoRouteToHostException noRoute) {
+            lastError = "alamat tidak bisa dijangkau dari jaringan TV ini";
+            return false;
+        } catch (SocketTimeoutException timeout) {
+            lastError = "tidak ada jawaban (diblokir firewall/jaringan, atau WiFi memisahkan perangkat)";
+            return false;
+        } catch (Exception other) {
+            lastError = other.getClass().getSimpleName() + ": " + other.getMessage();
             return false;
         } finally {
             if (conn != null) conn.disconnect();
