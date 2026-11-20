@@ -32,6 +32,7 @@
     "apps:build:mac": "node apps/desktop-client/scripts/build.mjs --app all --platform mac",
     "apps:build:mac:prod": "node apps/desktop-client/scripts/build.mjs --app all --platform mac --prod",
     "apps:build:linux": "node apps/desktop-client/scripts/build.mjs --app all --platform linux",
+    "tv:build:android": "node apps/android-tv/build.mjs",
     "server:bundle": "node apps/server-bundle/build.mjs",
     "discovery": "node scripts/discovery.mjs",
     "sim": "node scripts/sim.mjs"

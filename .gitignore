@@ -71,3 +71,7 @@ next-env.d.ts
 
 # sertifikat penandatanganan lokal app Mac (jangan di-commit)
 /apps/desktop-client/.signing/
+
+# Android TV app: build output and signing key (back the key up separately)
+/apps/android-tv/build/
+/apps/android-tv/.signing/

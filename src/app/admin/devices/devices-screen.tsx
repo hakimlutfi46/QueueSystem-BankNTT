@@ -483,7 +483,7 @@ function DeviceRow({
           Ganti nama
         </BrandButton>
         {onPairCode && !onApprove ? (
-          <BrandButton size="sm" variant="outline" onClick={onPairCode} ariaLabel={`Kode aplikasi Windows untuk ${device.name}`}>
+          <BrandButton size="sm" variant="outline" onClick={onPairCode} ariaLabel={`Kode aplikasi untuk ${device.name}`}>
             <Icon name="lock" className="size-4" />
             Kode aplikasi
           </BrandButton>
@@ -608,7 +608,7 @@ function IssuedModal({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-4 py-3">
             <p className="min-w-0 flex-1 text-sm">
               <span className="font-bold">
-                Memakai aplikasi {issued.device.kind === "kiosk" ? kioskAppName : TV_APP_NAME} di Windows?
+                Memakai aplikasi {issued.device.kind === "kiosk" ? `${kioskAppName} di Windows` : `${TV_APP_NAME} di Windows atau Android TV`}?
               </span>{" "}
               <span className="text-ink-muted">Pasangkan dengan kode pendek, tanpa menyalin tautan.</span>
             </p>
@@ -630,8 +630,8 @@ function IssuedModal({
 }
 
 /**
- * Kode pendek untuk aplikasi Windows kiosk atau TV, ditampilkan besar supaya mudah dibaca dan diketik
- * di PC perangkat itu. Installer hanya tersedia di server untuk aplikasi kiosk.
+ * Kode pendek untuk aplikasi kiosk (Windows) atau TV (Windows/Android TV), ditampilkan besar supaya mudah
+ * dibaca dan diketik di perangkat itu. Installer hanya tersedia di server untuk aplikasi kiosk.
  */
 function PairCodeModal({
   pairCode,
@@ -698,9 +698,10 @@ function PairCodeModal({
         ) : (
           <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-muted">
             <li>
-              Pasang aplikasi <span className="font-bold text-ink">{TV_APP_NAME}</span> di PC yang tersambung ke TV.
+              Pasang aplikasi <span className="font-bold text-ink">{TV_APP_NAME}</span> di PC yang tersambung ke TV, atau
+              file BANK-NTT-TV.apk di Android TV (misalnya Xiaomi TV).
             </li>
-            <li>Isi alamat server dan kode di atas.</li>
+            <li>Di Android TV, server dicari otomatis: cukup ketik kode di atas. Di PC, isi alamat server dan kode.</li>
             <li>Layar TV terbuka layar penuh. Status di halaman ini berubah menjadi Tersambung.</li>
           </ol>
         )}
