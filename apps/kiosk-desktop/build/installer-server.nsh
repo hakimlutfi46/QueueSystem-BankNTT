@@ -24,6 +24,10 @@
       MessageBox MB_OK|MB_ICONEXCLAMATION "Server antrian gagal dipasang (kode $0).$\r$\n$\r$\nRincian: C:\ProgramData\BankNTT\logs\install.log$\r$\n$\r$\nAplikasi kiosk tetap terpasang. Jalankan installer ini lagi setelah masalahnya diperbaiki."
     ${endIf}
   ${endIf}
+  ; Start Menu tools, so a branch never needs the repo or the install folder to reset or check the server.
+  CreateDirectory "$SMPROGRAMS\BANK NTT Server"
+  CreateShortCut "$SMPROGRAMS\BANK NTT Server\Reset Data Server.lnk" "$INSTDIR\resources\server\Reset-Data-Server.cmd" "" "$SYSDIR\shell32.dll" 31
+  CreateShortCut "$SMPROGRAMS\BANK NTT Server\Folder Cadangan.lnk" "C:\ProgramData\BankNTT\backups"
 !macroend
 
 !macro customUnInstall
@@ -35,5 +39,6 @@
     ; Removes services, firewall rules and the backup task. Data in C:\ProgramData\BankNTT stays.
     nsExec::ExecToLog '${BANKNTT_PS} "$INSTDIR\resources\server\uninstall-server.ps1"'
     Pop $0
+    RMDir /r "$SMPROGRAMS\BANK NTT Server"
   ${endIf}
 !macroend
