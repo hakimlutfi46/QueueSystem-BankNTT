@@ -67,9 +67,24 @@ async function playChime(): Promise<void> {
   gain.disconnect();
 }
 
+/**
+ * Rekaman suara (/audio/*.wav) diutamakan: terdengar sama di semua layar dan tidak bergantung pada mesin
+ * TTS. Banyak TV Android menyebut punya suara Indonesia padahal datanya belum diunduh, sehingga
+ * speechSynthesis diam tanpa error. TTS hanya dipakai bila ada klip yang tidak bisa dimuat, misalnya
+ * nama loket yang tidak punya rekaman.
+ */
 async function speakAnnouncement(text: string, clips: string[]): Promise<void> {
   const spoken = (window as Window & { __spoken?: string[] }).__spoken;
   if (spoken) spoken.push(text);
+  const context = audioContext();
+  if (context && context.state !== "running") await withTimeout(context.resume().catch(() => undefined), 300);
+  if (context && context.state === "running") {
+    const buffers = await withTimeout(Promise.all(clips.map((src) => loadClip(context, src))), 5_000);
+    if (buffers && buffers.every((buffer): buffer is AudioBuffer => buffer !== null)) {
+      for (const buffer of buffers) await playBuffer(context, buffer);
+      return;
+    }
+  }
   const voice = await indonesianVoice();
   if (voice) {
     await withTimeout(speakWithVoice(text, voice), 4_000 + text.length * 120);
@@ -113,9 +128,58 @@ function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+const bufferCache = new Map<string, Promise<AudioBuffer | null>>();
+
+function loadClip(context: AudioContext, src: string): Promise<AudioBuffer | null> {
+  let buffer = bufferCache.get(src);
+  if (!buffer) {
+    buffer = fetch(src)
+      .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error(String(response.status)))))
+      // Bentuk callback: Safari lama belum mengembalikan Promise dari decodeAudioData.
+      .then((data) => new Promise<AudioBuffer>((resolve, reject) => void context.decodeAudioData(data, resolve, reject)))
+      .catch(() => {
+        bufferCache.delete(src);
+        return null;
+      });
+    bufferCache.set(src, buffer);
+  }
+  return buffer;
+}
+
+/**
+ * Klip diputar lewat AudioContext yang sama dengan bunyi "ding". Browser TV berbasis WebView (misalnya
+ * TV Bro) mengizinkan AudioContext tanpa sentuhan tetapi menahan elemen <audio>; tanpa ini nada terdengar
+ * namun narator diam, terlebih di TV tanpa suara Indonesia untuk speechSynthesis.
+ */
+async function playClip(src: string): Promise<void> {
+  const context = audioContext();
+  if (context) {
+    if (context.state !== "running") await withTimeout(context.resume().catch(() => undefined), 300);
+    if (context.state === "running") {
+      const buffer = await withTimeout(loadClip(context, src), 3_000);
+      if (buffer) {
+        await playBuffer(context, buffer);
+        return;
+      }
+    }
+  }
+  return playElement(src);
+}
+
+async function playBuffer(context: AudioContext, buffer: AudioBuffer): Promise<void> {
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(context.destination);
+  await withTimeout(new Promise<void>((resolve) => {
+    source.onended = () => resolve();
+    source.start();
+  }), buffer.duration * 1000 + 300);
+  source.disconnect();
+}
+
 const clipCache = new Map<string, HTMLAudioElement>();
 
-function playClip(src: string): Promise<void> {
+function playElement(src: string): Promise<void> {
   return new Promise((resolve) => {
     let audio = clipCache.get(src);
     if (!audio) {
