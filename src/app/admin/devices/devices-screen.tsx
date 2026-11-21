@@ -281,7 +281,7 @@ export function DevicesScreen({
               label="Terima perangkat baru otomatis"
               description={
                 autoApprove
-                  ? "Menyala sampai dimatikan. Kiosk dan TV baru langsung bisa dipakai."
+                  ? "Menyala: kiosk dan TV di jaringan cabang, termasuk browser yang membuka /kiosk atau /display, langsung tersambung tanpa kode."
                   : "Mati: kiosk dan TV yang tersambung sendiri menunggu Setujui di halaman ini."
               }
               checked={autoApprove}

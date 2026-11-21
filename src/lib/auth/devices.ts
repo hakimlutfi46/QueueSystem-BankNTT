@@ -241,9 +241,13 @@ export function normalizeInstallId(input: unknown): string | null {
   return /^[A-Za-z0-9-]{8,100}$/.test(value) ? value : null;
 }
 
+/**
+ * Menyala bila belum pernah diatur (instalasi baru atau setelah reset data): kiosk dan TV di jaringan
+ * cabang langsung tersambung tanpa kode atau persetujuan. Admin bisa mematikannya di Admin → Perangkat.
+ */
 export async function readAutoApprove(db: PrismaClient): Promise<boolean> {
   const row = await db.setting.findUnique({ where: { key: AUTO_APPROVE_SETTING } });
-  return row?.value === true;
+  return row ? row.value === true : true;
 }
 
 export async function setAutoApprove(db: PrismaClient, enabled: boolean): Promise<boolean> {

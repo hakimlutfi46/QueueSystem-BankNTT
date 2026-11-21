@@ -5,7 +5,7 @@ type State = "app" | "pending" | "revoked" | "unknown" | "limited";
 const MESSAGES: Record<State, { title: string; body: string; retrySeconds: number | null }> = {
   app: {
     title: "Perangkat belum diizinkan",
-    body: "Kiosk dan TV dibuka dengan aplikasi BANK NTT Ticket atau BANK NTT TV, yang tersambung sendiri dan menunggu persetujuan admin. Untuk browser, minta tautan pemasangan dari Admin → Perangkat.",
+    body: "Perangkat baru belum diterima otomatis. Minta admin menyalakan \"Terima perangkat baru otomatis\" di Admin → Perangkat lalu muat ulang halaman ini, atau minta tautan pemasangan dari sana.",
     retrySeconds: null,
   },
   pending: {

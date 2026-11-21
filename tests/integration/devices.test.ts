@@ -11,6 +11,7 @@ import {
   hashDeviceToken,
   issuePairCode,
   listDevices,
+  readAutoApprove,
   redeemPairCode,
   renameDevice,
   revokeDevice,
@@ -160,7 +161,15 @@ describe("devices", () => {
     await expect(deleteDevice(prisma, device.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
+  it("accepts new devices at once while auto-approve was never set (new install or data reset)", async () => {
+    await expect(readAutoApprove(prisma)).resolves.toBe(true);
+    const tv = await autoRegisterDevice(prisma, "display");
+    expect(tv).toMatchObject({ kind: "display", name: "Layar TV", approved: true });
+    await expect(verifyDeviceToken(prisma, "display", tv.token)).resolves.toBe(true);
+  });
+
   it("makes a self-registered device wait for admin approval before it opens the kiosk", async () => {
+    await setAutoApprove(prisma, false);
     const first = await autoRegisterDevice(prisma, "kiosk");
     expect(first).toMatchObject({ kind: "kiosk", name: "Kiosk Tiket", approved: false });
     await expect(verifyDeviceToken(prisma, "kiosk", first.token)).resolves.toBe(false);
@@ -210,6 +219,7 @@ describe("devices", () => {
   });
 
   it("approves the kiosk on the server PC itself at once when it proves the local key", async () => {
+    await setAutoApprove(prisma, false);
     const local = await autoRegisterDevice(prisma, "kiosk", "Kiosk Mesin Tiket", "c0ffee00-0000-4000-8000-000000000001", { approve: true });
     expect(local.approved).toBe(true);
     await expect(verifyDeviceToken(prisma, "kiosk", local.token)).resolves.toBe(true);
@@ -218,6 +228,7 @@ describe("devices", () => {
   });
 
   it("approves devices created or paired by the admin without a separate step", async () => {
+    await setAutoApprove(prisma, false);
     const created = await createDevice(prisma, { kind: "display", name: "TV Lobi" });
     expect(created.device.approvedAt).not.toBeNull();
     const pending = await autoRegisterDevice(prisma, "kiosk", "Kiosk Baru", "a1b2c3d4-0000-4000-8000-000000000001");

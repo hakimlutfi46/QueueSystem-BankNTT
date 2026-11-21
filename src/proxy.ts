@@ -2,7 +2,8 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 import { decideDevice, DISPLAY_COOKIE, KIOSK_COOKIE, type DeviceKind } from "@/lib/auth/device";
-import { deviceMatcher, deviceTokenStatus } from "@/lib/auth/devices";
+import { autoRegisterDevice, deviceMatcher, deviceTokenStatus, readAutoApprove } from "@/lib/auth/devices";
+import { autoRegisterRateLimit, clientAddress, longestWait } from "@/lib/auth/rate-limit";
 import { getPrisma } from "@/lib/db";
 
 const { auth } = NextAuth(authConfig);
@@ -68,14 +69,31 @@ export const proxy = auth(async (request) => {
       return response;
     }
     const cookie = request.cookies.get(cookieName(kind))?.value;
-    if (cookie) {
-      const state = await deviceTokenStatus(db, kind, cookie);
-      return status(state === "active" ? "unknown" : state);
+    const state = cookie ? await deviceTokenStatus(db, kind, cookie) : null;
+    if (state === "pending" || state === "revoked") return status(state);
+    if (state === "active") return status("unknown");
+
+    // No device token, or one the server no longer knows (e.g. after a data reset). With "Terima
+    // perangkat baru otomatis" on, the browser registers itself like the BANK NTT apps do and opens at
+    // once; the device shows up in Admin → Perangkat, where it can be renamed or revoked. With it off,
+    // a browser needs a link from Admin → Perangkat.
+    if (!(await readAutoApprove(db))) return status(state ?? "app");
+    const client = clientAddress(request.headers);
+    if (longestWait([[autoRegisterRateLimit.perAddress, client], [autoRegisterRateLimit.overall, "all"]]) > 0) {
+      return status("limited");
     }
-    // A browser without a device token (e.g. a phone on the branch Wi-Fi) does not register itself:
-    // kiosks and TVs use the BANK NTT apps, which register through /api/devices/pair, or a link
-    // made in Admin → Perangkat.
-    return status("app");
+    autoRegisterRateLimit.perAddress.fail(client);
+    autoRegisterRateLimit.overall.fail("all");
+    const paired = await autoRegisterDevice(db, kind).catch((error: unknown) => {
+      console.error(error);
+      return null;
+    });
+    if (!paired?.approved) return status(state ?? "app");
+    const url = request.nextUrl.clone();
+    url.searchParams.delete("token");
+    const response = NextResponse.redirect(url);
+    response.cookies.set(cookieName(kind), paired.token, { ...cookieOptions, secure: isHttps(request) });
+    return response;
   }
   if (decision.type === "set-cookie") {
     const url = request.nextUrl.clone();

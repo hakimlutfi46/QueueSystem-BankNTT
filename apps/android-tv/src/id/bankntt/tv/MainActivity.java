@@ -405,8 +405,12 @@ public class MainActivity extends Activity {
         openServer();
     }
 
+    /**
+     * Without a token the TV registers itself: with "Terima perangkat baru otomatis" on it opens at once,
+     * otherwise it waits for Setujui in Admin → Perangkat. A code is only asked for when that fails.
+     */
     private void openServer() {
-        if (prefs.getString("token", "").isEmpty()) showCodeEntry(null);
+        if (prefs.getString("token", "").isEmpty()) pairWith(null);
         else loadDisplay();
     }
 
@@ -492,8 +496,9 @@ public class MainActivity extends Activity {
             prefs.edit().remove("token").apply();
             showCodeEntry("TV ini dicabut oleh admin. Buat kode baru untuk memasangnya lagi.");
         } else if ("unknown".equals(state)) {
+            // For example after a data reset: register again.
             prefs.edit().remove("token").apply();
-            showCodeEntry("Server tidak mengenali TV ini lagi (misalnya data server di-reset).");
+            pairWith(null);
         }
     }
 
