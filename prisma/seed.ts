@@ -12,7 +12,7 @@ const SETTINGS: Array<{ key: string; value: SettingValue }> = [
   { key: "branch_name", value: ORG_NAME },
   { key: "running_text", value: `Selamat datang di ${ORG_NAME}` },
   { key: "voice_enabled", value: true },
-  { key: "max_recall", value: 3 },
+  { key: "max_recall", value: 5 },
   { key: "target_service_minutes", value: 10 },
   { key: "ticket_footer", value: "Simpan tiket sampai nomor Anda dipanggil." },
   { key: "ticket_width_mm", value: 80 },

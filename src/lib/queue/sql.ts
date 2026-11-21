@@ -151,7 +151,7 @@ export async function maxRecall(db: Sql): Promise<number> {
       return parsed;
     }
   }
-  return 3;
+  return 5;
 }
 
 export async function recordEvent(

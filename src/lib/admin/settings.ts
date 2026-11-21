@@ -32,7 +32,7 @@ const DEFAULTS: AdminSettings = {
   branchName: DEFAULT_BRANDING.orgName,
   runningText: "",
   voiceEnabled: true,
-  maxRecall: 3,
+  maxRecall: 5,
   targetServiceMinutes: 10,
   ticketFooter: "",
   ticketWidthMm: 80,
